@@ -1,5 +1,3 @@
-from settings import *
-
 import os
 import argparse
 

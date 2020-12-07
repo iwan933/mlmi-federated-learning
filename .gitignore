@@ -128,9 +128,13 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-
 # exclude wandb
 wandb/
 
 # exclude pycharm settings
 .idea/
+
+# exclude cache and run
+cache/
+run/
+data/
