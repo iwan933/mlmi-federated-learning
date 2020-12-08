@@ -1,7 +1,7 @@
-from torch.utils.tensorboard import SummaryWriter
+from pytorch_lightning.loggers import TensorBoardLogger
 from mlmi.settings import RUN_DIR
 
 
-def create_tensorboard_writer(experiment_name: str) -> SummaryWriter:
-    experiment_path = RUN_DIR / experiment_name
-    return SummaryWriter(experiment_path.absolute())
+def create_tensorboard_logger(experiment_name: str, client_name: str) -> TensorBoardLogger:
+    experiment_path = RUN_DIR / experiment_name / client_name
+    return TensorBoardLogger(experiment_path.absolute())
