@@ -1,9 +1,7 @@
-from typing import List, Optional, Type, Dict
+from typing import Type, Dict
 from torch import optim
 from torch.utils import data
 import pytorch_lightning as pl
-
-from mlmi.participant import BaseParticipant
 
 
 class ExperimentContext(object):
