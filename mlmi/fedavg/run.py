@@ -46,6 +46,7 @@ def run_fedavg(context: ExperimentContext, num_rounds: int):
         run_train_aggregate_round(server, clients, training_args, num_train_samples=num_train_samples)
         logger.info('finished training round')
 
+
 if __name__ == '__main__':
     def run():
         context = ExperimentContext(name='fedavg_default')
