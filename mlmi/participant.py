@@ -122,8 +122,7 @@ class BaseTrainingParticipant(BaseParticipant):
         :param kwargs:
         :return:
         """
-        trainer = self.get_trainer(max_epochs=training_args.epochs,
-                                   **training_args.kwargs)
+        trainer = self.get_trainer(**training_args.kwargs)
         local_model = self.get_model()
         train_dataloader = self.get_train_data_loader()
         trainer.fit(local_model, train_dataloader, train_dataloader)

@@ -1,4 +1,4 @@
-from typing import Type, Dict
+from typing import Optional, Type, Dict
 from torch import optim
 from torch.utils import data
 import pytorch_lightning as pl
@@ -18,9 +18,7 @@ class TrainArgs(object):
     the arguments are send over wire.
     """
 
-    def __init__(self, epochs, resume_from_checkpoint=None, *args, **kwargs):
-        self.epochs = epochs
-        self.resume_from_checkpoint = resume_from_checkpoint
+    def __init__(self, *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
 

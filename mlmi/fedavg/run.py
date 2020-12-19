@@ -17,15 +17,15 @@ logger = getLogger(__name__)
 
 def run_fedavg(context: ExperimentContext, num_rounds: int):
     num_clients = 100
-    epochs = 2
+    steps = 10
     batch_size = 256
     learning_rate = 0.03
     optimizer_args = OptimizerArgs(optim.SGD, lr=learning_rate)
     model_args = ModelArgs(CNNLightning, optimizer_args, only_digits=False)
     if torch.cuda.is_available():
-        training_args = TrainArgs(epochs=epochs, gpus=1)
+        training_args = TrainArgs(max_steps=steps, gpus=1)
     else:
-        training_args = TrainArgs(epochs=epochs)
+        training_args = TrainArgs(max_steps=steps)
     data_dir = REPO_ROOT / 'data'
     fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=num_clients, batch_size=batch_size)
 
