@@ -1,3 +1,5 @@
+import argparse
+
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 import torch
@@ -13,6 +15,11 @@ from mlmi.utils import create_tensorboard_logger
 
 
 logger = getLogger(__name__)
+
+
+def add_args(parser: argparse.ArgumentParser):
+    parser.add_argument('--hierarchical', dest='hierarchical', action='store_const',
+                        const=True, default=False)
 
 
 def run_fedavg(context: ExperimentContext, num_rounds: int):
@@ -47,9 +54,21 @@ def run_fedavg(context: ExperimentContext, num_rounds: int):
         logger.info('finished training round')
 
 
+def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, num_rounds_cluster: int):
+    pass
+
+
 if __name__ == '__main__':
     def run():
-        context = ExperimentContext(name='fedavg_default')
-        run_fedavg(context, 2)
+        parser = argparse.ArgumentParser()
+        add_args(parser)
+        args = parser.parse_args()
+
+        if args.hierarchical:
+            context = ExperimentContext(name='fedavg_hierarchical')
+            run_fedavg_hierarchical(context, 2, 2)
+        else:
+            context = ExperimentContext(name='fedavg_default')
+            run_fedavg(context, 2)
 
     run()
