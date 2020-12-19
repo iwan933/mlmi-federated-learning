@@ -25,6 +25,7 @@ class BaseParticipant(object):
         assert context is not None, 'Experiment context is required for participant'
 
         self._name = participant_name
+        self._cluster_id = None
         self.experiment_context = context
         self.model_args = model_args
         self.model = model_args.model_class(*model_args.args, **model_args.kwargs)
@@ -67,6 +68,14 @@ class BaseParticipant(object):
         :return:
         """
         torch.save(self.model.state_dict(), self.get_checkpoint_path())
+
+    @property
+    def cluster_id(self) -> str:
+        return self._cluster_id
+
+    @cluster_id.setter
+    def cluster_id(self, value: str):
+        self._cluster_id = value
 
 
 class BaseTrainingParticipant(BaseParticipant):
