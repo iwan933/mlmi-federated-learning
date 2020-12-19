@@ -1,7 +1,9 @@
-from typing import Optional, Type, Dict
+from typing import List, Optional, Type, Dict
 from torch import optim
 from torch.utils import data
 import pytorch_lightning as pl
+
+from mlmi.participant import BaseParticipant
 
 
 class ExperimentContext(object):
@@ -14,17 +16,18 @@ class ExperimentContext(object):
 
 class TrainArgs(object):
     """
-    Structure to hold arguments used to be passed to training instances. Arguments should all be serializable in case
-    the arguments are send over wire.
+    Structure to hold arguments used to be passed to training instances. Arguments should all be
+    serializable in case the arguments are send over wire.
     """
-
     def __init__(self, *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
 
 
 class OptimizerArgs(object):
-
+    """
+    Arguments for optimizer construction
+    """
     def __init__(self, optimizer_class: Type[optim.Optimizer], *args, **kwargs):
         self.optimizer_class = optimizer_class
         self.optimizer_args = args
@@ -32,7 +35,9 @@ class OptimizerArgs(object):
 
 
 class ModelArgs(object):
-
+    """
+    Arguments for model construction
+    """
     def __init__(self, model_class: Type[pl.LightningModule], *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
@@ -40,6 +45,9 @@ class ModelArgs(object):
 
 
 class FederatedDatasetData(object):
+    """
+    Dataset type resulting from FedML dataset loader
+    """
     def __init__(self, client_num, train_data_num: int, test_data_num: int, train_data_global: data.DataLoader,
                  test_data_global: data.DataLoader, data_local_num_dict: Dict[int, int],
                  data_local_train_num_dict: Dict[int, int], data_local_test_num_dict: Dict[int, int],
