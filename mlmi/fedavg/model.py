@@ -63,6 +63,7 @@ class FedAvgServer(BaseAggregatorParticipant):
         weighted_model_sum = sum_model_states(weighted_model_state_list)
         self.model.load_state_dict(weighted_model_sum)
         self.total_train_sample_num = num_total_samples
+        self.save_model_state()
 
 
 class CNNLightning(pl.LightningModule):

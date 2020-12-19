@@ -29,14 +29,14 @@ def run_train_round(initial_model_state: Dict[str, Tensor], participants: List[B
     successful_participants = 0
     for participant in participants:
         try:
-            logger.debug('sending model to participant {0}'.format(participant.get_id()))
+            logger.debug('sending model to participant {0}'.format(participant._name))
             participant.load_model_state(initial_model_state)
             # invoke local training
-            logger.debug('invoking training on participant {0}'.format(participant.get_id()))
+            logger.debug('invoking training on participant {0}'.format(participant._name))
             participant.train(training_args)
             successful_participants += 1
         except Exception as e:
-            logger.error('training on participant {0} failed'.format(participant.get_id()), e)
+            logger.error('training on participant {0} failed'.format(participant._name), e)
 
     if success_threshold != -1 and successful_participants < success_threshold:
         raise ExecutionError('Failed to execute training round, not enough clients participated successfully')

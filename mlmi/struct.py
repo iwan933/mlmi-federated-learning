@@ -4,6 +4,14 @@ from torch.utils import data
 import pytorch_lightning as pl
 
 
+class ExperimentContext(object):
+    """
+    Structure to hold experiment context information
+    """
+    def __init__(self, name: str):
+        self.name = name
+
+
 class TrainArgs(object):
     """
     Structure to hold arguments used to be passed to training instances. Arguments should all be serializable in case
@@ -13,9 +21,6 @@ class TrainArgs(object):
     def __init__(self, epochs, resume_from_checkpoint=None, *args, **kwargs):
         self.epochs = epochs
         self.resume_from_checkpoint = resume_from_checkpoint
-        # initialize without optimizer
-
-        # save additional argument to pass to training routine
         self.args = args
         self.kwargs = kwargs
 

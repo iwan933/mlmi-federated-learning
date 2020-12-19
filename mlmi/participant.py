@@ -1,4 +1,5 @@
-from typing import Dict, List
+from pathlib import Path
+from typing import Dict, List, Union
 
 import torch
 from torch import Tensor
@@ -8,8 +9,9 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import LightningLoggerBase
 from pytorch_lightning.callbacks.base import Callback
 
-from mlmi.struct import TrainArgs, ModelArgs
+from mlmi.struct import ExperimentContext, TrainArgs, ModelArgs
 from mlmi.log import getLogger
+from mlmi.settings import CHECKPOINT_DIR
 
 
 logger = getLogger(__name__)
@@ -17,7 +19,13 @@ logger = getLogger(__name__)
 
 class BaseParticipant(object):
 
-    def __init__(self, model_args: ModelArgs):
+    def __init__(self, participant_name: str, model_args: ModelArgs, context: ExperimentContext):
+        assert participant_name is not None, 'A participant name is required to load and save logs'
+        assert model_args is not None, 'Model args are required to initialize a model for the participant'
+        assert context is not None, 'Experiment context is required for participant'
+
+        self._name = participant_name
+        self.experiment_context = context
         self.model_args = model_args
         self.model = model_args.model_class(*model_args.args, **model_args.kwargs)
 
@@ -35,42 +43,45 @@ class BaseParticipant(object):
         """
         self.model.load_state_dict(model_state)
 
-    def load_model_state_from_checkpoint(self, checkpoint_path: str):
+    def load_model_state_from_checkpoint(self):
         """
         Load the model state from an existing saved checkpoint
         :param checkpoint_path: Path to the checkpoint file
         """
-        self.model = self.model_args.model_class.load_from_checkpoint(checkpoint_path=checkpoint_path)
+        self.model = self.model_args.model_class.load_from_checkpoint(
+            checkpoint_path=str(self.get_checkpoint_path().absolute()))
 
-    def save_model_state(self, target_path: str):
+    def get_checkpoint_path(self, suffix: Union[str, None] = None) -> Path:
+        """
+        Constructs a checkpoint path based on
+        :return:
+        """
+        _suffix = '' if suffix is None else '_' + suffix
+        filename = (self._name + _suffix + '.ckpt')
+        return CHECKPOINT_DIR / self.experiment_context.name / filename
+
+    def save_model_state(self):
         """
         Saves the model state of the aggregated model
         :param target_path: The path to save the model at
         :return:
         """
-        torch.save(self.model.state_dict(), target_path)
+        torch.save(self.model.state_dict(), self.get_checkpoint_path())
 
 
 class BaseTrainingParticipant(BaseParticipant):
-    def __init__(self, client_id: str, model_args: ModelArgs, train_dataloader: data.DataLoader, num_train_samples: int,
+    def __init__(self, client_id: str, model_args: ModelArgs, context: ExperimentContext,
+                 train_dataloader: data.DataLoader, num_train_samples: int,
                  test_dataloader: data.DataLoader, num_test_samples: int,
-                 lightning_logger: LightningLoggerBase, callbacks: List[Callback] = None, *args, **kwargs):
-        super().__init__(model_args)
-        self.client_id = client_id
+                 lightning_logger: LightningLoggerBase, *args, **kwargs):
+        super().__init__(client_id, model_args, context)
         self.train_dataloader = train_dataloader
         self.test_dataloader = test_dataloader
         self.num_train_samples = num_train_samples
         self.num_test_samples = num_test_samples
         self.lightning_logger = lightning_logger
-        self.callbacks = callbacks
+        self.callbacks = None
         self.model_state = None
-
-    def get_id(self) -> str:
-        """
-        Participant id to identify the Participant
-        :return: Participant id string
-        """
-        return self.client_id
 
     def get_logger(self) -> LightningLoggerBase:
         """
@@ -87,6 +98,9 @@ class BaseTrainingParticipant(BaseParticipant):
         """
         return pl.Trainer(callbacks=self.callbacks, limit_val_batches=0.0, logger=self.lightning_logger,
                           **kwargs)
+
+    def set_trainer_callbacks(self, callbacks: List[Callback]):
+        self.callbacks = callbacks
 
     def get_train_data_loader(self) -> data.DataLoader:
         return self.train_dataloader
@@ -109,21 +123,17 @@ class BaseTrainingParticipant(BaseParticipant):
         :return:
         """
         trainer = self.get_trainer(max_epochs=training_args.epochs,
-                                   resume_from_checkpoint=training_args.resume_from_checkpoint,
                                    **training_args.kwargs)
         local_model = self.get_model()
         train_dataloader = self.get_train_data_loader()
         trainer.fit(local_model, train_dataloader, train_dataloader)
+        self.save_model_state()
 
 
 class BaseAggregatorParticipant(BaseParticipant):
 
-    def __init__(self, aggregator_id: str, model_args: ModelArgs):
-        super().__init__(model_args)
-        self.id = aggregator_id
-
-    def get_id(self):
-        return self.id
+    def __init__(self, participant_name: str, model_args: ModelArgs, context: ExperimentContext):
+        super().__init__(participant_name, model_args, context)
 
     def aggregate(self, participants: List[BaseParticipant], *args, **kwargs):
         """
