@@ -77,7 +77,6 @@ class BaseParticipant(object):
     def cluster_id(self, value: str):
         self._cluster_id = value
 
-
 class BaseTrainingParticipant(BaseParticipant):
     def __init__(self, client_id: str, model_args: ModelArgs, context: ExperimentContext,
                  train_dataloader: data.DataLoader, num_train_samples: int,

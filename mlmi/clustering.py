@@ -23,3 +23,7 @@ class RandomClusterPartitioner(BaseClusterPartitioner):
         return result_dic
 
 
+class GradientClusterPartitioner(BaseClusterPartitioner):
+    def cluster(self, participants: List[BaseParticipant]) ->Dict[str, List[BaseParticipant]]:
+        raise NotImplementedError()
+
