@@ -15,7 +15,6 @@ from mlmi.settings import REPO_ROOT
 from mlmi.utils import create_tensorboard_logger
 
 
-
 logger = getLogger(__name__)
 
 
@@ -49,7 +48,7 @@ def run_fedavg(context: ExperimentContext, num_rounds: int):
         clients.append(client)
 
     server = FedAvgServer('initial_server', model_args, context)
-    num_train_samples = [client.get_num_train_samples() for client in clients]
+    num_train_samples = [client.num_train_samples for client in clients]
     for i in range(num_rounds):
         logger.info('starting training round {0}'.format(str(i + 1)))
         run_train_aggregate_round(server, clients, training_args, num_train_samples=num_train_samples)
@@ -81,30 +80,31 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
         clients.append(client)
 
     server = FedAvgServer('initial_server', model_args, context)
-    num_train_samples = [client.get_num_train_samples() for client in clients]
+    num_train_samples = [client.num_train_samples for client in clients]
 
-    #Initialization
+    # Initialization of global model
     for i in range(num_rounds_init):
         logger.info('starting training round {0}'.format(str(i + 1)))
         run_train_aggregate_round(server, clients, training_args, num_train_samples=num_train_samples)
         logger.info('finished training round')
 
-    #Clustering
+    # Clustering of participants by model updates
     partitioner = RandomClusterPartitioner()
     cluster_clients_dic = partitioner.cluster(clients)
 
-    #Cluster-Initialzation
+    # Initialize cluster models
     cluster_server_dic = {}
     for cluster_id, participants in cluster_clients_dic.items():
         cluster_server_dic[cluster_id] = FedAvgServer('cluster_server'+cluster_id, model_args, context)
 
-    #Cluster-Training
+    # Train in clusters
     for cluster_id in cluster_clients_dic.keys():
         for i in range(num_rounds_cluster):
-            logger.info('starting training round {0}'.format(str(i + 1)))
-            num_train_samples = [client.get_num_train_samples() for client in cluster_clients_dic[cluster_id]]
-            run_train_aggregate_round(cluster_server_dic[cluster_id], cluster_clients_dic[cluster_id], training_args, num_train_samples=num_train_samples)
-            logger.info('finished training round')
+            logger.info('starting training cluster {1} in round {0}'.format(str(i + 1), cluster_id))
+            num_train_samples = [client.num_train_samples for client in cluster_clients_dic[cluster_id]]
+            run_train_aggregate_round(cluster_server_dic[cluster_id], cluster_clients_dic[cluster_id], training_args,
+                                      num_train_samples=num_train_samples)
+            logger.info('finished training cluster {0}'.format(cluster_id))
 
 
 if __name__ == '__main__':

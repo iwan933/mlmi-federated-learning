@@ -36,7 +36,7 @@ def load_participant_model_state(participant: BaseParticipant) -> Dict[str, Tens
     :param participant: participant to load the model from
     :return:
     """
-    return participant.get_model().state_dict()
+    return participant.model.state_dict()
 
 
 class FedAvgClient(BaseTrainingParticipant):
@@ -61,7 +61,7 @@ class FedAvgServer(BaseAggregatorParticipant):
                                                 num_samples, num_total_samples)
             weighted_model_state_list.append(weighted_model_state)
         weighted_model_sum = sum_model_states(weighted_model_state_list)
-        self.model.load_state_dict(weighted_model_sum)
+        self._model.load_state_dict(weighted_model_sum)
         self.total_train_sample_num = num_total_samples
         self.save_model_state()
 

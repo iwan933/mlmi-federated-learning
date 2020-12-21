@@ -51,7 +51,7 @@ def run_train_aggregate_round(aggregator: BaseAggregatorParticipant, participant
     :param training_args: training arguments for this round
     :return:
     """
-    initial_model_state = aggregator.get_model().state_dict()
+    initial_model_state = aggregator.model.state_dict()
 
     logger.debug('starting training round.')
     run_train_round(initial_model_state, participants, training_args)
