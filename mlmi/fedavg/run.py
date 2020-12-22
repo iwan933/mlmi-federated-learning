@@ -5,7 +5,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 import torch
 from torch import optim
 
-from mlmi.clustering import RandomClusterPartitioner
+from mlmi.clustering import RandomClusterPartitioner, GradientClusterPartitioner
 from mlmi.log import getLogger
 from mlmi.fedavg.femnist import load_femnist_dataset
 from mlmi.fedavg.model import FedAvgClient, FedAvgServer, CNNLightning
@@ -21,7 +21,7 @@ logger = getLogger(__name__)
 
 def add_args(parser: argparse.ArgumentParser):
     parser.add_argument('--hierarchical', dest='hierarchical', action='store_const',
-                        const=True, default=False)
+                        const=True, default=True)
 
 
 def run_fedavg(context: ExperimentContext, num_rounds: int):
@@ -58,7 +58,7 @@ def run_fedavg(context: ExperimentContext, num_rounds: int):
 
 def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, num_rounds_cluster: int):
     num_clients = 100
-    steps = 10
+    steps = 15
     batch_size = 256
     learning_rate = 0.03
     optimizer_args = OptimizerArgs(optim.SGD, lr=learning_rate)
@@ -90,8 +90,8 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
         logger.info('finished training round')
 
     #Clustering
-    partitioner = RandomClusterPartitioner()
-    cluster_clients_dic = partitioner.cluster(clients)
+    partitioner = GradientClusterPartitioner()
+    cluster_clients_dic = partitioner.cluster(clients, linkage_mech='single', dis_metric='euclidean', criterion='maxclust')
 
     #Cluster-Initialzation
     cluster_server_dic = {}
@@ -115,7 +115,7 @@ if __name__ == '__main__':
 
         if args.hierarchical:
             context = ExperimentContext(name='fedavg_hierarchical')
-            run_fedavg_hierarchical(context, 2, 2)
+            run_fedavg_hierarchical(context, 1, 2)
         else:
             context = ExperimentContext(name='fedavg_default')
             run_fedavg(context, 2)

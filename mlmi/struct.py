@@ -3,12 +3,6 @@ from torch import optim
 from torch.utils import data
 import pytorch_lightning as pl
 
-<<<<<<< HEAD
-=======
-
-
->>>>>>> implementations from programming session
-
 class ExperimentContext(object):
     """
     Structure to hold experiment context information
