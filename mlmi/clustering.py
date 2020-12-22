@@ -30,26 +30,24 @@ class RandomClusterPartitioner(BaseClusterPartitioner):
 
 class GradientClusterPartitioner(BaseClusterPartitioner):
     def cluster(self, participants: List[BaseParticipant], linkage_mech: str, dis_metric: str, criterion: str) ->Dict[str, List[BaseParticipant]]:
-
         clusters_hac_dic = {}
+
+        # Compute distance matrix for model updates: Using mean of weights from last layer of each participant
         model_updates = np.array([])
+        a = np.array([])
         for participant in participants:
             weights_last_layer_key = list(participant.get_model().state_dict().keys())[-2]
             weights_last_layer = participant.get_model().state_dict()[weights_last_layer_key]
             model_updates = np.append(model_updates, mean(weights_last_layer).numpy())
-        model_updates = np.reshape(model_updates,(len(model_updates),1))
+        model_updates = np.reshape(model_updates, (len(model_updates), 1))
         distance_matrix = hac.linkage(model_updates, method=linkage_mech, metric=dis_metric, optimal_ordering=False)
 
-        if criterion == 'maxclust':
-            num_cluster = 3
-            cluster_ids = hac.fcluster(distance_matrix, num_cluster, criterion="maxclust")
-        elif criterion == 'distance':
-            max_distance = 0.01
-            cluster_ids = hac.fcluster(distance_matrix, max_distance, criterion="distance")
-            num_cluster = max(cluster_ids)
-        else:
-            raise AttributeError
+        # Compute clusters based on distance matrix
+        max_value_criterion = 4
+        cluster_ids = hac.fcluster(distance_matrix, max_value_criterion, criterion)
+        num_cluster = max(cluster_ids)
 
+        # Allocate participants to clusters
         i = 0
         for id in range(1, num_cluster + 1):
             clusters_hac_dic[str(id)] = []
@@ -58,7 +56,7 @@ class GradientClusterPartitioner(BaseClusterPartitioner):
             clusters_hac_dic[participant.cluster_id].append(participant)
             i += 1
 
-        #Plotting dendrogram for client clusters
+        # Plotting dendrogram for client clusters
         hac.dendrogram(distance_matrix, leaf_rotation=45., leaf_font_size=12, show_contracted=True)
         plt.title("Dendrogram: Client clusters")
         plt.ylabel("Distance")

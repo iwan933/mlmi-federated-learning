@@ -57,9 +57,9 @@ def run_fedavg(context: ExperimentContext, num_rounds: int):
 
 
 def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, num_rounds_cluster: int):
-    num_clients = 100
+    num_clients = 10
     steps = 15
-    batch_size = 256
+    batch_size = 20
     learning_rate = 0.03
     optimizer_args = OptimizerArgs(optim.SGD, lr=learning_rate)
     model_args = ModelArgs(CNNLightning, optimizer_args, only_digits=False)
