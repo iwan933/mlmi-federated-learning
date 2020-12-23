@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 import torch
 from torch import Tensor
@@ -28,7 +28,7 @@ class BaseParticipant(object):
         self._cluster_id = None
         self._experiment_context = context
         self._model_args = model_args
-        self._model = model_args.model_class(*model_args.args, **model_args.kwargs)
+        self._model = model_args.model_class(*model_args.args, **model_args.kwargs, participant_name=participant_name)
 
     @property
     def model(self) -> pl.LightningModule:
@@ -46,17 +46,17 @@ class BaseParticipant(object):
     def cluster_id(self, value: str):
         self._cluster_id = value
 
-    def load_model_state(self, model_state: Dict[str, Tensor]):
+    def overwrite_model_state(self, model_state: Dict[str, Tensor]):
         """
         Loads the model state into the current model instance
         :param model_state: The model state to load
         """
         self._model.load_state_dict(model_state)
+        self.save_model_state()
 
     def load_model_state_from_checkpoint(self):
         """
         Load the model state from an existing saved checkpoint
-        :param checkpoint_path: Path to the checkpoint file
         """
         self._model = self._model_args.model_class.load_from_checkpoint(
             checkpoint_path=str(self.get_checkpoint_path().absolute()))
@@ -92,15 +92,18 @@ class BaseTrainingParticipant(BaseParticipant):
         self._lightning_logger = lightning_logger
         self._callbacks = None
         self._model_state = None
+        self._trainer = None
 
-    def create_trainer(self, **kwargs) -> pl.Trainer:
+    def create_trainer(self, enable_logging=True, **kwargs) -> pl.Trainer:
         """
         Creates a new trainer instance for each training round.
         :param kwargs: additional keyword arguments to send to the trainer for configuration
         :return: a pytorch lightning trainer instance
         """
-        return pl.Trainer(callbacks=self._callbacks, limit_val_batches=0.0, logger=self._lightning_logger,
-                          **kwargs)
+        _kwargs = kwargs.copy()
+        if enable_logging:
+            _kwargs['logger'] = self.logger
+        return pl.Trainer(callbacks=self._callbacks, limit_val_batches=0.0, **_kwargs)
 
     def set_trainer_callbacks(self, callbacks: List[Callback]):
         self._callbacks = callbacks
@@ -138,10 +141,26 @@ class BaseTrainingParticipant(BaseParticipant):
         :return:
         """
         trainer = self.create_trainer(**training_args.kwargs)
-        local_model = self.model
         train_dataloader = self.train_data_loader
-        trainer.fit(local_model, train_dataloader, train_dataloader)
+        trainer.fit(self.model, train_dataloader, train_dataloader)
         self.save_model_state()
+
+    def test(self, model: Optional[torch.nn.Module] = None, use_local_model: bool = False):
+        """
+        Test the model state on this clients data.
+        :param
+        :param model_state: The model state to evaluate
+        :return: The output loss
+        """
+        assert use_local_model or model is not None
+
+        trainer = self.create_trainer(enable_logging=False)
+
+        if use_local_model:
+            model = self.model
+
+        result = trainer.test(model=model, test_dataloaders=self.test_data_loader)
+        return result
 
 
 class BaseAggregatorParticipant(BaseParticipant):
@@ -156,3 +175,12 @@ class BaseAggregatorParticipant(BaseParticipant):
         :return:
         """
         raise NotImplementedError()
+
+
+class BaseParticipantModel(object):
+
+    def __init__(self, *args, **kwargs):
+        assert 'participant_name' in kwargs, 'Please provide a participant name parameter in model args to identify' \
+                                             'your model in logging'
+        self.participant_name = kwargs.pop('participant_name', None)
+        super().__init__(*args, **kwargs)

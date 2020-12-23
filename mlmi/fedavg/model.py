@@ -1,14 +1,16 @@
 from typing import Dict, List
 
+import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
 import pytorch_lightning as pl
+from pytorch_lightning.metrics import Accuracy
 
 from fedml_api.model.cv.cnn import CNN_DropOut
 
 from mlmi.log import getLogger
-from mlmi.participant import BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
+from mlmi.participant import BaseParticipantModel, BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
 from mlmi.struct import OptimizerArgs
 
 
@@ -66,12 +68,13 @@ class FedAvgServer(BaseAggregatorParticipant):
         self.save_model_state()
 
 
-class CNNLightning(pl.LightningModule):
+class CNNLightning(BaseParticipantModel, pl.LightningModule):
 
     def __init__(self, optimizer_args: OptimizerArgs, only_digits=False, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model = CNN_DropOut(only_digits=only_digits)
         self.optimizer_args = optimizer_args
+        self.accuracy = Accuracy()
 
     def configure_optimizers(self):
         o = self.optimizer_args
@@ -82,5 +85,18 @@ class CNNLightning(pl.LightningModule):
         y = y.long()
         logits = self.model(x)
         loss = F.cross_entropy(logits, y)
-        self.log('train/loss', loss)
+        preds = torch.argmax(logits, dim=1)
+        # TODO: this should actually be calculated on a validation set (missing cross entropy implementation)
+        self.log('train/acc/{}'.format(self.participant_name), self.accuracy(preds, y))
+        self.log('train/loss/{}'.format(self.participant_name), loss)
+        return loss
+
+    def test_step(self, test_batch, batch_idx):
+        x, y = test_batch
+        y = y.long()
+        logits = self.model(x)
+        loss = F.cross_entropy(logits, y)
+        preds = torch.argmax(logits, dim=1)
+        self.log('test/acc/{}'.format(self.participant_name), self.accuracy(preds, y))
+        self.log('test/loss/{}'.format(self.participant_name), loss)
         return loss
