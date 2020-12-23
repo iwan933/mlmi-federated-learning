@@ -32,9 +32,8 @@ class GradientClusterPartitioner(BaseClusterPartitioner):
     def cluster(self, participants: List[BaseParticipant], linkage_mech: str, dis_metric: str, criterion: str) ->Dict[str, List[BaseParticipant]]:
         clusters_hac_dic = {}
 
-        # Compute distance matrix for model updates: Using mean of weights from last layer of each participant
+        # Compute distance matrix of model updates: Using mean of weights from last layer of each participant
         model_updates = np.array([])
-        a = np.array([])
         for participant in participants:
             weights_last_layer_key = list(participant.get_model().state_dict().keys())[-2]
             weights_last_layer = participant.get_model().state_dict()[weights_last_layer_key]
