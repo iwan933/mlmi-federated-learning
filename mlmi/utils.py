@@ -7,19 +7,20 @@ from torch import Tensor
 from mlmi.participant import BaseParticipant, BaseTrainingParticipant
 from mlmi.settings import RUN_DIR
 from mlmi.log import getLogger
-from mlmi.struct import ModelArgs
+from mlmi.struct import ExperimentContext
 
 logger = getLogger(__name__)
 
 
-def create_tensorboard_logger(experiment_name: str, client_name: str) -> TensorBoardLogger:
+def create_tensorboard_logger(context: 'ExperimentContext') -> TensorBoardLogger:
     """
 
-    :param experiment_name:
-    :param client_name:
+    :param context: the experiment context to use to for name generation
     :return:
     """
-    experiment_path = RUN_DIR / experiment_name / client_name
+    configuration_string = '{}_e{}bs{}lr{}cf{}'.format(context.dataset, context.local_epochs, context.batch_size,
+                                                       context.lr, context.client_fraction)
+    experiment_path = RUN_DIR / context.name / configuration_string
     return TensorBoardLogger(experiment_path.absolute())
 
 
