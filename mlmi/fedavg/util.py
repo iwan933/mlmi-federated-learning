@@ -69,7 +69,8 @@ def save_fedavg_state(experiment_context: 'ExperimentContext', fl_round: int, mo
     local_epochs = experiment_context.local_epochs
     lr = experiment_context.lr
     batch_size = experiment_context.batch_size
-    path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{dataset.name}_bs{batch_size}lr{lr:.2E}cf{client_fraction:.2f}e{local_epochs}r{fl_round}.mdl'
+    path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{dataset.name}_bs{batch_size}lr{lr:.2E}cf{client_fraction:.2f}' \
+                                                     f'e{local_epochs}r{fl_round}.mdl'
     if not path.parent.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model_state, path)
@@ -81,7 +82,8 @@ def load_fedavg_state(experiment_context: 'ExperimentContext', fl_round: int) ->
     local_epochs = experiment_context.local_epochs
     lr = experiment_context.lr
     batch_size = experiment_context.batch_size
-    path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{dataset.name}_bs{batch_size}lr{lr:.2E}cf{client_fraction:.2f}e{local_epochs}r{fl_round}.mdl'
+    path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{dataset.name}_bs{batch_size}lr{lr:.2E}cf{client_fraction:.2f}' \
+                                                     f'e{local_epochs}r{fl_round}.mdl'
     if not path.exists():
         return None
     return torch.load(path)

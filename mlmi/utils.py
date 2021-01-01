@@ -19,8 +19,12 @@ def create_tensorboard_logger(context: 'ExperimentContext') -> TensorBoardLogger
     :param context: the experiment context to use to for name generation
     :return:
     """
-    configuration_string = '{}_e{}bs{}lr{}cf{}'.format(context.dataset.name, context.local_epochs, context.batch_size,
-                                                       context.lr, context.client_fraction)
+    dataset_name = context.dataset.name
+    epochs = context.local_epochs
+    batch_size = context.batch_size
+    lr = context.lr
+    cf = context.client_fraction
+    configuration_string = f'{dataset_name}_bs{batch_size}lr{lr:.2E}cf{cf:.2f}e{epochs}'
     experiment_path = RUN_DIR / context.name / configuration_string
     return TensorBoardLogger(experiment_path.absolute())
 

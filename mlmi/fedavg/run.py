@@ -86,17 +86,16 @@ def run_fedavg(context: ExperimentContext, num_rounds: int, save_states: bool,
         logger.info(f'... sampled {len(round_participants)} at fraction: {context.client_fraction:.2f}')
         logger.info(f'starting training round {i + 1} ...')
         # train and aggregate over fraction
-        run_fedavg_round(server, round_participants, context.train_args, num_train_samples=num_samples,
-                         num_total_samples=num_total_samples)
+        run_fedavg_round(server, round_participants, context.train_args, num_train_samples=num_samples)
         # test over all clients
         result = evaluate_global_model(global_model_participant=server, participants=clients)
         # log and save
+        if save_states:
+            save_fedavg_state(context, i, server.model.state_dict())
         for x in result.get('test/loss'):
             if torch.isnan(x) or torch.isinf(x):
                 raise Exception('Loss is Nan or Inf, aborting training.')
         log_loss_and_acc('global_model', result.get('test/loss'), result.get('test/acc'), context.experiment_logger, i)
-        if save_states:
-            save_fedavg_state(context, i, server.model.state_dict())
         logger.info('... finished training round')
     return server, clients
 

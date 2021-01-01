@@ -53,11 +53,10 @@ class FedAvgServer(BaseAggregatorParticipant):
 
     def aggregate(self, participants: List[BaseParticipant], *args, **kwargs):
         num_train_samples: List[int] = kwargs.pop('num_train_samples', [])
-        num_total_samples: int = kwargs.pop('num_total_samples', 0)
         assert len(num_train_samples) == len(participants), 'Please provide the keyword argument num_train_samples, ' \
                                                             'containing the number of training samples for each ' \
                                                             'participant'
-        assert num_total_samples > 0, 'Please provide num_total_samples'
+        num_total_samples = sum(num_train_samples)
 
         weighted_model_state_list = []
         for num_samples, participant in zip(num_train_samples, participants):
