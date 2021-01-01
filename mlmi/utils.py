@@ -9,6 +9,7 @@ from mlmi.settings import RUN_DIR
 from mlmi.log import getLogger
 from mlmi.struct import ExperimentContext
 
+
 logger = getLogger(__name__)
 
 
@@ -18,7 +19,7 @@ def create_tensorboard_logger(context: 'ExperimentContext') -> TensorBoardLogger
     :param context: the experiment context to use to for name generation
     :return:
     """
-    configuration_string = '{}_e{}bs{}lr{}cf{}'.format(context.dataset, context.local_epochs, context.batch_size,
+    configuration_string = '{}_e{}bs{}lr{}cf{}'.format(context.dataset.name, context.local_epochs, context.batch_size,
                                                        context.lr, context.client_fraction)
     experiment_path = RUN_DIR / context.name / configuration_string
     return TensorBoardLogger(experiment_path.absolute())
@@ -39,11 +40,14 @@ def overwrite_participants_models(model_state: Dict[str, Tensor], participants):
             logger.error('sendign model to participant {0} failed'.format(participant._name), e)
 
 
-def evaluate_local_models(participants: List['BaseTrainingParticipant']):
+def _evaluate_model(participants: List['BaseTrainingParticipant'], test_on_participant):
     test_losses = []
     test_acc = []
-    for participant in participants:
-        results = participant.test(use_local_model=True)
+    num_participants = len(participants)
+    logger.debug('testing model ...')
+    for i, participant in enumerate(participants):
+        results = test_on_participant(participant)
+        logger.debug(f'... tested model on {i+1:<4}/{num_participants} participants')
         for result in results:
             for key in result.keys():
                 if key.startswith('test/loss'):
@@ -52,20 +56,22 @@ def evaluate_local_models(participants: List['BaseTrainingParticipant']):
                     test_acc.append(result.get(key))
     losses = torch.squeeze(torch.FloatTensor(test_losses))
     acc = torch.squeeze(torch.FloatTensor(test_acc))
+    return losses, acc
+
+
+def evaluate_local_models(participants: List['BaseTrainingParticipant']):
+
+    def _eval(participant):
+        return participant.test(use_local_model=True)
+
+    losses, acc = _evaluate_model(participants, _eval)
     return {'test/loss': losses, 'test/acc': acc}
 
 
 def evaluate_global_model(global_model_participant: BaseParticipant, participants: List['BaseTrainingParticipant']):
-    test_losses = []
-    test_acc = []
-    for participant in participants:
-        results = participant.test(model=global_model_participant.model)
-        for result in results:
-            for key in result.keys():
-                if key.startswith('test/loss'):
-                    test_losses.append(result.get(key))
-                elif key.startswith('test/acc'):
-                    test_acc.append(result.get(key))
-    losses = torch.squeeze(torch.FloatTensor(test_losses))
-    acc = torch.squeeze(torch.FloatTensor(test_acc))
+
+    def _eval(participant):
+        return participant.test(model=global_model_participant.model)
+
+    losses, acc = _evaluate_model(participants, _eval)
     return {'test/loss': losses, 'test/acc': acc}

@@ -103,6 +103,11 @@ class BaseTrainingParticipant(BaseParticipant):
         _kwargs = kwargs.copy()
         if enable_logging:
             _kwargs['logger'] = self.logger
+        else:
+            _kwargs['checkpoint_callback'] = False
+            _kwargs['logger'] = False
+        if torch.cuda.is_available():
+            _kwargs['gpus'] = 1
         return pl.Trainer(callbacks=self._callbacks, limit_val_batches=0.0, **_kwargs)
 
     def set_trainer_callbacks(self, callbacks: List[Callback]):
@@ -140,7 +145,7 @@ class BaseTrainingParticipant(BaseParticipant):
         :param kwargs:
         :return:
         """
-        trainer = self.create_trainer(**training_args.kwargs)
+        trainer = self.create_trainer(enable_logging=False, **training_args.kwargs)
         train_dataloader = self.train_data_loader
         trainer.fit(self.model, train_dataloader, train_dataloader)
         self.save_model_state()
@@ -159,7 +164,7 @@ class BaseTrainingParticipant(BaseParticipant):
         if use_local_model:
             model = self.model
 
-        result = trainer.test(model=model, test_dataloaders=self.test_data_loader)
+        result = trainer.test(model=model, test_dataloaders=self.test_data_loader, verbose=False)
         return result
 
 

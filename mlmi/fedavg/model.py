@@ -53,16 +53,19 @@ class FedAvgServer(BaseAggregatorParticipant):
 
     def aggregate(self, participants: List[BaseParticipant], *args, **kwargs):
         num_train_samples: List[int] = kwargs.pop('num_train_samples', [])
+        num_total_samples: int = kwargs.pop('num_total_samples', 0)
         assert len(num_train_samples) == len(participants), 'Please provide the keyword argument num_train_samples, ' \
                                                             'containing the number of training samples for each ' \
                                                             'participant'
+        assert num_total_samples > 0, 'Please provide num_total_samples'
+
         weighted_model_state_list = []
-        num_total_samples = sum(num_train_samples)
         for num_samples, participant in zip(num_train_samples, participants):
             weighted_model_state = weigth_model(load_participant_model_state(participant),
                                                 num_samples, num_total_samples)
             weighted_model_state_list.append(weighted_model_state)
         weighted_model_sum = sum_model_states(weighted_model_state_list)
+
         self._model.load_state_dict(weighted_model_sum)
         self.total_train_sample_num = num_total_samples
         self.save_model_state()
@@ -87,8 +90,8 @@ class CNNLightning(BaseParticipantModel, pl.LightningModule):
         loss = F.cross_entropy(logits, y)
         preds = torch.argmax(logits, dim=1)
         # TODO: this should actually be calculated on a validation set (missing cross entropy implementation)
-        self.log('train/acc/{}'.format(self.participant_name), self.accuracy(preds, y))
-        self.log('train/loss/{}'.format(self.participant_name), loss)
+        self.log('train/acc/{}'.format(self.participant_name), self.accuracy(preds, y).item())
+        self.log('train/loss/{}'.format(self.participant_name), loss.item())
         return loss
 
     def test_step(self, test_batch, batch_idx):
@@ -97,6 +100,6 @@ class CNNLightning(BaseParticipantModel, pl.LightningModule):
         logits = self.model(x)
         loss = F.cross_entropy(logits, y)
         preds = torch.argmax(logits, dim=1)
-        self.log('test/acc/{}'.format(self.participant_name), self.accuracy(preds, y))
-        self.log('test/loss/{}'.format(self.participant_name), loss)
+        self.log(f'test/acc/{self.participant_name}', self.accuracy(preds, y).item())
+        self.log(f'test/loss/{self.participant_name}', loss.item())
         return loss
