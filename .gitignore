@@ -142,3 +142,6 @@ cache/
 run/
 data/
 checkpoints/
+
+# exclude Jupyter notebooks
+jupyter_notebooks/

@@ -35,7 +35,7 @@ def overwrite_participants_models(model_state: Dict[str, Tensor], participants):
             logger.debug('sending model to participant {0}'.format(participant._name))
             participant.overwrite_model_state(model_state)
         except Exception as e:
-            logger.error('sendign model to participant {0} failed'.format(participant._name), e)
+            logger.error('sending model to participant {0} failed'.format(participant._name), e)
 
 
 def evaluate_local_models(participants: List['BaseTrainingParticipant']):

@@ -17,7 +17,7 @@ from mlmi.struct import OptimizerArgs
 logger = getLogger(__name__)
 
 
-def weigth_model(model: Dict[str, Tensor], num_samples: int, num_total_samples: int) -> Dict[str, Tensor]:
+def weight_model(model: Dict[str, Tensor], num_samples: int, num_total_samples: int) -> Dict[str, Tensor]:
     weighted_model_state = dict()
     for key, w in model.items():
         weighted_model_state[key] = (num_samples / num_total_samples) * w
@@ -59,7 +59,7 @@ class FedAvgServer(BaseAggregatorParticipant):
         weighted_model_state_list = []
         num_total_samples = sum(num_train_samples)
         for num_samples, participant in zip(num_train_samples, participants):
-            weighted_model_state = weigth_model(load_participant_model_state(participant),
+            weighted_model_state = weight_model(load_participant_model_state(participant),
                                                 num_samples, num_total_samples)
             weighted_model_state_list.append(weighted_model_state)
         weighted_model_sum = sum_model_states(weighted_model_state_list)
