@@ -23,23 +23,36 @@ def weight_model(model: Dict[str, Tensor], num_samples: int, num_total_samples: 
     return weighted_model_state
 
 class ReptileClient(BaseTrainingParticipant):
-    def __init__(self):
-        super().__init__()
-
-    def train(self):
+    def train(self, training_args: TrainArgs, *args, **kwargs):
+        """
+        Implement the training routine.
+        :param training_args:
+        :param args:
+        :param kwargs:
+        :return:
+        """
         # TODO: Sort out training routine. Include hyperparameters:
         #       * inner_learning_rate
         #       * inner_batch_size // is already taken care of by dataloader
         #       * inner_num_epochs
         #       * inner_optimizer
-        trainer = self.create_trainer()
+
+        trainer = self.create_trainer(**training_args.kwargs)
+        train_dataloader = self.train_data_loader
+        trainer.fit(self.model, train_dataloader, train_dataloader)
+        self.save_model_state()
 
         # TODO: Do number of gradient steps (epochs) on local dataset
 
 
 class ReptileServer(BaseAggregatorParticipant):
-    def __init__(self, initial_model_params, num_meta_iterations, meta_learning_rate):
-        super().__init__()
+    def __init__(self,
+                 participant_name: str,
+                 model_args: ModelArgs,
+                 context: ExperimentContext,
+                 initial_model_params):
+        super().__init__(participant_name, model_args, context)
+        # TODO: model parameters = initial_model_params
 
     def aggregate(self,
                   participants: List[BaseParticipant],
@@ -69,4 +82,4 @@ class ReptileServer(BaseAggregatorParticipant):
             # TODO: meta_gradient = simple average of participants' model updates
             pass
 
-        # TODO: Update model state with meta_gradient using optimizer of choice
+        # TODO: 2. Update model state with meta_gradient using optimizer
