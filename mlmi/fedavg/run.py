@@ -63,6 +63,7 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
     learning_rate = 0.03
     optimizer_args = OptimizerArgs(optim.SGD, lr=learning_rate)
     model_args = ModelArgs(CNNLightning, optimizer_args, only_digits=False)
+    cluster_args = ClusterArgs(linkage_mech='single', dis_metric='euclidean', criterion='maxclust', max_value_criterion=4)
     if torch.cuda.is_available():
         training_args = TrainArgs(max_steps=steps, gpus=1)
     else:
@@ -90,7 +91,6 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
         logger.info('finished training round')
 
     #Clustering
-    cluster_args = ClusterArgs(linkage_mech='single', dis_metric='euclidean', criterion='maxclust', max_value_criterion=4)
     partitioner = GradientClusterPartitioner(cluster_args)
     cluster_clients_dic = partitioner.cluster(clients)
 
