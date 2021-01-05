@@ -20,6 +20,12 @@ class TrainArgs(object):
         self.args = args
         self.kwargs = kwargs
 
+class ClusterArgs(object):
+    """
+    Arguments for clustering
+    """
+    def __init__(self):
+        pass
 
 class OptimizerArgs(object):
     """

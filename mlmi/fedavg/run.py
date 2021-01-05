@@ -58,7 +58,7 @@ def run_fedavg(context: ExperimentContext, num_rounds: int):
 
 def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, num_rounds_cluster: int):
     num_clients = 10
-    steps = 15
+    steps = 10
     batch_size = 20
     learning_rate = 0.03
     optimizer_args = OptimizerArgs(optim.SGD, lr=learning_rate)
@@ -91,7 +91,7 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
 
     #Clustering
     partitioner = GradientClusterPartitioner()
-    cluster_clients_dic = partitioner.cluster(clients, linkage_mech='single', dis_metric='euclidean', criterion='maxclust')
+    cluster_clients_dic = partitioner.cluster(clients, linkage_mech='single', dis_metric='euclidean', criterion='maxclust', max_value_criterion=4)
 
     #Cluster-Initialzation
     cluster_server_dic = {}

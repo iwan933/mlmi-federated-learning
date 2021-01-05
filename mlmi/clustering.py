@@ -29,7 +29,7 @@ class RandomClusterPartitioner(BaseClusterPartitioner):
 
 
 class GradientClusterPartitioner(BaseClusterPartitioner):
-    def cluster(self, participants: List[BaseParticipant], linkage_mech: str, dis_metric: str, criterion: str) ->Dict[str, List[BaseParticipant]]:
+    def cluster(self, participants: List[BaseParticipant], linkage_mech: str, dis_metric: str, criterion: str, max_value_criterion: int) ->Dict[str, List[BaseParticipant]]:
         clusters_hac_dic = {}
 
         # Compute distance matrix of model updates: Using mean of weights from last layer of each participant
@@ -40,9 +40,12 @@ class GradientClusterPartitioner(BaseClusterPartitioner):
             model_updates = np.append(model_updates, mean(weights_last_layer).numpy())
         model_updates = np.reshape(model_updates, (len(model_updates), 1))
         distance_matrix = hac.linkage(model_updates, method=linkage_mech, metric=dis_metric, optimal_ordering=False)
+        print(distance_matrix)
+
+        # Alternative
+        #cluster_ids_alt = hac.fclusterdata(model_updates, 4, criterion="maxclust", metric="euclidean", method="single")
 
         # Compute clusters based on distance matrix
-        max_value_criterion = 4
         cluster_ids = hac.fcluster(distance_matrix, max_value_criterion, criterion)
         num_cluster = max(cluster_ids)
 
