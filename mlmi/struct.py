@@ -83,3 +83,10 @@ class ExperimentContext(object):
     @experiment_logger.setter
     def experiment_logger(self, value):
         self._experiment_logger = value
+
+    def __str__(self):
+        """
+        String identifying experiment. Used for model loading and saving.
+        :return:
+        """
+        return f'{self.dataset.name}_bs{self.batch_size}lr{self.lr:.2E}cf{self.client_fraction:.2f}e{self.local_epochs}'

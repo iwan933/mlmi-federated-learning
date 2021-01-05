@@ -13,7 +13,7 @@ from mlmi.struct import ExperimentContext
 logger = getLogger(__name__)
 
 
-def create_tensorboard_logger(context: 'ExperimentContext') -> TensorBoardLogger:
+def create_tensorboard_logger(context: 'ExperimentContext', version=None) -> TensorBoardLogger:
     """
 
     :param context: the experiment context to use to for name generation
@@ -26,7 +26,7 @@ def create_tensorboard_logger(context: 'ExperimentContext') -> TensorBoardLogger
     cf = context.client_fraction
     configuration_string = f'{dataset_name}_bs{batch_size}lr{lr:.2E}cf{cf:.2f}e{epochs}'
     experiment_path = RUN_DIR / context.name / configuration_string
-    return TensorBoardLogger(experiment_path.absolute())
+    return TensorBoardLogger(experiment_path.absolute(), version=version)
 
 
 def overwrite_participants_models(model_state: Dict[str, Tensor], participants):

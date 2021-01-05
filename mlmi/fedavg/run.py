@@ -41,11 +41,15 @@ def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, exp
     :param global_step: global step
     :return:
     """
-    experiment_logger.experiment.add_histogram('test/loss/{}'.format(model_name), loss, global_step=global_step)
-    experiment_logger.experiment.add_scalar('test/loss/{}/mean'.format(model_name), torch.mean(loss),
-                                            global_step=global_step)
     experiment_logger.experiment.add_histogram('test/acc/{}'.format(model_name), acc, global_step=global_step)
     experiment_logger.experiment.add_scalar('test/acc/{}/mean'.format(model_name), torch.mean(acc),
+                                            global_step=global_step)
+
+    for x in loss:
+        if torch.isnan(x) or torch.isinf(x):
+            return
+    experiment_logger.experiment.add_histogram('test/loss/{}'.format(model_name), loss, global_step=global_step)
+    experiment_logger.experiment.add_scalar('test/loss/{}/mean'.format(model_name), torch.mean(loss),
                                             global_step=global_step)
 
 
@@ -65,8 +69,12 @@ def initialize_clients(context: ExperimentContext, initial_model_state: Dict[str
 
 def run_fedavg(context: ExperimentContext, num_rounds: int, save_states: bool,
                initial_model_state: Optional[Dict[str, Tensor]] = None, clients: Optional[List['FedAvgClient']] = None,
-               server: Optional['FedAvgServer'] = None):
+               server: Optional['FedAvgServer'] = None, start_round=0):
     assert (server is None and clients is None) or (server is not None and clients is not None)
+
+    if start_round + 1 >= num_rounds:
+        return
+
     if clients is None or server is None:
         logger.info('initializing server ...')
         server = FedAvgServer('initial_server', context.model_args, context)
@@ -79,7 +87,7 @@ def run_fedavg(context: ExperimentContext, num_rounds: int, save_states: bool,
     logger.info(f'... copied {num_total_samples} data samples in total')
     context.experiment_logger.experiment.add_histogram('sample/distribution', Tensor(num_train_samples), global_step=0)
 
-    for i in range(num_rounds):
+    for i in range(start_round, num_rounds):
         logger.info('sampling clients ...')
         round_participants = sample_randomly_by_fraction(clients, context.client_fraction)
         num_samples = [c.num_train_samples for c in round_participants]
@@ -92,9 +100,6 @@ def run_fedavg(context: ExperimentContext, num_rounds: int, save_states: bool,
         # log and save
         if save_states:
             save_fedavg_state(context, i, server.model.state_dict())
-        for x in result.get('test/loss'):
-            if torch.isnan(x) or torch.isinf(x):
-                raise Exception('Loss is Nan or Inf, aborting training.')
         log_loss_and_acc('global_model', result.get('test/loss'), result.get('test/acc'), context.experiment_logger, i)
         logger.info('... finished training round')
     return server, clients
@@ -138,7 +143,7 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
 
 
 def create_femnist_experiment_context(name: str, local_epochs: int, fed_dataset: FederatedDatasetData, batch_size: int,
-                                      lr: float, client_fraction: float):
+                                      lr: float, client_fraction: float, fixed_logger_version=None):
     logger.debug('creating experiment context ...')
     optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     model_args = ModelArgs(CNNLightning, optimizer_args, only_digits=False)
@@ -146,9 +151,23 @@ def create_femnist_experiment_context(name: str, local_epochs: int, fed_dataset:
     context = ExperimentContext(name=name, client_fraction=client_fraction, local_epochs=local_epochs,
                                 lr=lr, batch_size=batch_size, optimizer_args=optimizer_args, model_args=model_args,
                                 train_args=training_args, dataset=fed_dataset)
-    experiment_logger = create_tensorboard_logger(context)
+    experiment_logger = create_tensorboard_logger(context, fixed_logger_version)
     context.experiment_logger = experiment_logger
     return context
+
+
+def load_last_state_for_configuration(context: ExperimentContext):
+    last_round = -1
+    last_state = None
+    # check if saved model for given experiment and round already exists
+    while True:
+        saved_state = load_fedavg_state(context, last_round + 1)
+        if saved_state is not None:
+            last_state = saved_state
+            last_round += 1
+            logger.info(f'found saved state for {context}, round {last_round}')
+        else:
+            return last_state, last_round
 
 
 if __name__ == '__main__':
@@ -172,11 +191,10 @@ if __name__ == '__main__':
                 try:
                     logger.info(f'running FedAvg with the following configuration: {configuration}')
                     context = create_femnist_experiment_context(name='fedavg_default', batch_size=10,
-                                                                fed_dataset=fed_dataset, **configuration)
-                    if load_fedavg_state(context, 0) is not None:
-                        logger.info(f'skipping configuration {configuration}')
-                        continue
-                    run_fedavg(context, 3, save_states=True)
+                                                                fed_dataset=fed_dataset, fixed_logger_version=0,
+                                                                **configuration)
+                    last_state, last_round = load_last_state_for_configuration(context)
+                    run_fedavg(context, 10, save_states=True, initial_model_state=last_state, start_round=last_round+1)
                 except Exception as e:
                     logger.exception(f'Failed to execute configuration {configuration}', e)
         else:

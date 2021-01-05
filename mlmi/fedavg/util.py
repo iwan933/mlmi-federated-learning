@@ -1,3 +1,4 @@
+import threading
 from typing import List, Dict, Union
 
 import torch
@@ -12,6 +13,7 @@ from mlmi.log import getLogger
 from mlmi.settings import REPO_ROOT
 from mlmi.struct import TrainArgs, ExperimentContext
 from mlmi.utils import overwrite_participants_models
+
 
 logger = getLogger(__name__)
 
@@ -28,7 +30,6 @@ def run_train_round(participants: List[BaseTrainingParticipant], training_args: 
     successful_participants = 0
     for participant in participants:
         try:
-            # invoke local training
             logger.debug('invoking training on participant {0}'.format(participant._name))
             participant.train(training_args)
             successful_participants += 1
@@ -64,26 +65,14 @@ def run_fedavg_round(aggregator: BaseAggregatorParticipant, participants: List[B
 
 
 def save_fedavg_state(experiment_context: 'ExperimentContext', fl_round: int, model_state: Dict[str, Tensor]):
-    dataset = experiment_context.dataset
-    client_fraction = experiment_context.client_fraction
-    local_epochs = experiment_context.local_epochs
-    lr = experiment_context.lr
-    batch_size = experiment_context.batch_size
-    path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{dataset.name}_bs{batch_size}lr{lr:.2E}cf{client_fraction:.2f}' \
-                                                     f'e{local_epochs}r{fl_round}.mdl'
+    path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{experiment_context}r{fl_round}.mdl'
     if not path.parent.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model_state, path)
 
 
 def load_fedavg_state(experiment_context: 'ExperimentContext', fl_round: int) -> Union[Dict[str, Tensor], None]:
-    dataset = experiment_context.dataset
-    client_fraction = experiment_context.client_fraction
-    local_epochs = experiment_context.local_epochs
-    lr = experiment_context.lr
-    batch_size = experiment_context.batch_size
-    path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{dataset.name}_bs{batch_size}lr{lr:.2E}cf{client_fraction:.2f}' \
-                                                     f'e{local_epochs}r{fl_round}.mdl'
+    path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{experiment_context}r{fl_round}.mdl'
     if not path.exists():
         return None
     return torch.load(path)
