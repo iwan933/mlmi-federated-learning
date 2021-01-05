@@ -24,8 +24,14 @@ class ClusterArgs(object):
     """
     Arguments for clustering
     """
-    def __init__(self):
-        pass
+    def __init__(self,linkage_mech: str, dis_metric: str, criterion: str, max_value_criterion: int, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+        self.linkage_mech = linkage_mech
+        self.dis_metric = dis_metric
+        self.criterion = criterion
+        self.max_value_criterion = max_value_criterion
+
 
 class OptimizerArgs(object):
     """

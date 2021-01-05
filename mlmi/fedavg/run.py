@@ -10,7 +10,7 @@ from mlmi.log import getLogger
 from mlmi.fedavg.femnist import load_femnist_dataset
 from mlmi.fedavg.model import FedAvgClient, FedAvgServer, CNNLightning
 from mlmi.fedavg.util import run_train_aggregate_round
-from mlmi.struct import ExperimentContext, ModelArgs, TrainArgs, OptimizerArgs
+from mlmi.struct import ExperimentContext, ModelArgs, TrainArgs, OptimizerArgs, ClusterArgs
 from mlmi.settings import REPO_ROOT
 from mlmi.utils import create_tensorboard_logger
 
@@ -57,8 +57,8 @@ def run_fedavg(context: ExperimentContext, num_rounds: int):
 
 
 def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, num_rounds_cluster: int):
-    num_clients = 10
-    steps = 10
+    num_clients = 4
+    steps = 4
     batch_size = 20
     learning_rate = 0.03
     optimizer_args = OptimizerArgs(optim.SGD, lr=learning_rate)
@@ -90,8 +90,9 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
         logger.info('finished training round')
 
     #Clustering
-    partitioner = GradientClusterPartitioner()
-    cluster_clients_dic = partitioner.cluster(clients, linkage_mech='single', dis_metric='euclidean', criterion='maxclust', max_value_criterion=4)
+    cluster_args = ClusterArgs(linkage_mech='single', dis_metric='euclidean', criterion='maxclust', max_value_criterion=4)
+    partitioner = GradientClusterPartitioner(cluster_args)
+    cluster_clients_dic = partitioner.cluster(clients)
 
     #Cluster-Initialzation
     cluster_server_dic = {}
