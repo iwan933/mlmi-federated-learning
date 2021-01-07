@@ -47,8 +47,6 @@ def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, exp
     :param global_step: global step
     :return:
     """
-    experiment_logger.experiment.add_histogram('test/loss/{}'.format(model_name), loss, global_step=global_step)
-    experiment_logger.experiment.add_scalar('test/loss/{}/mean'.format(model_name), torch.mean(loss), global_step=global_step)
     experiment_logger.experiment.add_histogram('test/acc/{}'.format(model_name), acc, global_step=global_step)
     experiment_logger.experiment.add_scalar('test/acc/{}/mean'.format(model_name), torch.mean(acc),
                                             global_step=global_step)
