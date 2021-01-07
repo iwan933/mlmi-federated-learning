@@ -1,4 +1,4 @@
-from typing import Type, Dict
+from typing import Optional, Type, Dict
 from torch import optim
 from torch.utils import data
 import pytorch_lightning as pl
@@ -13,17 +13,18 @@ class TrainArgs(object):
         self.args = args
         self.kwargs = kwargs
 
+
 class ClusterArgs(object):
     """
     Arguments for clustering
     """
-    def __init__(self,linkage_mech: str, dis_metric: str, criterion: str, max_value_criterion: int, *args, **kwargs):
+    def __init__(self, partitioner_class: Type['BaseClusterPartitioner'], *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
-        self.linkage_mech = linkage_mech
-        self.dis_metric = dis_metric
-        self.criterion = criterion
-        self.max_value_criterion = max_value_criterion
+        self.partitioner_class = partitioner_class
+
+    def __str__(self):
+        return 'implement_me'
 
 
 class OptimizerArgs(object):
@@ -76,7 +77,7 @@ class ExperimentContext(object):
 
     def __init__(self, name: str, client_fraction: float, local_epochs: int, lr: float,
                  batch_size: int, optimizer_args: OptimizerArgs, train_args: TrainArgs, model_args: ModelArgs,
-                 dataset: FederatedDatasetData):
+                 dataset: FederatedDatasetData, cluster_args: Optional['ClusterArgs'] = None):
         self.name = name
         self.client_fraction = client_fraction
         self.local_epochs = local_epochs
@@ -85,6 +86,7 @@ class ExperimentContext(object):
         self.optimizer_args = optimizer_args
         self.train_args = train_args
         self.model_args = model_args
+        self.cluster_args = cluster_args
         self.dataset = dataset
         self._experiment_logger = None
 
@@ -101,4 +103,7 @@ class ExperimentContext(object):
         String identifying experiment. Used for model loading and saving.
         :return:
         """
-        return f'{self.dataset.name}_bs{self.batch_size}lr{self.lr:.2E}cf{self.client_fraction:.2f}e{self.local_epochs}'
+        id = f'{self.dataset.name}_bs{self.batch_size}lr{self.lr:.2E}cf{self.client_fraction:.2f}e{self.local_epochs}'
+        if self.cluster_args is not None:
+            id += str(self.cluster_args)
+        return id

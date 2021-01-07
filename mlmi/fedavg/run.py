@@ -7,9 +7,10 @@ from sklearn.model_selection import ParameterGrid
 import torch
 from pytorch_lightning.loggers import LightningLoggerBase
 from torch import Tensor, optim
+from torch.distributions import Categorical
 
 from mlmi.selectors import sample_randomly_by_fraction
-from mlmi.struct import ExperimentContext, FederatedDatasetData
+from mlmi.struct import ClusterArgs, ExperimentContext, FederatedDatasetData
 from mlmi.clustering import RandomClusterPartitioner, GradientClusterPartitioner
 from mlmi.log import getLogger
 from mlmi.fedavg.femnist import load_femnist_dataset
@@ -17,8 +18,7 @@ from mlmi.fedavg.model import FedAvgClient, FedAvgServer, CNNLightning
 from mlmi.fedavg.util import load_fedavg_state, run_fedavg_round, save_fedavg_state
 from mlmi.struct import ModelArgs, TrainArgs, OptimizerArgs
 from mlmi.settings import REPO_ROOT
-from mlmi.utils import create_tensorboard_logger, evaluate_global_model
-
+from mlmi.utils import create_tensorboard_logger, evaluate_global_model, fix_random_seeds
 
 logger = getLogger(__name__)
 
@@ -34,6 +34,8 @@ def add_args(parser: argparse.ArgumentParser):
                         const=True, default=False)
     parser.add_argument('--log-data-distribution', dest='log_data_distribution', action='store_const',
                         const=True, default=False)
+    parser.add_argument('--no-model-reuse', dest='load_last_state', action='store_const',
+                        const=False, default=True)
 
 
 def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, experiment_logger: LightningLoggerBase,
@@ -77,24 +79,32 @@ def log_data_distribution(dataset: FederatedDatasetData, experiment_logger: Ligh
     num_partitions = len(dataset.train_data_local_dict.items())
     num_train_samples = []
     num_different_labels = []
+    entropy_per_partition = []
 
     logger.debug('... extracting dataset distributions')
     for i, (c, dataloader) in enumerate(dataset.train_data_local_dict.items()):
-        all_labels = None
+        local_labels = None
         num_all_samples = 0
         for x, y in dataloader:
             num_all_samples += x.shape[0]
-            if all_labels is None:
-                all_labels = y
+            if local_labels is None:
+                local_labels = y
             else:
-                all_labels = torch.cat((all_labels, y), 0)
-        num_different_labels.append(len(torch.unique(all_labels)))
+                local_labels = torch.cat((local_labels, y), dim=0)
+        unique_labels, counts = torch.unique(local_labels, return_counts=True)
+        entropy = Categorical(probs=counts / counts.sum()).entropy()
+        num_different_labels.append(len(unique_labels))
         num_train_samples.append(num_all_samples)
+        entropy_per_partition.append(entropy)
+
         if (i + 1) % 50 == 0:
             logger.debug('... extracted {}/{} partitions'.format(i + 1, num_partitions))
-    experiment_logger.experiment.add_histogram('sample_num/distribution', Tensor(num_train_samples),
+
+    experiment_logger.experiment.add_histogram('distribution/sample_num', Tensor(num_train_samples),
                                                global_step=0)
-    experiment_logger.experiment.add_histogram('labels_num/distribution', Tensor(num_different_labels),
+    experiment_logger.experiment.add_histogram('distribution/labels_num', Tensor(num_different_labels),
+                                               global_step=0)
+    experiment_logger.experiment.add_histogram('distribution/entropy', Tensor(entropy_per_partition),
                                                global_step=0)
 
 
@@ -136,6 +146,8 @@ def run_fedavg(context: ExperimentContext, num_rounds: int, save_states: bool,
 
 
 def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, num_rounds_cluster: int):
+    assert context.cluster_args is not None, 'Please set cluster args to run hierarchical experiment'
+
     saved_model_state = load_fedavg_state(context, num_rounds_init)
     if saved_model_state is None:
         server, clients = run_fedavg(context, num_rounds_init, save_states=True)
@@ -144,10 +156,8 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
         server.overwrite_model_state(saved_model_state)
         clients = initialize_clients(context, initial_model_state=saved_model_state)
 
-    cluster_args = ClusterArgs(linkage_mech='ward', dis_metric='euclidean', criterion='maxclust', max_value_criterion=4)
-
     # Clustering of participants by model updates
-    partitioner = GradientClusterPartitioner(cluster_args)
+    partitioner = context.cluster_args.partitioner_class(*context.cluster_args.args, **context.cluster_args.kwargs)
     cluster_clients_dic = partitioner.cluster(clients)
 
     # Initialize cluster models
@@ -175,14 +185,15 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
 
 
 def create_femnist_experiment_context(name: str, local_epochs: int, fed_dataset: FederatedDatasetData, batch_size: int,
-                                      lr: float, client_fraction: float, fixed_logger_version=None):
+                                      lr: float, client_fraction: float, fixed_logger_version=None,
+                                      cluster_args: Optional[ClusterArgs] = None):
     logger.debug('creating experiment context ...')
     optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     model_args = ModelArgs(CNNLightning, optimizer_args, only_digits=False)
     training_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs)
     context = ExperimentContext(name=name, client_fraction=client_fraction, local_epochs=local_epochs,
                                 lr=lr, batch_size=batch_size, optimizer_args=optimizer_args, model_args=model_args,
-                                train_args=training_args, dataset=fed_dataset)
+                                train_args=training_args, dataset=fed_dataset, cluster_args=cluster_args)
     experiment_logger = create_tensorboard_logger(context.name, str(context), fixed_logger_version)
     context.experiment_logger = experiment_logger
     return context
@@ -202,8 +213,42 @@ def load_last_state_for_configuration(context: ExperimentContext):
             return last_state, last_round
 
 
+def select_fed_dataset_partition_fraction(fed_dataset: FederatedDatasetData, n: int):
+    clients = list(fed_dataset.train_data_local_dict.keys())
+    num_out = 367
+    indices = np.arange(len(clients))
+    random_indices = np.random.choice(indices, size=num_out, replace=False)
+    train_data_local_dict = dict()
+    data_local_num_dict = dict()
+    data_local_train_num_dict = dict()
+    test_data_local_dict = dict()
+    data_local_test_num_dict = dict()
+    for i in random_indices:
+        train_data_local_dict[i] = fed_dataset.train_data_local_dict[i]
+        data_local_train_num_dict[i] = fed_dataset.data_local_train_num_dict[i]
+        test_data_local_dict[i] = fed_dataset.test_data_local_dict[i]
+        data_local_test_num_dict[i] = fed_dataset.data_local_test_num_dict[i]
+        data_local_num_dict[i] = fed_dataset.data_local_num_dict[i]
+    train_data_num = sum([num for num in data_local_train_num_dict.values()])
+    test_data_num = sum([num for num in data_local_test_num_dict.values()])
+    result_dataset = FederatedDatasetData(client_num=n, train_data_num=train_data_num, test_data_num=test_data_num,
+                                          train_data_global=fed_dataset.train_data_global,
+                                          test_data_global=fed_dataset.test_data_global,
+                                          data_local_num_dict=data_local_num_dict,
+                                          data_local_test_num_dict=data_local_test_num_dict,
+                                          data_local_train_num_dict=data_local_train_num_dict,
+                                          class_num=fed_dataset.class_num,
+                                          train_data_local_dict=train_data_local_dict,
+                                          test_data_local_dict=test_data_local_dict,
+                                          name=f'{fed_dataset.name}{n}')
+    return result_dataset
+
+
 if __name__ == '__main__':
     def run():
+        # fix for experiment reproducability
+        fix_random_seeds(123123123)
+
         parser = argparse.ArgumentParser()
         add_args(parser)
         args = parser.parse_args()
@@ -219,6 +264,9 @@ if __name__ == '__main__':
         else:
             # default to femnist dataset
             fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=3400, batch_size=10)
+
+            # select 367 clients as in the briggs paper
+            fed_dataset = select_fed_dataset_partition_fraction(fed_dataset, 367)
 
         if args.log_data_distribution:
             logger.info('... found log distribution flag, only logging data distribution information')
@@ -239,10 +287,32 @@ if __name__ == '__main__':
                     context = create_femnist_experiment_context(name='fedavg_default', batch_size=10,
                                                                 fed_dataset=fed_dataset, fixed_logger_version=0,
                                                                 **configuration)
-                    last_state, last_round = load_last_state_for_configuration(context)
-                    run_fedavg(context, 10, save_states=True, initial_model_state=last_state, start_round=last_round+1)
+                    if args.load_last_state:
+                        last_state, last_round = load_last_state_for_configuration(context)
+                    else:
+                        last_state, last_round = None, -1
+                    run_fedavg(context, 10, save_states=True, initial_model_state=last_state,
+                               start_round=last_round + 1)
                 except Exception as e:
                     logger.exception(f'Failed to execute configuration {configuration}', e)
         else:
-            logger.info('default implementation missing, please provide according arguments')
+            """
+            default: run fed avg with fixed parameters
+            """
+            configuration = {'lr': 3.59e-02, 'local_epochs': 5, 'client_fraction': 0.1}
+            try:
+                logger.info(f'running FedAvg with the following configuration: {configuration}')
+                context = create_femnist_experiment_context(name='fedavg_default', batch_size=10,
+                                                            fed_dataset=fed_dataset, fixed_logger_version=0,
+                                                            **configuration)
+                if args.load_last_state:
+                    last_state, last_round = load_last_state_for_configuration(context)
+                else:
+                    last_state, last_round = None, -1
+                run_fedavg(context, 10, save_states=True, initial_model_state=last_state,
+                           start_round=last_round + 1)
+            except Exception as e:
+                logger.exception(f'Failed to execute configuration {configuration}', e)
+
+
     run()

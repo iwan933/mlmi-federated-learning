@@ -34,14 +34,11 @@ class RandomClusterPartitioner(BaseClusterPartitioner):
 
 class GradientClusterPartitioner(BaseClusterPartitioner):
 
-    def __init__(self, cluster_args: ClusterArgs):
-        assert cluster_args is not None, 'Cluster args are required to perform clustering'
-
-        self.cluster_args = cluster_args
-        self.linkage_mech = cluster_args.linkage_mech
-        self.criterion = cluster_args.criterion
-        self.dis_metric = cluster_args.dis_metric
-        self.max_value_criterion = cluster_args.max_value_criterion
+    def __init__(self, linkage_mech, criterion, dis_metric, max_value_criterion):
+        self.linkage_mech = linkage_mech
+        self.criterion = criterion
+        self.dis_metric = dis_metric
+        self.max_value_criterion = max_value_criterion
 
     def cluster(self, participants: List[BaseParticipant]) -> Dict[str, List[BaseParticipant]]:
         clusters_hac_dic = {}
@@ -49,8 +46,8 @@ class GradientClusterPartitioner(BaseClusterPartitioner):
         # Compute distance matrix of model updates: Using mean of weights from last layer of each participant
         model_updates = np.array([])
         for participant in participants:
-            weights_last_layer_key = list(participant.get_model().state_dict().keys())[-2]
-            weights_last_layer = participant.get_model().state_dict()[weights_last_layer_key]
+            weights_last_layer_key = list(participant.model.state_dict().keys())[-2]
+            weights_last_layer = participant.model.state_dict()[weights_last_layer_key]
             model_updates = np.append(model_updates, mean(weights_last_layer).numpy())
         model_updates = np.reshape(model_updates, (len(model_updates), 1))
         distance_matrix = hac.linkage(model_updates, method=self.linkage_mech, metric=self.dis_metric, optimal_ordering=False)

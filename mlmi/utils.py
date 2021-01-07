@@ -78,3 +78,10 @@ def evaluate_global_model(global_model_participant: BaseParticipant, participant
 
     losses, acc = _evaluate_model(participants, _eval)
     return {'test/loss': losses, 'test/acc': acc}
+
+
+def fix_random_seeds(seed: int):
+    import numpy as np
+    import torch
+    torch.manual_seed(seed)
+    np.random.seed(seed)
