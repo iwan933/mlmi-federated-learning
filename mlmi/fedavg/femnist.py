@@ -12,4 +12,4 @@ def load_femnist_dataset(data_dir, num_clients=3400, batch_size=20) -> Federated
     """
     federated_dataset_args = load_partition_data_federated_emnist('', data_dir, client_number=num_clients,
                                                                   batch_size=batch_size)
-    return FederatedDatasetData(*federated_dataset_args)
+    return FederatedDatasetData(*federated_dataset_args, name='femnist')

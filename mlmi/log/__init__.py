@@ -17,11 +17,24 @@ config = {
             'level': 'DEBUG',
         },
     },
-    'root': {
-        'level': 'DEBUG',
-        'handlers': ['console']
-    },
+    'loggers': {
+        '': {
+            'level': 'DEBUG',
+            'handlers': ['console']
+        },
+        'mlmi': {
+            'level': 'DEBUG',
+            'propagate': False,
+            'handlers': ['console']
+        },
+        '__main__': {
+            'level': 'DEBUG',
+            'propagate': False,
+            'handlers': ['console']
+        }
+    }
 }
+
 
 dictConfig(config)
 getLogger = _getLogger

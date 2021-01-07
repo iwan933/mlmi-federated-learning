@@ -4,14 +4,6 @@ from torch.utils import data
 import pytorch_lightning as pl
 
 
-class ExperimentContext(object):
-    """
-    Structure to hold experiment context information
-    """
-    def __init__(self, name: str):
-        self.name = name
-
-
 class TrainArgs(object):
     """
     Structure to hold arguments used to be passed to training instances. Arguments should all be
@@ -62,7 +54,7 @@ class FederatedDatasetData(object):
                  test_data_global: data.DataLoader, data_local_num_dict: Dict[int, int],
                  data_local_train_num_dict: Dict[int, int], data_local_test_num_dict: Dict[int, int],
                  train_data_local_dict: Dict[int, data.DataLoader], test_data_local_dict: Dict[int, data.DataLoader],
-                 class_num: int):
+                 class_num: int, name: str):
         self.client_num = client_num
         self.train_data_num = train_data_num
         self.test_data_num = test_data_num
@@ -74,3 +66,39 @@ class FederatedDatasetData(object):
         self.train_data_local_dict = train_data_local_dict
         self.test_data_local_dict = test_data_local_dict
         self.class_num = class_num
+        self.name = name
+
+
+class ExperimentContext(object):
+    """
+    Structure to hold experiment context information
+    """
+
+    def __init__(self, name: str, client_fraction: float, local_epochs: int, lr: float,
+                 batch_size: int, optimizer_args: OptimizerArgs, train_args: TrainArgs, model_args: ModelArgs,
+                 dataset: FederatedDatasetData):
+        self.name = name
+        self.client_fraction = client_fraction
+        self.local_epochs = local_epochs
+        self.lr = lr
+        self.batch_size = batch_size
+        self.optimizer_args = optimizer_args
+        self.train_args = train_args
+        self.model_args = model_args
+        self.dataset = dataset
+        self._experiment_logger = None
+
+    @property
+    def experiment_logger(self):
+        return self._experiment_logger
+
+    @experiment_logger.setter
+    def experiment_logger(self, value):
+        self._experiment_logger = value
+
+    def __str__(self):
+        """
+        String identifying experiment. Used for model loading and saving.
+        :return:
+        """
+        return f'{self.dataset.name}_bs{self.batch_size}lr{self.lr:.2E}cf{self.client_fraction:.2f}e{self.local_epochs}'
