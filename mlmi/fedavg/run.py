@@ -125,13 +125,9 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
         log_loss_and_acc('global_model', result.get('test/loss'), result.get('test/acc'), experiment_logger, i)
         logger.info('finished training round')
 
-<<<<<<< HEAD
-    # Clustering of participants by model updates
-    partitioner = RandomClusterPartitioner()
-=======
+
     #Clustering
     partitioner = GradientClusterPartitioner(cluster_args)
->>>>>>> max
     cluster_clients_dic = partitioner.cluster(clients)
 
     # Initialize cluster models
@@ -166,11 +162,7 @@ if __name__ == '__main__':
 
         if args.hierarchical:
             context = ExperimentContext(name='fedavg_hierarchical')
-<<<<<<< HEAD
             run_fedavg_hierarchical(context, 20, 20)
-=======
-            run_fedavg_hierarchical(context, 1, 2)
->>>>>>> max
         else:
             context = ExperimentContext(name='fedavg_default')
             run_fedavg(context, 80)

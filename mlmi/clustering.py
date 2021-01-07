@@ -34,10 +34,6 @@ class RandomClusterPartitioner(BaseClusterPartitioner):
 
 class GradientClusterPartitioner(BaseClusterPartitioner):
 
-    def cluster(self, participants: List[T]) -> Dict[str, List[T]]:
-        raise NotImplementedError()
-
-
     def __init__(self, cluster_args: ClusterArgs):
         assert cluster_args is not None, 'Cluster args are required to perform clustering'
 
