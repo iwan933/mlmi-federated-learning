@@ -85,7 +85,7 @@ def run_fedavg(context: ExperimentContext, num_rounds: int):
 
 
 def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, num_rounds_cluster: int):
-    num_clients = 4
+    num_clients = 40
     steps = 4
     batch_size = 20
     learning_rate = 0.03
@@ -161,7 +161,7 @@ if __name__ == '__main__':
 
         if args.hierarchical:
             context = ExperimentContext(name='fedavg_hierarchical')
-            run_fedavg_hierarchical(context, 2, 2)
+            run_fedavg_hierarchical(context, 5, 2)
         else:
             context = ExperimentContext(name='fedavg_default')
             run_fedavg(context, 80)

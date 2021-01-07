@@ -78,6 +78,20 @@ class BaseParticipant(object):
         """
         torch.save(self._model.state_dict(), self.get_checkpoint_path())
 
+    def get_model(self) -> pl.LightningModule:
+        """
+        The model to train
+        :return: The model
+        """
+        return self.model
+
+    def load_model_state(self, model_state: Dict[str, Tensor]):
+        """
+        Loads the model state into the current model instance
+        :param model_state: The model state to load
+        """
+        self.model.load_state_dict(model_state)
+
 
 class BaseTrainingParticipant(BaseParticipant):
     def __init__(self, client_id: str, model_args: ModelArgs, context: ExperimentContext,
