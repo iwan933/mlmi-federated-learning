@@ -215,9 +215,8 @@ def load_last_state_for_configuration(context: ExperimentContext):
 
 def select_fed_dataset_partition_fraction(fed_dataset: FederatedDatasetData, n: int):
     clients = list(fed_dataset.train_data_local_dict.keys())
-    num_out = 367
     indices = np.arange(len(clients))
-    random_indices = np.random.choice(indices, size=num_out, replace=False)
+    random_indices = np.random.choice(indices, size=n, replace=False)
     train_data_local_dict = dict()
     data_local_num_dict = dict()
     data_local_train_num_dict = dict()
@@ -313,6 +312,4 @@ if __name__ == '__main__':
                            start_round=last_round + 1)
             except Exception as e:
                 logger.exception(f'Failed to execute configuration {configuration}', e)
-
-
     run()
