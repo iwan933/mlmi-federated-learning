@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import torch
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -7,25 +7,24 @@ from torch import Tensor
 from mlmi.participant import BaseParticipant, BaseTrainingParticipant
 from mlmi.settings import RUN_DIR
 from mlmi.log import getLogger
-from mlmi.struct import ExperimentContext
 
 
 logger = getLogger(__name__)
 
 
-def create_tensorboard_logger(context: 'ExperimentContext', version=None) -> TensorBoardLogger:
+def create_tensorboard_logger(experiment_name: str, experiment_specification: Optional[str] = None,
+                              version=None) -> TensorBoardLogger:
     """
 
-    :param context: the experiment context to use to for name generation
+    :param experiment_name: name used for experiment
+    :param experiment_specification: specification for experiment configuration
+    :param version: allows to fix a version
     :return:
     """
-    dataset_name = context.dataset.name
-    epochs = context.local_epochs
-    batch_size = context.batch_size
-    lr = context.lr
-    cf = context.client_fraction
-    configuration_string = f'{dataset_name}_bs{batch_size}lr{lr:.2E}cf{cf:.2f}e{epochs}'
-    experiment_path = RUN_DIR / context.name / configuration_string
+
+    experiment_path = RUN_DIR / experiment_name
+    if experiment_specification:
+        experiment_path /= experiment_specification
     return TensorBoardLogger(experiment_path.absolute(), version=version)
 
 

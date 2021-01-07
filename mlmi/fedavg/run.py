@@ -28,6 +28,12 @@ def add_args(parser: argparse.ArgumentParser):
                         const=True, default=False)
     parser.add_argument('--search-grid', dest='search_grid', action='store_const',
                         const=True, default=False)
+    parser.add_argument('--cifar10', dest='cifar10', action='store_const',
+                        const=True, default=False)
+    parser.add_argument('--cifar100', dest='cifar100', action='store_const',
+                        const=True, default=False)
+    parser.add_argument('--log-data-distribution', dest='log_data_distribution', action='store_const',
+                        const=True, default=False)
 
 
 def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, experiment_logger: LightningLoggerBase,
@@ -67,6 +73,31 @@ def initialize_clients(context: ExperimentContext, initial_model_state: Dict[str
     return clients
 
 
+def log_data_distribution(dataset: FederatedDatasetData, experiment_logger: LightningLoggerBase):
+    num_partitions = len(dataset.train_data_local_dict.items())
+    num_train_samples = []
+    num_different_labels = []
+
+    logger.debug('... extracting dataset distributions')
+    for i, (c, dataloader) in enumerate(dataset.train_data_local_dict.items()):
+        all_labels = None
+        num_all_samples = 0
+        for x, y in dataloader:
+            num_all_samples += x.shape[0]
+            if all_labels is None:
+                all_labels = y
+            else:
+                all_labels = torch.cat((all_labels, y), 0)
+        num_different_labels.append(len(torch.unique(all_labels)))
+        num_train_samples.append(num_all_samples)
+        if (i + 1) % 50 == 0:
+            logger.debug('... extracted {}/{} partitions'.format(i + 1, num_partitions))
+    experiment_logger.experiment.add_histogram('sample_num/distribution', Tensor(num_train_samples),
+                                               global_step=0)
+    experiment_logger.experiment.add_histogram('labels_num/distribution', Tensor(num_different_labels),
+                                               global_step=0)
+
+
 def run_fedavg(context: ExperimentContext, num_rounds: int, save_states: bool,
                initial_model_state: Optional[Dict[str, Tensor]] = None, clients: Optional[List['FedAvgClient']] = None,
                server: Optional['FedAvgServer'] = None, start_round=0):
@@ -85,7 +116,6 @@ def run_fedavg(context: ExperimentContext, num_rounds: int, save_states: bool,
     num_train_samples = [client.num_train_samples for client in clients]
     num_total_samples = sum(num_train_samples)
     logger.info(f'... copied {num_total_samples} data samples in total')
-    context.experiment_logger.experiment.add_histogram('sample/distribution', Tensor(num_train_samples), global_step=0)
 
     for i in range(start_round, num_rounds):
         logger.info('sampling clients ...')
@@ -151,7 +181,7 @@ def create_femnist_experiment_context(name: str, local_epochs: int, fed_dataset:
     context = ExperimentContext(name=name, client_fraction=client_fraction, local_epochs=local_epochs,
                                 lr=lr, batch_size=batch_size, optimizer_args=optimizer_args, model_args=model_args,
                                 train_args=training_args, dataset=fed_dataset)
-    experiment_logger = create_tensorboard_logger(context, fixed_logger_version)
+    experiment_logger = create_tensorboard_logger(context.name, str(context), fixed_logger_version)
     context.experiment_logger = experiment_logger
     return context
 
@@ -178,7 +208,21 @@ if __name__ == '__main__':
 
         logger.debug('loading experiment data ...')
         data_dir = REPO_ROOT / 'data'
-        fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=3400, batch_size=10)
+        fed_dataset = None
+
+        if args.cifar10:
+            pass
+        elif args.cifar100:
+            pass
+        else:
+            # default to femnist dataset
+            fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=3400, batch_size=10)
+
+        if args.log_data_distribution:
+            logger.info('... found log distribution flag, only logging data distribution information')
+            experiment_logger = create_tensorboard_logger('datadistribution', fed_dataset.name, version=0)
+            log_data_distribution(fed_dataset, experiment_logger)
+            return
 
         if args.hierarchical:
             context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.1, local_epochs=1,
