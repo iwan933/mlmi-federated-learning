@@ -12,9 +12,8 @@ from mlmi.fedavg.femnist import load_femnist_dataset
 from mlmi.fedavg.model import FedAvgClient, FedAvgServer, CNNLightning
 
 from mlmi.fedavg.util import run_fedavg_round
-from mlmi.struct import ExperimentContext, ModelArgs, TrainArgs, OptimizerArgs
 
-from mlmi.fedavg.util import run_train_aggregate_round
+#from mlmi.fedavg.util import run_train_aggregate_round
 from mlmi.struct import ExperimentContext, ModelArgs, TrainArgs, OptimizerArgs, ClusterArgs
 from mlmi.settings import REPO_ROOT
 from mlmi.utils import create_tensorboard_logger, evaluate_global_model
@@ -46,9 +45,9 @@ def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, exp
 
 
 def run_fedavg(context: ExperimentContext, num_rounds: int):
-    num_clients = 100
+    num_clients = 2
     steps = 10
-    batch_size = 256
+    batch_size = 20
     learning_rate = 0.03
     log_every_n_steps = 3
     experiment_logger = create_tensorboard_logger(context.name,
@@ -162,7 +161,7 @@ if __name__ == '__main__':
 
         if args.hierarchical:
             context = ExperimentContext(name='fedavg_hierarchical')
-            run_fedavg_hierarchical(context, 20, 20)
+            run_fedavg_hierarchical(context, 2, 2)
         else:
             context = ExperimentContext(name='fedavg_default')
             run_fedavg(context, 80)
