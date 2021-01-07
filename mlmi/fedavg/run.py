@@ -1,4 +1,5 @@
 import argparse
+import math
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -36,6 +37,7 @@ def add_args(parser: argparse.ArgumentParser):
                         const=True, default=False)
     parser.add_argument('--no-model-reuse', dest='load_last_state', action='store_const',
                         const=False, default=True)
+    parser.add_argument('--max-last', type=int, dest='max_last', default=-1)
 
 
 def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, experiment_logger: LightningLoggerBase,
@@ -188,9 +190,9 @@ def create_femnist_experiment_context(name: str, local_epochs: int, fed_dataset:
                                       lr: float, client_fraction: float, fixed_logger_version=None,
                                       cluster_args: Optional[ClusterArgs] = None):
     logger.debug('creating experiment context ...')
-    optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
+    optimizer_args = OptimizerArgs(optim.Adam, lr=lr)
     model_args = ModelArgs(CNNLightning, optimizer_args, only_digits=False)
-    training_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs)
+    training_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, gradient_clip_val=0.5)
     context = ExperimentContext(name=name, client_fraction=client_fraction, local_epochs=local_epochs,
                                 lr=lr, batch_size=batch_size, optimizer_args=optimizer_args, model_args=model_args,
                                 train_args=training_args, dataset=fed_dataset, cluster_args=cluster_args)
@@ -199,7 +201,7 @@ def create_femnist_experiment_context(name: str, local_epochs: int, fed_dataset:
     return context
 
 
-def load_last_state_for_configuration(context: ExperimentContext):
+def load_last_state_for_configuration(context: ExperimentContext, max_last: int = -1):
     last_round = -1
     last_state = None
     # check if saved model for given experiment and round already exists
@@ -208,6 +210,8 @@ def load_last_state_for_configuration(context: ExperimentContext):
         if saved_state is not None:
             last_state = saved_state
             last_round += 1
+            if not max_last == -1 and max_last <= last_round:
+                return last_state, last_round
             logger.info(f'found saved state for {context}, round {last_round}')
         else:
             return last_state, last_round
@@ -241,6 +245,12 @@ def select_fed_dataset_partition_fraction(fed_dataset: FederatedDatasetData, n: 
                                           test_data_local_dict=test_data_local_dict,
                                           name=f'{fed_dataset.name}{n}')
     return result_dataset
+
+
+def lr_gen(bases: List[float], powers: List[int]):
+    for x in bases:
+        for y in powers:
+            yield x * math.pow(10, y)
 
 
 if __name__ == '__main__':
@@ -278,8 +288,10 @@ if __name__ == '__main__':
                                                         lr=0.3, batch_size=10, fed_dataset=fed_dataset)
             run_fedavg_hierarchical(context, 1, 20)
         elif args.search_grid:
-            param_grid = {'lr': np.logspace(-1.0, -3.0, num=10), 'local_epochs': [1, 5],
-                          'client_fraction': [0.0, 0.1, 0.5, 1.0]}
+            param_grid = {'lr': list(lr_gen([1], [-1])) + list(lr_gen([1, 2.5, 5, 7.5], [-2])) +
+                                list(lr_gen([5, 7.5], [-3])), 'local_epochs': [1, 5],
+                          'client_fraction': [0.1, 0.5, 1.0]}
+            print(param_grid)
             for configuration in ParameterGrid(param_grid):
                 try:
                     logger.info(f'running FedAvg with the following configuration: {configuration}')
@@ -287,7 +299,7 @@ if __name__ == '__main__':
                                                                 fed_dataset=fed_dataset, fixed_logger_version=0,
                                                                 **configuration)
                     if args.load_last_state:
-                        last_state, last_round = load_last_state_for_configuration(context)
+                        last_state, last_round = load_last_state_for_configuration(context, args.max_last)
                     else:
                         last_state, last_round = None, -1
                     run_fedavg(context, 10, save_states=True, initial_model_state=last_state,
@@ -298,18 +310,19 @@ if __name__ == '__main__':
             """
             default: run fed avg with fixed parameters
             """
-            configuration = {'lr': 3.59e-02, 'local_epochs': 5, 'client_fraction': 0.1}
+            configuration = {'client_fraction': 0.1, 'local_epochs': 5, 'lr': 0.05}
             try:
                 logger.info(f'running FedAvg with the following configuration: {configuration}')
                 context = create_femnist_experiment_context(name='fedavg_default', batch_size=10,
                                                             fed_dataset=fed_dataset, fixed_logger_version=0,
                                                             **configuration)
                 if args.load_last_state:
-                    last_state, last_round = load_last_state_for_configuration(context)
+                    last_state, last_round = load_last_state_for_configuration(context, args.max_last)
                 else:
                     last_state, last_round = None, -1
-                run_fedavg(context, 10, save_states=True, initial_model_state=last_state,
+                run_fedavg(context, 10, save_states=False, initial_model_state=last_state,
                            start_round=last_round + 1)
             except Exception as e:
                 logger.exception(f'Failed to execute configuration {configuration}', e)
+
     run()

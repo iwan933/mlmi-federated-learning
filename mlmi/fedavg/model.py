@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional
 
 import torch
-from torch import Tensor, nn
+from torch import Tensor, nn, optim
 from torch.nn import functional as F
 
 import pytorch_lightning as pl
@@ -11,7 +11,7 @@ from fedml_api.model.cv.cnn import CNN_DropOut
 
 from mlmi.log import getLogger
 from mlmi.participant import BaseParticipantModel, BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
-from mlmi.struct import OptimizerArgs
+from mlmi.struct import ExperimentContext, ModelArgs, OptimizerArgs
 
 
 logger = getLogger(__name__)
@@ -43,10 +43,6 @@ class FedAvgClient(BaseTrainingParticipant):
 
 
 class FedAvgServer(BaseAggregatorParticipant):
-    total_train_sample_num = 0
-
-    def get_total_train_sample_num(self):
-        return self.total_train_sample_num
 
     def aggregate(self, participants: List[BaseParticipant], *args, **kwargs):
         num_train_samples: List[int] = kwargs.pop('num_train_samples', [])
@@ -61,8 +57,10 @@ class FedAvgServer(BaseAggregatorParticipant):
                                                         load_participant_model_state(participant),
                                                         num_samples, num_total_samples)
 
-        self._model.load_state_dict(aggregated_model_state)
-        self.total_train_sample_num = num_total_samples
+        self.model.load_state_dict(aggregated_model_state)
+        # make next optimizer step
+        self.model.optimizer.zero_grad()
+        self.model.optimizer.step()
         self.save_model_state()
 
 
@@ -73,10 +71,15 @@ class CNNLightning(BaseParticipantModel, pl.LightningModule):
         self.model = CNN_DropOut(only_digits=only_digits)
         self.optimizer_args = optimizer_args
         self.accuracy = Accuracy()
+        o = self.optimizer_args
+        self._optimizer = o.optimizer_class(self.model.parameters(), *o.optimizer_args, **o.optimizer_kwargs)
+
+    @property
+    def optimizer(self) -> optim.Optimizer:
+        return self._optimizer
 
     def configure_optimizers(self):
-        o = self.optimizer_args
-        return o.optimizer_class(self.model.parameters(), *o.optimizer_args, **o.optimizer_kwargs)
+        return self._optimizer
 
     def training_step(self, train_batch, batch_idx):
         x, y = train_batch

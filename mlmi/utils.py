@@ -43,6 +43,21 @@ def overwrite_participants_models(model_state: Dict[str, Tensor], participants):
             logger.error('sendign model to participant {0} failed'.format(participant._name), e)
 
 
+def overwrite_participants_optimizers(optimizer_state: Dict[str, Tensor], participants):
+    """
+    Overwrites the participants optimizer with a state
+    :param optimizer_state: state to save on the client side
+    :param participants: list of participants to apply the model to
+    :return:
+    """
+    for participant in participants:
+        try:
+            logger.debug('sending model to participant {0}'.format(participant._name))
+            participant.overwrite_optimizer_state(optimizer_state)
+        except Exception as e:
+            logger.error('sendign model to participant {0} failed'.format(participant._name), e)
+
+
 def _evaluate_model(participants: List['BaseTrainingParticipant'], test_on_participant):
     test_losses = []
     test_acc = []

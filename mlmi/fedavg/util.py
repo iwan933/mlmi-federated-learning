@@ -12,8 +12,7 @@ from mlmi.exceptions import ExecutionError
 from mlmi.log import getLogger
 from mlmi.settings import REPO_ROOT
 from mlmi.struct import TrainArgs, ExperimentContext
-from mlmi.utils import overwrite_participants_models
-
+from mlmi.utils import overwrite_participants_models, overwrite_participants_optimizers
 
 logger = getLogger(__name__)
 
@@ -52,6 +51,10 @@ def run_fedavg_round(aggregator: BaseAggregatorParticipant, participants: List[B
     logger.debug('distribute the initial model to the clients.')
     initial_model_state = aggregator.model.state_dict()
     overwrite_participants_models(initial_model_state, participants)
+    # reset gradients // first check how to handle optimizers in federated learning
+    # aggregator.model.optimizer.zero_grad()
+    # optimizer_state = aggregator.model.optimizer.state_dict()
+    # overwrite_participants_optimizers(optimizer_state, participants)
 
     logger.debug('starting training round.')
     run_train_round(participants, training_args)

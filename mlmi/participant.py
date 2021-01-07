@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 import torch
-from torch import Tensor
+from torch import Tensor, optim
 from torch.utils import data
 
 import pytorch_lightning as pl
@@ -31,7 +31,7 @@ class BaseParticipant(object):
         self._model = model_args.model_class(*model_args.args, **model_args.kwargs, participant_name=participant_name)
 
     @property
-    def model(self) -> pl.LightningModule:
+    def model(self) -> Union['BaseParticipantModel', pl.LightningModule]:
         """
         The model to train
         :return: The model
@@ -53,6 +53,14 @@ class BaseParticipant(object):
         """
         self._model.load_state_dict(model_state)
         self.save_model_state()
+
+    def overwrite_optimizer_state(self, optimizer_state: Dict[str, Tensor]):
+        """
+        Overwrites the optimizer state
+        :param optimizer_state: state to write
+        :return:
+        """
+        self.model.optimizer.load_state_dict(optimizer_state)
 
     def load_model_state_from_checkpoint(self):
         """
@@ -189,3 +197,7 @@ class BaseParticipantModel(object):
                                              'your model in logging'
         self.participant_name = kwargs.pop('participant_name', None)
         super().__init__(*args, **kwargs)
+
+    @property
+    def optimizer(self) -> optim.Optimizer:
+        raise NotImplementedError()
