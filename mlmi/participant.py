@@ -84,7 +84,9 @@ class BaseParticipant(object):
         :param target_path: The path to save the model at
         :return:
         """
-        torch.save(self._model.state_dict(), self.get_checkpoint_path())
+        path = self.get_checkpoint_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(self._model.state_dict(), path)
 
 
 class BaseTrainingParticipant(BaseParticipant):

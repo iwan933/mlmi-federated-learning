@@ -69,8 +69,7 @@ def run_fedavg_round(aggregator: BaseAggregatorParticipant, participants: List[B
 
 def save_fedavg_state(experiment_context: 'ExperimentContext', fl_round: int, model_state: Dict[str, Tensor]):
     path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{experiment_context}r{fl_round}.mdl'
-    if not path.parent.exists():
-        path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model_state, path)
 
 
