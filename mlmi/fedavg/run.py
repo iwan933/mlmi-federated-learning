@@ -1,5 +1,6 @@
 import argparse
 import math
+import random
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -9,7 +10,9 @@ import torch
 from pytorch_lightning.loggers import LightningLoggerBase
 from torch import Tensor, optim
 from torch.distributions import Categorical
+from torch.utils import data as data
 
+from mlmi.fedavg.data import scratch_data, select_random_fed_dataset_partitions
 from mlmi.selectors import sample_randomly_by_fraction
 from mlmi.struct import ClusterArgs, ExperimentContext, FederatedDatasetData
 from mlmi.clustering import RandomClusterPartitioner, GradientClusterPartitioner
@@ -37,6 +40,8 @@ def add_args(parser: argparse.ArgumentParser):
                         const=True, default=False)
     parser.add_argument('--no-model-reuse', dest='load_last_state', action='store_const',
                         const=False, default=True)
+    parser.add_argument('--scratch-data', dest='scratch_data', action='store_const',
+                        const=True, default=False)
     parser.add_argument('--max-last', type=int, dest='max_last', default=-1)
 
 
@@ -217,36 +222,6 @@ def load_last_state_for_configuration(context: ExperimentContext, max_last: int 
             return last_state, last_round
 
 
-def select_fed_dataset_partition_fraction(fed_dataset: FederatedDatasetData, n: int):
-    clients = list(fed_dataset.train_data_local_dict.keys())
-    indices = np.arange(len(clients))
-    random_indices = np.random.choice(indices, size=n, replace=False)
-    train_data_local_dict = dict()
-    data_local_num_dict = dict()
-    data_local_train_num_dict = dict()
-    test_data_local_dict = dict()
-    data_local_test_num_dict = dict()
-    for i in random_indices:
-        train_data_local_dict[i] = fed_dataset.train_data_local_dict[i]
-        data_local_train_num_dict[i] = fed_dataset.data_local_train_num_dict[i]
-        test_data_local_dict[i] = fed_dataset.test_data_local_dict[i]
-        data_local_test_num_dict[i] = fed_dataset.data_local_test_num_dict[i]
-        data_local_num_dict[i] = fed_dataset.data_local_num_dict[i]
-    train_data_num = sum([num for num in data_local_train_num_dict.values()])
-    test_data_num = sum([num for num in data_local_test_num_dict.values()])
-    result_dataset = FederatedDatasetData(client_num=n, train_data_num=train_data_num, test_data_num=test_data_num,
-                                          train_data_global=fed_dataset.train_data_global,
-                                          test_data_global=fed_dataset.test_data_global,
-                                          data_local_num_dict=data_local_num_dict,
-                                          data_local_test_num_dict=data_local_test_num_dict,
-                                          data_local_train_num_dict=data_local_train_num_dict,
-                                          class_num=fed_dataset.class_num,
-                                          train_data_local_dict=train_data_local_dict,
-                                          test_data_local_dict=test_data_local_dict,
-                                          name=f'{fed_dataset.name}{n}')
-    return result_dataset
-
-
 def lr_gen(bases: List[float], powers: List[int]):
     for x in bases:
         for y in powers:
@@ -275,7 +250,10 @@ if __name__ == '__main__':
             fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=3400, batch_size=10)
 
             # select 367 clients as in the briggs paper
-            fed_dataset = select_fed_dataset_partition_fraction(fed_dataset, 367)
+            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 367)
+
+        if args.scratch_data:
+            scratch_data(fed_dataset, client_fraction_to_scratch=0.75, fraction_to_scratch=0.9)
 
         if args.log_data_distribution:
             logger.info('... found log distribution flag, only logging data distribution information')
