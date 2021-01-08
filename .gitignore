@@ -145,3 +145,5 @@ checkpoints/
 
 # exclude Jupyter notebooks
 jupyter_notebooks/
+# exclude lightning_logs
+lightning_logs/
