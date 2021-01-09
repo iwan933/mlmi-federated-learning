@@ -47,6 +47,8 @@ class GradientClusterPartitioner(BaseClusterPartitioner):
         model_updates = np.array([])
         for participant in participants:
             weights_last_layer_key = list(participant.model.state_dict().keys())[-2]
+            print(weights_last_layer_key)
+            print(len(weights_last_layer_key))
             weights_last_layer = participant.model.state_dict()[weights_last_layer_key]
             model_updates = np.append(model_updates, mean(weights_last_layer).numpy())
         model_updates = np.reshape(model_updates, (len(model_updates), 1))

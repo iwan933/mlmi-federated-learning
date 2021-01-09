@@ -29,7 +29,7 @@ logger = getLogger(__name__)
 
 def add_args(parser: argparse.ArgumentParser):
     parser.add_argument('--hierarchical', dest='hierarchical', action='store_const',
-                        const=True, default=False)
+                        const=True, default=True)
     parser.add_argument('--search-grid', dest='search_grid', action='store_const',
                         const=True, default=False)
     parser.add_argument('--cifar10', dest='cifar10', action='store_const',
@@ -198,6 +198,7 @@ def create_femnist_experiment_context(name: str, local_epochs: int, fed_dataset:
     optimizer_args = OptimizerArgs(optim.Adam, lr=lr)
     model_args = ModelArgs(CNNLightning, optimizer_args, only_digits=False)
     training_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, gradient_clip_val=0.5)
+    cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech="single", criterion="maxclust", dis_metric="euclidean", max_value_criterion=4)
     context = ExperimentContext(name=name, client_fraction=client_fraction, local_epochs=local_epochs,
                                 lr=lr, batch_size=batch_size, optimizer_args=optimizer_args, model_args=model_args,
                                 train_args=training_args, dataset=fed_dataset, cluster_args=cluster_args)
@@ -250,7 +251,7 @@ if __name__ == '__main__':
             fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=3400, batch_size=10)
 
             # select 367 clients as in the briggs paper
-            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 367)
+            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 2)
 
         if args.scratch_data:
             scratch_data(fed_dataset, client_fraction_to_scratch=0.75, fraction_to_scratch=0.9)
@@ -264,7 +265,7 @@ if __name__ == '__main__':
         if args.hierarchical:
             context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.1, local_epochs=1,
                                                         lr=0.3, batch_size=10, fed_dataset=fed_dataset)
-            run_fedavg_hierarchical(context, 1, 20)
+            run_fedavg_hierarchical(context, 1, 2)
         elif args.search_grid:
             param_grid = {'lr': list(lr_gen([1], [-1])) + list(lr_gen([1, 2.5, 5, 7.5], [-2])) +
                                 list(lr_gen([5, 7.5], [-3])), 'local_epochs': [1, 5],
@@ -298,7 +299,7 @@ if __name__ == '__main__':
                     last_state, last_round = load_last_state_for_configuration(context, args.max_last)
                 else:
                     last_state, last_round = None, -1
-                run_fedavg(context, 10, save_states=False, initial_model_state=last_state,
+                run_fedavg(context, 10, save_states=True, initial_model_state=last_state,
                            start_round=last_round + 1)
             except Exception as e:
                 logger.exception(f'Failed to execute configuration {configuration}', e)
