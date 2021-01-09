@@ -43,6 +43,7 @@ class ReptileClient(BaseTrainingParticipant):
         :param model_state: The model state to evaluate
         :return: The output loss
         """
+        # TODO: Finish implementation of this function
 
         trainer = self.create_trainer(enable_logging=False,
                                       **training_args.kwargs)
@@ -60,7 +61,16 @@ class ReptileClient(BaseTrainingParticipant):
         #result = trainer.test(model=model, test_dataloaders=self.test_data_loader)
         #return result
 
+    # The below function was taken from the supervised-reptile repository (from
+    # the Nichols 2018 paper)
     def _test_predictions(self, train_set, test_set):
+        """
+        Get model predictions on test set. Train set required as input
+        (presumably) because of batch normalization.
+        :param train_set:
+        :param test_set:
+        :return:
+        """
         res = []
         for test_sample in test_set:
             inputs, _ = zip(*train_set)
@@ -127,7 +137,7 @@ class ReptileServer(BaseAggregatorParticipant):
 
     def update_model_state(self, gradient, learning_rate):
         """
-        Update model state using gradient
+        Update model state with vanilla gradient descent
         :param gradient: OrderedDict[str, Tensor]
         :return:
         """
@@ -141,7 +151,7 @@ class ReptileServer(BaseAggregatorParticipant):
 
 class OmniglotModel(BaseParticipantModel, pl.LightningModule):
     # TODO: Implement model as below in PyTorch (this is the classifier from
-    #       Nichols 2018: On First-Order Meta-Learning Algorithms
+    #       Nichols 2018: On First-Order Meta-Learning Algorithms)
 
 class OmniglotModel:
     """

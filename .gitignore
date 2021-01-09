@@ -140,8 +140,10 @@ wandb/
 # exclude cache and run
 cache/
 run/
-data/
+data/*
 checkpoints/
+# Do not ignore omniglot dataset
+!data/omniglot
 
 # exclude Jupyter notebooks
 jupyter_notebooks/

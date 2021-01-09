@@ -44,7 +44,28 @@ def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, exp
     experiment_logger.experiment.add_scalar('test/acc/{}/mean'.format(model_name), torch.mean(acc), global_step=global_step)
 
 class ReptileTrainingArgs:
-
+    """
+    Container for meta-learning parameters
+    :param model: Base model
+    :param inner_optimizer: Optimizer on task level
+    :param inner_learning_rate: Learning rate for task level optimizer
+    :param num_inner_steps: Number of training steps on task level
+    :param log_every_n_steps:
+    :param inner_batch_size: Batch size for training on task level. A value of -1
+        means batch size is equal to local training set size (full batch
+        training)
+    :param meta_batch_size: Batch size of tasks for single meta-training step.
+        A value of -1 means meta batch size is equal to total number of training
+        tasks (full batch meta training)
+    :param meta_learning_rate_initial: Learning rate for meta training (initial
+        value). Learning rate decreases linearly with training progress to reach
+        meta_learning_rate_final at end of training.
+    :param meta_learning_rate_final: Final value for learning rate for meta
+        training. If None, this will be equal to meta_learning_rate_initial and
+        learning rate will remain constant over training.
+    :param num_meta_steps: Number of total meta training steps
+    :return:
+    """
     def __init__(self,
                  model,
                  inner_optimizer,
@@ -70,6 +91,9 @@ class ReptileTrainingArgs:
         self.num_meta_steps = num_meta_steps
 
     def get_inner_training_args(self):
+        """
+        Return TrainArgs for inner training (training on task level)
+        """
         inner_training_args = TrainArgs(
             min_steps=self.num_inner_steps,
             max_steps=self.num_inner_steps,
@@ -80,18 +104,22 @@ class ReptileTrainingArgs:
         return inner_training_args
 
     def get_meta_training_args(self, frac_done: float):
+        """
+        Return TrainArgs for meta training
+        :param frac_done: Fraction of meta training steps already done
+        """
         return TrainArgs(
             meta_learning_rate=frac_done * self.meta_learning_rate_final + \
                                  (1 - frac_done) * self.meta_learning_rate_initial
         )
 
 
-def run_reptile(context: ExperimentContext, initial_model_state = None):
+def run_reptile(context: ExperimentContext, initial_model_state=None):
 
-    # TODO: Ensure that logging and tensorboard work
+    # TODO: Ensure that logging and tensorboard work properly
 
     reptile_args = ReptileTrainingArgs(
-        model = OmniglotModel,
+        model=OmniglotModel,
         inner_optimizer=optim.Adam,
         inner_learning_rate=0.03,
         num_inner_steps=1,
@@ -102,9 +130,7 @@ def run_reptile(context: ExperimentContext, initial_model_state = None):
         meta_learning_rate_final=0.03,
         num_meta_steps=1000
     )
-
     num_clients = 100
-
     experiment_logger = create_tensorboard_logger(
         context.name,
         (f"c{num_clients}is{reptile_args.num_inner_steps}"
@@ -112,6 +138,7 @@ def run_reptile(context: ExperimentContext, initial_model_state = None):
          f"ilr{str(reptile_args.inner_learning_rate).replace('.', '')}")
     )
 
+    # Load and prepare Omniglot data
     data_dir = REPO_ROOT / 'data'
     omniglot_dataset = load_omniglot_dataset(
         str(data_dir.absolute()),
@@ -121,6 +148,7 @@ def run_reptile(context: ExperimentContext, initial_model_state = None):
         num_shots_per_class=1,
         inner_batch_size=reptile_args.inner_batch_size
     )
+    # Prepare ModelArgs for task training
     inner_optimizer_args = OptimizerArgs(
         optimizer_class=reptile_args.inner_optimizer,
         lr=reptile_args.inner_learning_rate
@@ -131,7 +159,9 @@ def run_reptile(context: ExperimentContext, initial_model_state = None):
         only_digits=False
     )
 
-    # Set up clients with non-i.i.d. data
+    # Set up clients
+    # Since we are doing meta-learning, we need separate sets of training and
+    # test clients
     train_clients = []
     for c, dataset in omniglot_dataset.train_data_local_dict.items():
         client = ReptileClient(

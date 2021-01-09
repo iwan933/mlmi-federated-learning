@@ -42,10 +42,11 @@ def reptile_train_step(aggregator: ReptileServer,
                        meta_training_args: TrainArgs,
                        *args, **kwargs):
     """
-    Routine to run a training round with the given clients based on the server model and then aggregate the results
+    Routine to run a Reptile training step
     :param aggregator: aggregator participant that will aggregate the resulting training models
     :param participants: training participants in this round
-    :param training_args: training arguments for this round
+    :param inner_training_args: training arguments for participant models
+    :param meta_training_args: training arguments for meta model
     :return:
     """
 
@@ -68,6 +69,12 @@ def reptile_train_step(aggregator: ReptileServer,
 
 def reptile_evaluate(aggregator: ReptileServer,
                      participants: List[ReptileClient]):
+    """
+    Evaluate meta model on test clients
+    :param aggregator: Aggregator participants with meta model
+    :param participants: Test clients
+    :return:
+    """
     test_losses = []
     test_acc = []
     initial_model_state = aggregator.model.state_dict()

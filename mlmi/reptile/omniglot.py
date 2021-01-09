@@ -23,7 +23,9 @@ def load_omniglot_dataset(data_dir,
     :param num_clients_test: number of test clients
     :param num_classes_per_client: number of omniglot characters per client
     :param num_shots_per_class: number of data samples per omniglot character per client
-    :param inner_batch_size: number of data samples per batch
+    :param inner_batch_size: Number of data samples per batch. A value of -1
+            means batch size is equal to local training data size (full batch
+            training)
     :return:
     """
 
@@ -50,9 +52,12 @@ def load_omniglot_dataset(data_dir,
             num_classes=num_classes_per_client,
             num_shots=num_shots_per_class
         ))
+        _inner_batch_size = inner_batch_size
+        if _inner_batch_size == -1:
+            _inner_batch_size = len(client_train_data)
         federated_dataset_args['train_data_local_dict'][i] = DataLoader(
             dataset=client_train_data,
-            batch_size=inner_batch_size,
+            batch_size=_inner_batch_size,
             shuffle=True
         )
         federated_dataset_args['data_local_train_num_dict'][i] = len(client_train_data)
@@ -65,15 +70,20 @@ def load_omniglot_dataset(data_dir,
             num_classes=num_classes_per_client,
             num_shots=num_shots_per_class + 1
         )
-        # Split test data into test-train and test-test set. At test time, train
-        # model on test-train data and test on test-test data of unseen test clients.
+        # Train and test clients are two separate sets. Split data of test clients
+        # into test-train and test-test data. At test time, train model on
+        # test-train data and test it on test-test data in test clients.
         test_train_set, test_test_set = _split_train_test(client_test_data)
-        # 'test_data_local_dict' will contain a tuple of dataloader, test_train_set,
-        # and test_test_set
+        _inner_batch_size = inner_batch_size
+        if _inner_batch_size == -1:
+            _inner_batch_size = len(test_train_set)
+        # Note: 'test_data_local_dict' will contain tuples of (dataloader,
+        # test_train_set, test_test_set) as opposed to 'train_data_local_dict'
+        # which contains only dataloaders
         federated_dataset_args['test_data_local_dict'][i] = (
             DataLoader(
                 dataset=test_train_set,
-                batch_size=inner_batch_size,
+                batch_size=_inner_batch_size,
                 shuffle=True
             ),
             test_train_set,
@@ -85,6 +95,8 @@ def load_omniglot_dataset(data_dir,
     return FederatedDatasetData(**federated_dataset_args)
 
 
+# The below code is taken from the supervised-reptile repository (code from the
+# Nichols 2018 paper)
 def _sample_mini_dataset(dataset, num_classes, num_shots):
     """
     Sample a few shot task from a dataset.
@@ -97,7 +109,6 @@ def _sample_mini_dataset(dataset, num_classes, num_shots):
     for class_idx, class_obj in enumerate(shuffled[:num_classes]):
         for sample in class_obj.sample(num_shots):
             yield (sample, class_idx)
-
 
 def read_dataset(data_dir):
     """
@@ -121,7 +132,6 @@ def read_dataset(data_dir):
                 continue
             yield Character(os.path.join(alphabet_dir, char_name), 0)
 
-
 def split_dataset(dataset, num_train=1200):
     """
     Split the dataset into a training and test set.
@@ -136,7 +146,6 @@ def split_dataset(dataset, num_train=1200):
     random.shuffle(all_data)
     return all_data[:num_train], all_data[num_train:]
 
-
 def augment_dataset(dataset):
     """
     Augment the dataset by adding 90 degree rotations.
@@ -150,7 +159,6 @@ def augment_dataset(dataset):
     for character in dataset:
         for rotation in [0, 90, 180, 270]:
             yield Character(character.dir_path, rotation=rotation)
-
 
 # pylint: disable=R0903
 class Character:
@@ -185,7 +193,6 @@ class Character:
             img = Image.open(in_file).resize((28, 28)).rotate(self.rotation)
             self._cache[path] = np.array(img).astype('float32')
             return self._cache[path]
-
 
 def _split_train_test(samples, test_shots=1):
     """
