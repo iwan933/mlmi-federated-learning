@@ -5,6 +5,7 @@ from mlmi.participant import BaseParticipant
 from mlmi.struct import ClusterArgs
 
 import scipy.cluster.hierarchy as hac
+import torch
 from torch import mean
 import numpy as np
 import matplotlib.pyplot as plt
@@ -43,9 +44,23 @@ class GradientClusterPartitioner(BaseClusterPartitioner):
     def cluster(self, participants: List[BaseParticipant]) -> Dict[str, List[BaseParticipant]]:
         clusters_hac_dic = {}
 
+        def model_weigths(participant):
+            key_layers_participant = list(participant.get_model().state_dict().keys())
+            num_layers = int(len(participant.get_model().state_dict().keys()) / 2)
+            # ToDo: Mean over all dimensions
+            accumulated_weights_participant = 0
+            for layer in range(num_layers):
+                mean_weight_layer = participant.get_model().state_dict()[key_layers_participant[layer*2]].squeeze().mean((0,1,2))
+                print(mean_weight_layer.size())
+                mean_weight_layer = float(mean_weight_layer)
+                accumulated_weights_participant = accumulated_weights_participant + mean_weight_layer
+            return accumulated_weights_participant
+
         # Compute distance matrix of model updates: Using mean of weights from last layer of each participant
         model_updates = np.array([])
         for participant in participants:
+            accumulated_weights_participant = model_weigths(participant)
+            print(accumulated_weights_participant)
             weights_last_layer_key = list(participant.get_model().state_dict().keys())[-2]
             weights_last_layer = participant.get_model().state_dict()[weights_last_layer_key]
             model_updates = np.append(model_updates, mean(weights_last_layer).numpy())
