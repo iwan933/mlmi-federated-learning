@@ -120,9 +120,6 @@ def run_fedavg(context: ExperimentContext, num_rounds: int, save_states: bool,
                server: Optional['FedAvgServer'] = None, start_round=0):
     assert (server is None and clients is None) or (server is not None and clients is not None)
 
-    if start_round + 1 >= num_rounds:
-        return
-
     if clients is None or server is None:
         logger.info('initializing server ...')
         server = FedAvgServer('initial_server', context.model_args, context)
@@ -130,6 +127,10 @@ def run_fedavg(context: ExperimentContext, num_rounds: int, save_states: bool,
             server.overwrite_model_state(initial_model_state)
         logger.info('initializing clients ...')
         clients = initialize_clients(context, server.model.state_dict())
+
+    if start_round + 1 > num_rounds:
+        return server, clients
+
     num_train_samples = [client.num_train_samples for client in clients]
     num_total_samples = sum(num_train_samples)
     logger.info(f'... copied {num_total_samples} data samples in total')
@@ -262,8 +263,11 @@ if __name__ == '__main__':
             return
 
         if args.hierarchical:
-            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.1, local_epochs=1,
-                                                        lr=0.3, batch_size=10, fed_dataset=fed_dataset)
+            cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech="single", criterion="maxclust",
+                                       dis_metric="euclidean", max_value_criterion=4)
+            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.1, local_epochs=5,
+                                                        lr=0.05, batch_size=10, fed_dataset=fed_dataset,
+                                                        cluster_args=cluster_args)
             run_fedavg_hierarchical(context, 1, 20)
         elif args.search_grid:
             param_grid = {'lr': list(lr_gen([1], [-1])) + list(lr_gen([1, 2.5, 5, 7.5], [-2])) +
