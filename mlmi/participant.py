@@ -31,7 +31,7 @@ class BaseParticipant(object):
         self._model = model_args.model_class(*model_args.args, **model_args.kwargs, participant_name=participant_name)
 
     @property
-    def model(self) -> Union['BaseParticipantModel', pl.LightningModule]:
+    def model(self) -> pl.LightningModule:
         """
         The model to train
         :return: The model

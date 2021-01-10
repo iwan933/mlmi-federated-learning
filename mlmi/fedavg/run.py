@@ -29,7 +29,7 @@ logger = getLogger(__name__)
 
 def add_args(parser: argparse.ArgumentParser):
     parser.add_argument('--hierarchical', dest='hierarchical', action='store_const',
-                        const=True, default=False)
+                        const=True, default=True)
     parser.add_argument('--search-grid', dest='search_grid', action='store_const',
                         const=True, default=False)
     parser.add_argument('--cifar10', dest='cifar10', action='store_const',
@@ -39,7 +39,7 @@ def add_args(parser: argparse.ArgumentParser):
     parser.add_argument('--log-data-distribution', dest='log_data_distribution', action='store_const',
                         const=True, default=False)
     parser.add_argument('--no-model-reuse', dest='load_last_state', action='store_const',
-                        const=False, default=True)
+                        const=False, default=False)
     parser.add_argument('--scratch-data', dest='scratch_data', action='store_const',
                         const=True, default=False)
     parser.add_argument('--max-last', type=int, dest='max_last', default=-1)
@@ -199,6 +199,7 @@ def create_femnist_experiment_context(name: str, local_epochs: int, fed_dataset:
     optimizer_args = OptimizerArgs(optim.Adam, lr=lr)
     model_args = ModelArgs(CNNLightning, optimizer_args, only_digits=False)
     training_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, gradient_clip_val=0.5)
+    cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech='single', criterion='maxclust', dis_metric='euclidean', max_value_criterion=4)
     context = ExperimentContext(name=name, client_fraction=client_fraction, local_epochs=local_epochs,
                                 lr=lr, batch_size=batch_size, optimizer_args=optimizer_args, model_args=model_args,
                                 train_args=training_args, dataset=fed_dataset, cluster_args=cluster_args)
@@ -251,7 +252,7 @@ if __name__ == '__main__':
             fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=3400, batch_size=10)
 
             # select 367 clients as in the briggs paper
-            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 367)
+            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 10)
 
         if args.scratch_data:
             scratch_data(fed_dataset, client_fraction_to_scratch=0.75, fraction_to_scratch=0.9)
@@ -265,7 +266,7 @@ if __name__ == '__main__':
         if args.hierarchical:
             cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech="single", criterion="maxclust",
                                        dis_metric="euclidean", max_value_criterion=4)
-            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.1, local_epochs=5,
+            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.5, local_epochs=1,
                                                         lr=0.05, batch_size=10, fed_dataset=fed_dataset,
                                                         cluster_args=cluster_args)
             run_fedavg_hierarchical(context, 1, 20)
