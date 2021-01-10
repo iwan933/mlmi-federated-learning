@@ -199,7 +199,7 @@ def create_femnist_experiment_context(name: str, local_epochs: int, fed_dataset:
     optimizer_args = OptimizerArgs(optim.Adam, lr=lr)
     model_args = ModelArgs(CNNLightning, optimizer_args, only_digits=False)
     training_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, gradient_clip_val=0.5)
-    cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech='single', criterion='maxclust', dis_metric='euclidean', max_value_criterion=4)
+    cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech='single', criterion='maxclust', dis_metric='euclidean', max_value_criterion=4, plot_dendrogram=False)
     context = ExperimentContext(name=name, client_fraction=client_fraction, local_epochs=local_epochs,
                                 lr=lr, batch_size=batch_size, optimizer_args=optimizer_args, model_args=model_args,
                                 train_args=training_args, dataset=fed_dataset, cluster_args=cluster_args)
@@ -265,11 +265,11 @@ if __name__ == '__main__':
 
         if args.hierarchical:
             cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech="single", criterion="maxclust",
-                                       dis_metric="euclidean", max_value_criterion=4)
+                                       dis_metric="euclidean", max_value_criterion=4, plot_dendrogram=False)
             context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.5, local_epochs=1,
                                                         lr=0.05, batch_size=10, fed_dataset=fed_dataset,
                                                         cluster_args=cluster_args)
-            run_fedavg_hierarchical(context, 1, 20)
+            run_fedavg_hierarchical(context, 1, 2)
         elif args.search_grid:
             param_grid = {'lr': list(lr_gen([1], [-1])) + list(lr_gen([1, 2.5, 5, 7.5], [-2])) +
                                 list(lr_gen([5, 7.5], [-3])), 'local_epochs': [1, 5],

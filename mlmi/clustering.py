@@ -1,5 +1,6 @@
 from typing import Dict, List, TypeVar
 import random
+import logging
 
 from mlmi.participant import BaseParticipant
 from mlmi.struct import ClusterArgs
@@ -35,20 +36,20 @@ class RandomClusterPartitioner(BaseClusterPartitioner):
 
 class GradientClusterPartitioner(BaseClusterPartitioner):
 
-    def __init__(self, linkage_mech, criterion, dis_metric, max_value_criterion):
+    def __init__(self, linkage_mech, criterion, dis_metric, max_value_criterion, plot_dendrogram):
         self.linkage_mech = linkage_mech
         self.criterion = criterion
         self.dis_metric = dis_metric
         self.max_value_criterion = max_value_criterion
+        self.plot_dendrogram = plot_dendrogram
 
     def model_weigths(self, participant: BaseParticipant):
-        a = participant.model()
-        key_layers_participant = list(participant.model().state_dict().keys())
-        num_layers = int(len(participant.model().state_dict().keys()) / 2)
+        key_layers_participant = list(participant.model.state_dict().keys())
+        num_layers = int(len(participant.model.state_dict().keys()) / 2)
         accumulated_weights_participant = 0
         for layer in range(num_layers):
-            layer_dim = participant.model().state_dict()[key_layers_participant[layer*2]].squeeze().dim()
-            weights_layer = participant.model().state_dict()[key_layers_participant[layer * 2]].squeeze()
+            layer_dim = participant.model.state_dict()[key_layers_participant[layer*2]].squeeze().dim()
+            weights_layer = participant.model.state_dict()[key_layers_participant[layer * 2]].squeeze()
             mean_weights_layer = weights_layer.mean(tuple(range(layer_dim)))
             mean_weights_layer = float(mean_weights_layer)
             accumulated_weights_participant = accumulated_weights_participant + mean_weights_layer
@@ -56,12 +57,12 @@ class GradientClusterPartitioner(BaseClusterPartitioner):
         return accumulated_weights_participant
 
     def cluster(self, participants: List[BaseParticipant]) -> Dict[str, List[BaseParticipant]]:
+        logging.info('Start clustering')
         clusters_hac_dic = {}
 
         # Compute distance matrix of model updates: Using mean of weights from last layer of each participant
         model_updates = np.array([])
         for participant in participants:
-            print(participant.m)
             accumulated_weights_participant = self.model_weigths(participant)
             model_updates = np.append(model_updates, accumulated_weights_participant)
 
@@ -84,11 +85,15 @@ class GradientClusterPartitioner(BaseClusterPartitioner):
             clusters_hac_dic[participant.cluster_id].append(participant)
             i += 1
 
-        # Plotting dendrogram for client clusters
-        hac.dendrogram(distance_matrix, leaf_rotation=45., leaf_font_size=12, show_contracted=True)
-        plt.title("Dendrogram: Client clusters")
-        plt.ylabel("Distance")
-        plt.show()
+        logging.info('Found %i clusters', num_cluster)
+        logging.info('Finished clustering')
+
+        if self.plot_dendrogram:
+            # Plotting dendrogram for client clusters
+            hac.dendrogram(distance_matrix, leaf_rotation=45., leaf_font_size=12, show_contracted=True)
+            plt.title("Dendrogram: Client clusters")
+            plt.ylabel("Distance")
+            plt.show()
 
         return clusters_hac_dic
 
