@@ -86,6 +86,9 @@ class GradientClusterPartitioner(BaseClusterPartitioner):
             clusters_hac_dic[participant.cluster_id].append(participant)
             i += 1
 
+        logging.info('Used linkage method: ' + str(self.linkage_mech))
+        logging.info('Used distance method: ' + str(self.dis_metric))
+        logging.info('Used criterion for clustering: ' + str(self.criterion))
         logging.info('Found %i clusters', num_cluster)
         logging.info('Finished clustering')
 
