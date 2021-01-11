@@ -22,9 +22,31 @@ class ClusterArgs(object):
         self.args = args
         self.kwargs = kwargs
         self.partitioner_class = partitioner_class
+        self._config_string = self._create_config_string(**kwargs)
+
+    def _create_config_string(self, **kwargs):
+        unique_str = ''
+        linkage_mech = kwargs.get('linkage_mech', None)
+        criterion = kwargs.get('criterion', None)
+        dis_metric = kwargs.get('dis_metric', None)
+        max_value_criterion = kwargs.get('max_value_criterion', None)
+        if linkage_mech == 'ward':
+            unique_str += 'w'
+        else:
+            raise ValueError(f'No shortform of linkage_mech "{linkage_mech}" known')
+        if criterion == 'distance':
+            unique_str += '_dist'
+        else:
+            raise ValueError(f'No shortform of criterion "{criterion}" known')
+        if dis_metric == 'euclidean':
+            unique_str += '_eu'
+        else:
+            raise ValueError(f'No shortform of dis_metric "{dis_metric}" known')
+        unique_str += f'{max_value_criterion:.2f}'
+        return unique_str
 
     def __str__(self):
-        return 'implement_me'
+        return self._config_string
 
 
 class OptimizerArgs(object):
@@ -104,6 +126,4 @@ class ExperimentContext(object):
         :return:
         """
         id = f'{self.dataset.name}_bs{self.batch_size}lr{self.lr:.2E}cf{self.client_fraction:.2f}e{self.local_epochs}'
-        if self.cluster_args is not None:
-            id += str(self.cluster_args)
         return id

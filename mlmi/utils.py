@@ -72,8 +72,8 @@ def _evaluate_model(participants: List['BaseTrainingParticipant'], test_on_parti
                     test_losses.append(result.get(key))
                 elif key.startswith('test/acc'):
                     test_acc.append(result.get(key))
-    losses = torch.squeeze(torch.FloatTensor(test_losses))
-    acc = torch.squeeze(torch.FloatTensor(test_acc))
+    losses = torch.squeeze(torch.FloatTensor(test_losses)).cpu()
+    acc = torch.squeeze(torch.FloatTensor(test_acc)).cpu()
     return losses, acc
 
 

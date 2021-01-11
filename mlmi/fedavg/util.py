@@ -1,5 +1,6 @@
 import threading
-from typing import List, Dict, Union
+import json
+from typing import List, Dict, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -67,10 +68,80 @@ def run_fedavg_round(aggregator: BaseAggregatorParticipant, participants: List[B
     overwrite_participants_models(resulting_model_state, participants)
 
 
-def save_fedavg_state(experiment_context: 'ExperimentContext', fl_round: int, model_state: Dict[str, Tensor]):
+def save_fedavg_hierarchical_cluster_configuration(
+        experiment_context: ExperimentContext,
+        cluster_names: List[str],
+        client_ids: Dict[str, List[str]]
+):
+    # save client assignments
+    configuration = {
+        'cluster_names': cluster_names,
+        'client_ids': client_ids
+    }
+    directory = REPO_ROOT / 'run' / 'states' / 'fedavg_hierarchical'
+    configuration_path = directory / f'{experiment_context}{experiment_context.cluster_args}.json'
+    configuration_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(configuration_path, 'w') as f:
+        json.dump(configuration, f)
+
+
+def load_fedavg_hierarchical_cluster_configuration(
+        experiment_context: ExperimentContext
+) -> Tuple[Optional[List[str]], Optional[Dict[str, List[str]]]]:
+    # save client assignments
+
+    directory = REPO_ROOT / 'run' / 'states' / 'fedavg_hierarchical'
+    configuration_path = directory / f'{experiment_context}{experiment_context.cluster_args}.json'
+    if not configuration_path.exists():
+        return None, None
+    with open(configuration_path, 'r') as f:
+        configuration = json.load(f)
+    return configuration.get('cluster_names'), configuration.get('client_ids')
+
+
+def save_fedavg_hierarchical_cluster_model_state(
+        experiment_context: ExperimentContext,
+        fl_round: int,
+        cluster_name: str,
+        cluster_round: int,
+        cluster_model_state: Dict[str, Tensor]
+):
+    """
+    Saves the federated hierarchical clustering state (client distribution, cluster state)
+    :param experiment_context: federated averaging experiment context
+    :param fl_round: round of initializing fedavg
+    :param cluster_model_state: state of the cluster model
+    :param cluster_round: round inside cluster
+    :param cluster_name: name of cluster
+    :return:
+    """
+
+    unique_name = f'{experiment_context}r{fl_round}_{experiment_context.cluster_args}r{cluster_round}n{cluster_name}'
+    directory = REPO_ROOT / 'run' / 'states' / 'fedavg_hierarchical'
+    model_path = directory / f'{unique_name}.mdl'
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(cluster_model_state, model_path)
+
+
+def load_fedavg_hierarchical_cluster_model_state(
+        experiment_context: ExperimentContext,
+        fl_round: int, cluster_name: str,
+        cluster_round: int
+) -> Optional[Dict[str, Tensor]]:
+    unique_name = f'{experiment_context}r{fl_round}_{experiment_context.cluster_args}r{cluster_round}n{cluster_name}'
+    directory = REPO_ROOT / 'run' / 'states' / 'fedavg_hierarchical'
+    model_path = directory / f'{unique_name}.mdl'
+    if not model_path.exists():
+        return None
+    return torch.load(model_path)
+
+
+def load_fedavg_hierarchical_cluster_state(
+        experiment_context: 'ExperimentContext', fl_round: int) -> Union[Dict[str, Tensor], None]:
     path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{experiment_context}r{fl_round}.mdl'
-    path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(model_state, path)
+    if not path.exists():
+        return None
+    return torch.load(path)
 
 
 def load_fedavg_state(experiment_context: 'ExperimentContext', fl_round: int) -> Union[Dict[str, Tensor], None]:
@@ -78,3 +149,9 @@ def load_fedavg_state(experiment_context: 'ExperimentContext', fl_round: int) ->
     if not path.exists():
         return None
     return torch.load(path)
+
+
+def save_fedavg_state(experiment_context: 'ExperimentContext', fl_round: int, model_state: Dict[str, Tensor]):
+    path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{experiment_context}r{fl_round}.mdl'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(model_state, path)
