@@ -22,7 +22,7 @@ from mlmi.fedavg.model import FedAvgClient, FedAvgServer, CNNLightning
 from mlmi.fedavg.util import load_fedavg_state, run_fedavg_round, save_fedavg_state
 from mlmi.struct import ModelArgs, TrainArgs, OptimizerArgs
 from mlmi.settings import REPO_ROOT
-from mlmi.utils import create_tensorboard_logger, evaluate_global_model, fix_random_seeds
+from mlmi.utils import create_tensorboard_logger, evaluate_global_model, fix_random_seeds, evaluate_local_models
 
 logger = getLogger(__name__)
 
