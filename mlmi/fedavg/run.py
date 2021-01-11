@@ -168,6 +168,12 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
     partitioner = context.cluster_args.partitioner_class(*context.cluster_args.args, **context.cluster_args.kwargs)
     cluster_clients_dic = partitioner.cluster(clients)
 
+    # Logging post clustering mean acc and loss of clients
+    loss_acc_clients = evaluate_local_models(clients)
+    acc_clients_post_clustering = loss_acc_clients.get('test/acc')
+    loss_clients_post_clustering = loss_acc_clients.get('test/loss')
+    log_loss_and_acc('Post clustering', loss_clients_post_clustering, acc_clients_post_clustering, context.experiment_logger, num_rounds_init)
+
     # Initialize cluster models
     cluster_server_dic = {}
     for cluster_id, participants in cluster_clients_dic.items():
