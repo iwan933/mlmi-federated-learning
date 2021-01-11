@@ -24,7 +24,7 @@ from mlmi.fedavg.util import load_fedavg_hierarchical_cluster_configuration, \
     save_fedavg_hierarchical_cluster_configuration, save_fedavg_hierarchical_cluster_model_state, save_fedavg_state
 from mlmi.struct import ModelArgs, TrainArgs, OptimizerArgs
 from mlmi.settings import REPO_ROOT
-from mlmi.utils import create_tensorboard_logger, evaluate_global_model, fix_random_seeds
+from mlmi.utils import create_tensorboard_logger, evaluate_global_model, fix_random_seeds, evaluate_local_models
 
 logger = getLogger(__name__)
 
@@ -195,6 +195,7 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
     # Train in clusters
     for cluster_id in cluster_clients_dic.keys():
         for i in range(num_rounds_cluster):
+            logger.info('starting training cluster {1} in round {0}'.format(str(i + 1), cluster_id))
             # train
             cluster_server = cluster_server_dic[cluster_id]
             cluster_clients = cluster_clients_dic[cluster_id]
