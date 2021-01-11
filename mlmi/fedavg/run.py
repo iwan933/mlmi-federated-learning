@@ -216,7 +216,6 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
             if restore_clustering and loaded_state is not None:
                 cluster_server.overwrite_model_state(loaded_state)
                 logger.info(f'skipping training cluster {cluster_id} in round {i+1}. loaded state from disk.')
-                continue
             else:
                 logger.info(f'starting training cluster {cluster_id} in round {i+1}')
                 num_train_samples = [client.num_train_samples for client in cluster_clients]
