@@ -43,7 +43,8 @@ class GradientClusterPartitioner(BaseClusterPartitioner):
         self.max_value_criterion = max_value_criterion
         self.plot_dendrogram = plot_dendrogram
 
-    def model_weigths(self, participant: BaseParticipant):
+    @staticmethod
+    def model_weights(participant: BaseParticipant):
         key_layers_participant = list(participant.model.state_dict().keys())
         num_layers = int(len(participant.model.state_dict().keys()) / 2)
         accumulated_weights_participant = 0
@@ -63,7 +64,7 @@ class GradientClusterPartitioner(BaseClusterPartitioner):
         # Compute distance matrix of model updates: Using mean of weights from last layer of each participant
         model_updates = np.array([])
         for participant in participants:
-            accumulated_weights_participant = self.model_weigths(participant)
+            accumulated_weights_participant = self.model_weights(participant)
             model_updates = np.append(model_updates, accumulated_weights_participant)
 
         model_updates = np.reshape(model_updates, (len(model_updates), 1))
