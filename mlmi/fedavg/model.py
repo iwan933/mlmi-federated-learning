@@ -7,7 +7,7 @@ from torch.nn import functional as F
 import pytorch_lightning as pl
 from pytorch_lightning.metrics import Accuracy
 
-from fedml_api.model.cv.cnn import CNN_DropOut
+from fedml_api.model.cv.cnn import CNN_DropOut, CNN_OriginalFedAvg
 
 from mlmi.log import getLogger
 from mlmi.participant import BaseParticipantModel, BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
@@ -68,7 +68,7 @@ class CNNLightning(BaseParticipantModel, pl.LightningModule):
 
     def __init__(self, optimizer_args: OptimizerArgs, only_digits=False, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.model = CNN_DropOut(only_digits=only_digits)
+        self.model = CNN_OriginalFedAvg(only_digits=only_digits)
         self.optimizer_args = optimizer_args
         self.accuracy = Accuracy()
         o = self.optimizer_args
