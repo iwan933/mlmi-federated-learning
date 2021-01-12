@@ -39,7 +39,8 @@ def run_train_round(participants: List[BaseTrainingParticipant], training_args: 
 def reptile_train_step(aggregator: ReptileServer,
                        participants: List[ReptileClient],
                        inner_training_args: TrainArgs,
-                       meta_training_args: TrainArgs,
+                       meta_training_args: TrainArgs = None,
+                       evaluation_mode: bool = False,
                        *args, **kwargs):
     """
     Routine to run a Reptile training step
@@ -57,37 +58,12 @@ def reptile_train_step(aggregator: ReptileServer,
     logger.debug('starting training round.')
     run_train_round(participants, inner_training_args)
 
-    logger.debug('starting aggregation.')
-    aggregator.aggregate(
-        participants=participants,
-        meta_learning_rate=meta_training_args.kwargs['meta_learning_rate']
-    )
-
-    logger.debug('distribute the aggregated global model to clients')
-    resulting_model_state = aggregator.model.state_dict()
-    overwrite_participants_models(resulting_model_state, participants)
-
-def reptile_evaluate(aggregator: ReptileServer,
-                     participants: List[ReptileClient]):
-    """
-    Evaluate meta model on test clients
-    :param aggregator: Aggregator participants with meta model
-    :param participants: Test clients
-    :return:
-    """
-    test_losses = []
-    test_acc = []
-    initial_model_state = aggregator.model.state_dict()
-    overwrite_participants_models(initial_model_state, participants)
-
-    for participant in participants:
-        results = participant.test()
-        for result in results:
-            for key in result.keys():
-                if key.startswith('test/loss'):
-                    test_losses.append(result.get(key))
-                elif key.startswith('test/acc'):
-                    test_acc.append(result.get(key))
-    losses = torch.squeeze(torch.FloatTensor(test_losses))
-    acc = torch.squeeze(torch.FloatTensor(test_acc))
-    return {'test/loss': losses, 'test/acc': acc}
+    # Aggregate only when not in evaluation mode
+    if not evaluation_mode:
+        assert meta_training_args is not None, ('Argument meta_training_args '
+            'must not be None when not in evaluation_mode')
+        logger.debug('starting aggregation.')
+        aggregator.aggregate(
+            participants=participants,
+            meta_learning_rate=meta_training_args.kwargs['meta_learning_rate']
+        )

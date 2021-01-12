@@ -1,12 +1,15 @@
 from typing import Dict, List
 from collections import OrderedDict
 
+import torch
 from torch import Tensor
+from torch.nn import functional as F
 import pytorch_lightning as pl
+from pytorch_lightning.metrics import Accuracy
 
 from mlmi.log import getLogger
 from mlmi.participant import BaseParticipantModel, BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
-from mlmi.struct import TrainArgs, ModelArgs, ExperimentContext
+from mlmi.struct import TrainArgs, ModelArgs, ExperimentContext, OptimizerArgs
 
 
 logger = getLogger(__name__)
@@ -35,55 +38,16 @@ def subtract_model_states(minuend: OrderedDict,
     return result_state
 
 class ReptileClient(BaseTrainingParticipant):
+    pass
 
-    def test(self, training_args: TrainArgs):
-        """
-        Test the model state on this client's data.
-        :param
-        :param model_state: The model state to evaluate
-        :return: The output loss
-        """
-        # TODO: Finish implementation of this function
-
-        trainer = self.create_trainer(enable_logging=False,
-                                      **training_args.kwargs)
-        train_dataloader = self.test_data_loader[0]
-        trainer.fit(self.model, train_dataloader, train_dataloader)
-        self.save_model_state()
-
-        train_set, test_set = self.test_data_loader[1], self.train_data_loader[2]
-        test_preds = self._test_predictions(train_set=train_set, test_set=test_set)
-        # TODO: Compute loss and accuracy
-        #num_correct = sum([pred == sample[1] for pred, sample in zip(test_preds, test_set)])
-        #self._full_state.import_variables(old_vars)
-        #return num_correct
-
-        #result = trainer.test(model=model, test_dataloaders=self.test_data_loader)
-        #return result
-
-    # The below function was taken from the supervised-reptile repository (from
-    # the Nichols 2018 paper)
-    def _test_predictions(self, train_set, test_set):
-        """
-        Get model predictions on test set. Train set required as input
-        (presumably) because of batch normalization.
-        :param train_set:
-        :param test_set:
-        :return:
-        """
-        res = []
-        for test_sample in test_set:
-            inputs, _ = zip(*train_set)
-            inputs += (test_sample[0],)
-            res.append(self.model(inputs)[-1])
-        return res
 
 class ReptileServer(BaseAggregatorParticipant):
     def __init__(self,
                  participant_name: str,
+                 model_args,
                  context: ExperimentContext,
                  initial_model_state: OrderedDict = None):
-        super().__init__(participant_name, None, context)
+        super().__init__(participant_name, model_args, context)
         # Initialize model parameters
         if initial_model_state is not None:
             self.model.load_state_dict(initial_model_state)
@@ -149,26 +113,84 @@ class ReptileServer(BaseAggregatorParticipant):
                 learning_rate * gradient[key]
         self.model.load_state_dict(new_model_state)
 
-class OmniglotModel(BaseParticipantModel, pl.LightningModule):
-    # TODO: Implement model as below in PyTorch (this is the classifier from
-    #       Nichols 2018: On First-Order Meta-Learning Algorithms)
 
-class OmniglotModel:
+class OmniglotLightning(BaseParticipantModel, pl.LightningModule):
     """
-    A model for Omniglot classification.
+    A model for Omniglot classification - PyTorch implementation.
+    """
+    def __init__(self, optimizer_args: OptimizerArgs, num_classes:int, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.model = OmniglotModel(num_classes=num_classes)
+        self.optimizer_args = optimizer_args
+        self.accuracy = Accuracy()
+
+    def configure_optimizers(self):
+        o = self.optimizer_args
+        return o.optimizer_class(self.model.parameters(), *o.optimizer_args, **o.optimizer_kwargs)
+
+    def training_step(self, train_batch, batch_idx):
+        x, y = train_batch
+        y = y.long()
+        logits = self.model(x)
+        loss = F.cross_entropy(logits, y)
+        preds = torch.argmax(logits, dim=1)
+        # TODO: this should actually be calculated on a validation set (missing cross entropy implementation)
+        self.log('train/acc/{}'.format(self.participant_name), self.accuracy(preds, y))
+        self.log('train/loss/{}'.format(self.participant_name), loss)
+        return loss
+
+    def test_step(self, test_batch, batch_idx):
+        x, y = test_batch
+        y = y.long()
+        logits = self.model(x)
+        loss = F.cross_entropy(logits, y)
+        preds = torch.argmax(logits, dim=1)
+        self.log('test/acc/{}'.format(self.participant_name), self.accuracy(preds, y))
+        self.log('test/loss/{}'.format(self.participant_name), loss)
+        return loss
+
+
+class OmniglotModel(torch.nn.Module):
+    """
+    A model for Omniglot classification. Adapted from Nichol 2018.
     """
 
-    def __init__(self, num_classes, optimizer=DEFAULT_OPTIMIZER, **optim_kwargs):
-        self.input_ph = tf.placeholder(tf.float32, shape=(None, 28, 28))
-        out = tf.reshape(self.input_ph, (-1, 28, 28, 1))
-        for _ in range(4):
-            out = tf.layers.conv2d(out, 64, 3, strides=2, padding='same')
-            out = tf.layers.batch_normalization(out, training=True)
-            out = tf.nn.relu(out)
-        out = tf.reshape(out, (-1, int(np.prod(out.get_shape()[1:]))))
-        self.logits = tf.layers.dense(out, num_classes)
-        self.label_ph = tf.placeholder(tf.int32, shape=(None,))
-        self.loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.label_ph,
-                                                                   logits=self.logits)
-        self.predictions = tf.argmax(self.logits, axis=-1)
-        self.minimize_op = optimizer(**optim_kwargs).minimize(self.loss)
+    def __init__(self, num_classes: int):
+        super().__init__()
+
+        self.conv2d = []
+        self.batchnorm = []
+        self.relu = []
+
+        kernel_size = 3
+        for i in range(4):
+            self.conv2d.append(
+                torch.nn.Conv2d(
+                    in_channels=1 if i == 0 else 64,
+                    out_channels=64,
+                    kernel_size=kernel_size,
+                    stride=2,
+                    padding=int((kernel_size - 1) / 2)  # Apply same padding
+                )
+            )
+            self.batchnorm.append(
+                torch.nn.BatchNorm2d(
+                    num_features=64,
+                    eps=1e-3,
+                    momentum=0.01
+                )
+            )
+            self.relu.append(
+                torch.nn.ReLU()
+            )
+        self.flatten = torch.nn.Flatten(start_dim=1)
+        self.logits = torch.nn.Linear(in_features=256, out_features=num_classes)
+
+    def forward(self, x):
+        for i in range(4):
+            x = self.conv2d[i](x)
+            x = self.batchnorm[i](x)
+            x = self.relu[i](x)
+        x = self.flatten(x)
+        x = self.logits(x)
+        return x
