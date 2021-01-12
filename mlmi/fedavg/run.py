@@ -224,7 +224,7 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
             result = evaluate_global_model(global_model_participant=cluster_server, participants=cluster_clients)
             log_loss_and_acc(f'cluster{cluster_id}', result.get('test/loss'), result.get('test/acc'),
                              context.experiment_logger, i)
-            log_goal_test_acc(f'cluster{cluster_id}_99', clients, result.get('test/acc'), context.experiment_logger, i)
+            log_goal_test_acc(f'cluster{cluster_id}_99', result.get('test/acc'), context.experiment_logger, i)
             save_fedavg_hierarchical_cluster_model_state(context, num_rounds_init, cluster_id, i,
                                                          cluster_server.model.state_dict())
             logger.info(f'finished training cluster {cluster_id}')
@@ -243,7 +243,6 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
         log_loss_and_acc('total hierarchical', global_losses, global_acc, context.experiment_logger,
                          num_rounds_init + i)
         log_goal_test_acc('total 99%', global_acc, context.experiment_logger, num_rounds_init + i)
-
 
 def create_femnist_experiment_context(name: str, local_epochs: int, fed_dataset: FederatedDatasetData, batch_size: int,
                                       lr: float, client_fraction: float, fixed_logger_version=None,
@@ -304,7 +303,7 @@ if __name__ == '__main__':
             fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=3400, batch_size=10)
 
             # select 367 clients as in the briggs paper
-            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 367)
+            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 20)
 
         if args.scratch_data:
             scratch_data(fed_dataset, client_fraction_to_scratch=0.75, fraction_to_scratch=0.9)
@@ -318,10 +317,10 @@ if __name__ == '__main__':
         if args.hierarchical:
             cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech="ward", criterion="distance",
                                        dis_metric="euclidean", max_value_criterion=10, plot_dendrogram=False)
-            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=3,
+            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=1,
                                                         lr=0.1, batch_size=10, fed_dataset=fed_dataset,
                                                         cluster_args=cluster_args)
-            run_fedavg_hierarchical(context, 2, 2, restore_clustering=True)
+            run_fedavg_hierarchical(context, 1, 1, restore_clustering=True)
         elif args.search_grid:
             param_grid = {'lr': list(lr_gen([1], [-1])) + list(lr_gen([1, 2.5, 5, 7.5], [-2])) +
                                 list(lr_gen([5, 7.5], [-3])), 'local_epochs': [1, 5],
