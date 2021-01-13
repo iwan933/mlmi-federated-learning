@@ -21,7 +21,8 @@ from mlmi.fedavg.femnist import load_femnist_dataset
 from mlmi.fedavg.model import FedAvgClient, FedAvgServer, CNNLightning
 from mlmi.fedavg.util import load_fedavg_hierarchical_cluster_configuration, \
     load_fedavg_hierarchical_cluster_model_state, load_fedavg_state, run_fedavg_round, \
-    save_fedavg_hierarchical_cluster_configuration, save_fedavg_hierarchical_cluster_model_state, save_fedavg_state
+    save_fedavg_hierarchical_cluster_configuration, save_fedavg_hierarchical_cluster_model_state, save_fedavg_state, \
+    run_train_round
 from mlmi.struct import ModelArgs, TrainArgs, OptimizerArgs
 from mlmi.settings import REPO_ROOT
 from mlmi.utils import create_tensorboard_logger, evaluate_global_model, fix_random_seeds, evaluate_local_models
@@ -174,6 +175,9 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
         server = FedAvgServer('initial_server', context.model_args, context)
         server.overwrite_model_state(saved_model_state)
         clients = initialize_clients(context, initial_model_state=saved_model_state)
+
+    logger.debug('starting local training before clustering.')
+    run_train_round(clients, context.train_args)
 
     cluster_ids, cluster_clients = None, None
     if restore_clustering:
