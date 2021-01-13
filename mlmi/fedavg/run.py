@@ -21,7 +21,8 @@ from mlmi.fedavg.femnist import load_femnist_dataset
 from mlmi.fedavg.model import FedAvgClient, FedAvgServer, CNNLightning
 from mlmi.fedavg.util import load_fedavg_hierarchical_cluster_configuration, \
     load_fedavg_hierarchical_cluster_model_state, load_fedavg_state, run_fedavg_round, \
-    save_fedavg_hierarchical_cluster_configuration, save_fedavg_hierarchical_cluster_model_state, save_fedavg_state
+    save_fedavg_hierarchical_cluster_configuration, save_fedavg_hierarchical_cluster_model_state, save_fedavg_state, \
+    run_train_round
 from mlmi.struct import ModelArgs, TrainArgs, OptimizerArgs
 from mlmi.settings import REPO_ROOT
 from mlmi.utils import create_tensorboard_logger, evaluate_global_model, fix_random_seeds, evaluate_local_models
@@ -175,6 +176,9 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
         server.overwrite_model_state(saved_model_state)
         clients = initialize_clients(context, initial_model_state=saved_model_state)
 
+    logger.debug('starting local training before clustering.')
+    run_train_round(clients, context.train_args)
+
     cluster_ids, cluster_clients = None, None
     if restore_clustering:
         # load configuration
@@ -316,12 +320,12 @@ if __name__ == '__main__':
             return
 
         if args.hierarchical:
-            cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech="ward", criterion="distance",
-                                       dis_metric="euclidean", max_value_criterion=10, plot_dendrogram=False)
+            cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech="single", criterion="maxclust",
+                                       dis_metric="euclidean", max_value_criterion=6, plot_dendrogram=True)
             context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=3,
                                                         lr=0.1, batch_size=10, fed_dataset=fed_dataset,
                                                         cluster_args=cluster_args)
-            run_fedavg_hierarchical(context, 10, 40, restore_clustering=False)
+            run_fedavg_hierarchical(context, 10, 1, restore_clustering=False)
         elif args.search_grid:
             param_grid = {'lr': list(lr_gen([1], [-1])) + list(lr_gen([1, 2.5, 5, 7.5], [-2])) +
                                 list(lr_gen([5, 7.5], [-3])), 'local_epochs': [1, 5],

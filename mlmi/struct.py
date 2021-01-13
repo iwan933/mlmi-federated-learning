@@ -30,11 +30,11 @@ class ClusterArgs(object):
         criterion = kwargs.get('criterion', None)
         dis_metric = kwargs.get('dis_metric', None)
         max_value_criterion = kwargs.get('max_value_criterion', None)
-        if linkage_mech == 'ward':
+        if linkage_mech == 'single':
             unique_str += 'w'
         else:
             raise ValueError(f'No shortform of linkage_mech "{linkage_mech}" known')
-        if criterion == 'distance':
+        if criterion == 'maxclust':
             unique_str += '_dist'
         else:
             raise ValueError(f'No shortform of criterion "{criterion}" known')
