@@ -227,14 +227,14 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
             zip(range(reptile_args.num_meta_steps), cycle(client_batches)):
         logger.info(f'starting meta training round {i + 1}')
         # train
-       # reptile_train_step(
-       #     aggregator=server,
-       #     participants=client_batch,
-       #     inner_training_args=reptile_args.get_inner_training_args(),
-       #     meta_training_args=reptile_args.get_meta_training_args(
-       #         frac_done=i / reptile_args.num_meta_steps
-       #     )
-       # )
+        reptile_train_step(
+            aggregator=server,
+            participants=client_batch,
+            inner_training_args=reptile_args.get_inner_training_args(),
+            meta_training_args=reptile_args.get_meta_training_args(
+                frac_done=i / reptile_args.num_meta_steps
+            )
+        )
 
         if i % eval_iters == eval_iters - 1:
             # test
