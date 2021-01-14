@@ -172,11 +172,8 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
     assert context.cluster_args is not None, 'Please set cluster args to run hierarchical experiment'
 
     saved_model_state = load_fedavg_state(context, num_rounds_init - 1)
-<<<<<<< HEAD
-    if saved_model_state is None:
-=======
+
     if saved_model_state is None or not restore_fedavg:
->>>>>>> 51308b6d09af32a07ae9f323358341405e419efd
         server, clients = run_fedavg(context, num_rounds_init, save_states=True)
     else:
         server = FedAvgServer('initial_server', context.model_args, context)
