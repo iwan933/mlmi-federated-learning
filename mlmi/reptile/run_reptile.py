@@ -37,10 +37,10 @@ def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, exp
     :param global_step: global step
     :return:
     """
-    experiment_logger.experiment.add_histogram('test/loss/{}'.format(model_name), loss, global_step=global_step)
-    experiment_logger.experiment.add_scalar('test/loss/{}/mean'.format(model_name), torch.mean(loss), global_step=global_step)
-    experiment_logger.experiment.add_histogram('test/acc/{}'.format(model_name), acc, global_step=global_step)
-    experiment_logger.experiment.add_scalar('test/acc/{}/mean'.format(model_name), torch.mean(acc), global_step=global_step)
+    experiment_logger.experiment.add_histogram('test-test/loss/{}'.format(model_name), loss, global_step=global_step)
+    experiment_logger.experiment.add_scalar('test-test/loss/{}/mean'.format(model_name), torch.mean(loss), global_step=global_step)
+    experiment_logger.experiment.add_histogram('test-test/acc/{}'.format(model_name), acc, global_step=global_step)
+    experiment_logger.experiment.add_scalar('test-test/acc/{}/mean'.format(model_name), torch.mean(acc), global_step=global_step)
 
 class ReptileTrainingArgs:
     """
@@ -96,7 +96,9 @@ class ReptileTrainingArgs:
         inner_training_args = TrainArgs(
             min_steps=self.num_inner_steps,
             max_steps=self.num_inner_steps,
-            log_every_n_steps=self.log_every_n_steps
+            log_every_n_steps=self.log_every_n_steps,
+            #weights_summary=None,  # Do not show model summary
+            #progress_bar_refresh_rate=0  # Do not show training progress bar
         )
         if torch.cuda.is_available():
             inner_training_args.kwargs['gpus'] = 1
@@ -115,37 +117,39 @@ class ReptileTrainingArgs:
 
 def run_reptile(context: ExperimentContext, initial_model_state=None):
 
-    # TODO: Ensure that logging and tensorboard work properly
-
-    num_clients = 20
+    num_clients_train = 10000
+    num_clients_test = 100
     num_classes_per_client = 5
-    num_shots_per_class = 1
+    num_shots_per_class = 5
+
+    eval_iters = 1
 
     reptile_args = ReptileTrainingArgs(
         model=OmniglotLightning,
         inner_optimizer=optim.Adam,
-        inner_learning_rate=0.03,
-        num_inner_steps=2,
+        inner_learning_rate=0.001,
+        num_inner_steps=5,
         log_every_n_steps=3,
-        inner_batch_size=5,
-        meta_batch_size=-1,
-        meta_learning_rate_initial=0.03,
-        meta_learning_rate_final=0.03,
-        num_meta_steps=4
+        inner_batch_size=10,
+        meta_batch_size=5,
+        meta_learning_rate_initial=1,
+        meta_learning_rate_final=0,
+        num_meta_steps=100000
     )
     experiment_logger = create_tensorboard_logger(
         context.name,
-        (f"c{num_clients}is{reptile_args.num_inner_steps}"
+        (f"c{num_clients_train};{num_classes_per_client}-way{num_shots_per_class}-shot;"
          f"mlr{str(reptile_args.meta_learning_rate_initial).replace('.', '')}"
-         f"ilr{str(reptile_args.inner_learning_rate).replace('.', '')}")
+         f"ilr{str(reptile_args.inner_learning_rate).replace('.', '')}"
+         f"is{reptile_args.num_inner_steps}")
     )
 
     # Load and prepare Omniglot data
     data_dir = REPO_ROOT / 'data' / 'omniglot'
     omniglot_train_clients, omniglot_test_clients = load_omniglot_datasets(
         str(data_dir.absolute()),
-        num_clients_train=num_clients,
-        num_clients_test=int(num_clients * 0.2),
+        num_clients_train=num_clients_train,
+        num_clients_test=num_clients_test,
         num_classes_per_client=num_classes_per_client,
         num_shots_per_class=num_shots_per_class,
         inner_batch_size=reptile_args.inner_batch_size
@@ -223,30 +227,30 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
             zip(range(reptile_args.num_meta_steps), cycle(client_batches)):
         logger.info(f'starting meta training round {i + 1}')
         # train
-        reptile_train_step(
-            aggregator=server,
-            participants=client_batch,
-            inner_training_args=reptile_args.get_inner_training_args(),
-            meta_training_args=reptile_args.get_meta_training_args(
-                frac_done=i / reptile_args.num_meta_steps
-            )
-        )
+       # reptile_train_step(
+       #     aggregator=server,
+       #     participants=client_batch,
+       #     inner_training_args=reptile_args.get_inner_training_args(),
+       #     meta_training_args=reptile_args.get_meta_training_args(
+       #         frac_done=i / reptile_args.num_meta_steps
+       #     )
+       # )
 
-        # test
-        # Do one training step on test-train set
-        reptile_train_step(
-            aggregator=server,
-            participants=test_clients,
-            inner_training_args=reptile_args.get_inner_training_args(),
-            evaluation_mode=True
-        )
-        # Evaluate on test-test set
-        result = evaluate_local_models(participants=test_clients)
-        log_loss_and_acc('global_model', result.get('test/loss'), result.get('test/acc'),
-                         experiment_logger, i)
+        if i % eval_iters == eval_iters - 1:
+            # test
+            # Do one training step on test-train set
+            reptile_train_step(
+                aggregator=server,
+                participants=test_clients,
+                inner_training_args=reptile_args.get_inner_training_args(),
+                evaluation_mode=True
+            )
+            # Evaluate on test-test set
+            result = evaluate_local_models(participants=test_clients)
+            log_loss_and_acc('global_model', result.get('test/loss'), result.get('test/acc'),
+                             experiment_logger, global_step=i+1)
 
         logger.info('finished training round')
-
 
 
 if __name__ == '__main__':

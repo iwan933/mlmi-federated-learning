@@ -23,7 +23,7 @@ def create_tensorboard_logger(experiment_name: str, client_name: str) -> TensorB
     return TensorBoardLogger(experiment_path.absolute())
 
 
-def overwrite_participants_models(model_state: Dict[str, Tensor], participants):
+def overwrite_participants_models(model_state: Dict[str, Tensor], participants, verbose=True):
     """
     Overwrites the participants models with a initial state
     :param model_state: state to save on the client side
@@ -32,7 +32,8 @@ def overwrite_participants_models(model_state: Dict[str, Tensor], participants):
     """
     for participant in participants:
         try:
-            logger.debug('sending model to participant {0}'.format(participant._name))
+            if verbose:
+                logger.debug('sending model to participant {0}'.format(participant._name))
             participant.overwrite_model_state(model_state)
         except Exception as e:
             logger.error('sending model to participant {0} failed'.format(participant._name), e)
