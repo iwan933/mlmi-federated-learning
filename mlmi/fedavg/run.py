@@ -308,7 +308,7 @@ if __name__ == '__main__':
             fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=3400, batch_size=10)
 
             # select 367 clients as in briggs paper
-            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 367)
+            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 20)
 
         if args.scratch_data:
             scratch_data(fed_dataset, client_fraction_to_scratch=0.75, fraction_to_scratch=0.9)
@@ -321,11 +321,11 @@ if __name__ == '__main__':
 
         if args.hierarchical:
             cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech="single", criterion="maxclust",
-                                       dis_metric="euclidean", max_value_criterion=6, plot_dendrogram=True)
-            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=3,
+                                       dis_metric="euclidean", max_value_criterion=2, plot_dendrogram=True)
+            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=1,
                                                         lr=0.1, batch_size=10, fed_dataset=fed_dataset,
                                                         cluster_args=cluster_args)
-            run_fedavg_hierarchical(context, 10, 1, restore_clustering=False)
+            run_fedavg_hierarchical(context, 1, 1, restore_clustering=False)
         elif args.search_grid:
             param_grid = {'lr': list(lr_gen([1], [-1])) + list(lr_gen([1, 2.5, 5, 7.5], [-2])) +
                                 list(lr_gen([5, 7.5], [-3])), 'local_epochs': [1, 5],
