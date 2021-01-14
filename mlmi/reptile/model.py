@@ -158,39 +158,61 @@ class OmniglotModel(torch.nn.Module):
     def __init__(self, num_classes: int):
         super().__init__()
 
-        self.conv2d = []
-        self.batchnorm = []
-        self.relu = []
+        # The below layers could be more conveniently generated as an array.
+        # However, the class function state_dict() does not work then. For this
+        # reason, we define all layers individually.
+        self.conv2d_1 = self._make_conv2d_layer(first=True)
+        self.batchnorm_1 = self._make_batchnorm_layer()
+        self.relu_1 = self._make_relu_layer()
 
-        kernel_size = 3
-        for i in range(4):
-            self.conv2d.append(
-                torch.nn.Conv2d(
-                    in_channels=1 if i == 0 else 64,
-                    out_channels=64,
-                    kernel_size=kernel_size,
-                    stride=2,
-                    padding=int((kernel_size - 1) / 2)  # Apply same padding
-                )
-            )
-            self.batchnorm.append(
-                torch.nn.BatchNorm2d(
-                    num_features=64,
-                    eps=1e-3,
-                    momentum=0.01
-                )
-            )
-            self.relu.append(
-                torch.nn.ReLU()
-            )
+        self.conv2d_2 = self._make_conv2d_layer()
+        self.batchnorm_2 = self._make_batchnorm_layer()
+        self.relu_2 = self._make_relu_layer()
+
+        self.conv2d_3 = self._make_conv2d_layer()
+        self.batchnorm_3 = self._make_batchnorm_layer()
+        self.relu_3 = self._make_relu_layer()
+
+        self.conv2d_4 = self._make_conv2d_layer()
+        self.batchnorm_4 = self._make_batchnorm_layer()
+        self.relu_4 = self._make_relu_layer()
+
         self.flatten = torch.nn.Flatten(start_dim=1)
         self.logits = torch.nn.Linear(in_features=256, out_features=num_classes)
 
+    def _make_conv2d_layer(self, first: bool = False):
+        kernel_size = 3
+        return torch.nn.Conv2d(
+            in_channels=1 if first else 64,
+            out_channels=64,
+            kernel_size=kernel_size,
+            stride=2,
+            padding=int((kernel_size - 1) / 2)  # Apply same padding
+        )
+
+    def _make_batchnorm_layer(self):
+        return torch.nn.BatchNorm2d(num_features=64, eps=1e-3, momentum=0.01)
+
+    def _make_relu_layer(self):
+        return torch.nn.ReLU()
+
     def forward(self, x):
-        for i in range(4):
-            x = self.conv2d[i](x)
-            x = self.batchnorm[i](x)
-            x = self.relu[i](x)
+        x = self.conv2d_1(x)
+        x = self.batchnorm_1(x)
+        x = self.relu_1(x)
+
+        x = self.conv2d_2(x)
+        x = self.batchnorm_2(x)
+        x = self.relu_2(x)
+
+        x = self.conv2d_3(x)
+        x = self.batchnorm_3(x)
+        x = self.relu_3(x)
+
+        x = self.conv2d_4(x)
+        x = self.batchnorm_4(x)
+        x = self.relu_4(x)
+
         x = self.flatten(x)
         x = self.logits(x)
         return x

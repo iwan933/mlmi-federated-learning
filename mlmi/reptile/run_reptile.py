@@ -117,12 +117,12 @@ class ReptileTrainingArgs:
 
 def run_reptile(context: ExperimentContext, initial_model_state=None):
 
-    num_clients_train = 10000
-    num_clients_test = 100
+    num_clients_train = 5000
+    num_clients_test = 50
     num_classes_per_client = 5
     num_shots_per_class = 5
 
-    eval_iters = 1
+    eval_iters = 100
 
     reptile_args = ReptileTrainingArgs(
         model=OmniglotLightning,
@@ -134,7 +134,7 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
         meta_batch_size=5,
         meta_learning_rate_initial=1,
         meta_learning_rate_final=0,
-        num_meta_steps=100000
+        num_meta_steps=10000
     )
     experiment_logger = create_tensorboard_logger(
         context.name,
@@ -227,14 +227,14 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
             zip(range(reptile_args.num_meta_steps), cycle(client_batches)):
         logger.info(f'starting meta training round {i + 1}')
         # train
-       # reptile_train_step(
-       #     aggregator=server,
-       #     participants=client_batch,
-       #     inner_training_args=reptile_args.get_inner_training_args(),
-       #     meta_training_args=reptile_args.get_meta_training_args(
-       #         frac_done=i / reptile_args.num_meta_steps
-       #     )
-       # )
+        reptile_train_step(
+            aggregator=server,
+            participants=client_batch,
+            inner_training_args=reptile_args.get_inner_training_args(),
+            meta_training_args=reptile_args.get_meta_training_args(
+                frac_done=i / reptile_args.num_meta_steps
+            )
+        )
 
         if i % eval_iters == eval_iters - 1:
             # test
