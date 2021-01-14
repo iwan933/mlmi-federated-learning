@@ -44,7 +44,7 @@ class GradientClusterPartitioner(BaseClusterPartitioner):
         self.plot_dendrogram = plot_dendrogram
 
     @staticmethod
-    def model_weights(participant: BaseParticipant):
+    def model_weights_mean(participant: BaseParticipant):
         key_layers_participant = list(participant.model.state_dict().keys())
         num_layers = int(len(participant.model.state_dict().keys()) / 2)
         mean_weights_participant = 0
@@ -54,8 +54,17 @@ class GradientClusterPartitioner(BaseClusterPartitioner):
             mean_weights_layer = weights_layer.mean(tuple(range(layer_dim)))
             mean_weights_layer = float(mean_weights_layer)
             mean_weights_participant = mean_weights_participant + mean_weights_layer
-
         return mean_weights_participant
+
+    @staticmethod
+    def model_weights_sum(participant: BaseParticipant):
+        sum_weights_participant = 0
+        key_layers_participant = list(participant.model.state_dict().keys())
+        num_layers = int(len(participant.model.state_dict().keys()) / 2)
+        for layer in range(num_layers):
+            weights_layer = participant.model.state_dict()[key_layers_participant[layer * 2]].squeeze()
+            sum_weights_participant += float(weights_layer.sum())
+        return sum_weights_participant
 
     def cluster(self, participants: List[BaseParticipant]) -> Dict[str, List[BaseParticipant]]:
         logging.info('Start clustering')
@@ -64,14 +73,10 @@ class GradientClusterPartitioner(BaseClusterPartitioner):
         # Compute distance matrix of model updates: Using mean of weights from last layer of each participant
         model_updates = np.array([])
         for participant in participants:
-            mean_weights_participant = self.model_weights(participant)
-            model_updates = np.append(model_updates, mean_weights_participant)
-
+            weights_participant = self.model_weights_sum(participant)
+            model_updates = np.append(model_updates, weights_participant)
         model_updates = np.reshape(model_updates, (len(model_updates), 1))
         distance_matrix = hac.linkage(model_updates, method=self.linkage_mech, metric=self.dis_metric, optimal_ordering=False)
-
-        # Alternative
-        #cluster_ids_alt = hac.fclusterdata(model_updates, 4, criterion="maxclust", metric="euclidean", method="single")
 
         # Compute clusters based on distance matrix
         cluster_ids = hac.fcluster(distance_matrix, self.max_value_criterion, self.criterion)
