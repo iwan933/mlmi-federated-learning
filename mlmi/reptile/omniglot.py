@@ -109,7 +109,7 @@ def _make_omniglot_dataset(dataset,
 
 
 # The below code is taken from the supervised-reptile repository (code from the
-# Nichols 2018 paper)
+# Nichol 2018 paper)
 def _sample_mini_dataset(dataset, num_classes, num_shots):
     """
     Sample a few shot task from a dataset.

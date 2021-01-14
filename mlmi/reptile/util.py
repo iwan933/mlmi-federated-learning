@@ -27,7 +27,7 @@ def run_train_round(participants: List[BaseTrainingParticipant], training_args: 
     for participant in participants:
         try:
             # invoke local training
-            logger.debug('invoking training on participant {0}'.format(participant._name))
+            #logger.debug('invoking training on participant {0}'.format(participant._name))
             participant.train(training_args)
             successful_participants += 1
         except Exception as e:
@@ -53,7 +53,9 @@ def reptile_train_step(aggregator: ReptileServer,
 
     logger.debug('distribute the initial model to the clients.')
     initial_model_state = aggregator.model.state_dict()
-    overwrite_participants_models(initial_model_state, participants)
+    overwrite_participants_models(
+        initial_model_state, participants, verbose=False
+    )
 
     logger.debug('starting training round.')
     run_train_round(participants, inner_training_args)
