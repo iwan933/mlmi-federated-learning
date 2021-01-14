@@ -62,7 +62,8 @@ def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, exp
     experiment_logger.experiment.add_histogram('test/acc/{}'.format(model_name), acc, global_step=global_step)
     experiment_logger.experiment.add_scalar('test/acc/{}/mean'.format(model_name), torch.mean(acc),
                                             global_step=global_step)
-
+    if loss.dim() == 0:
+        loss = torch.tensor([loss])
     for x in loss:
         if torch.isnan(x) or torch.isinf(x):
             return
@@ -327,7 +328,7 @@ if __name__ == '__main__':
             context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=3,
                                                         lr=0.1, batch_size=10, fed_dataset=fed_dataset,
                                                         cluster_args=cluster_args)
-            run_fedavg_hierarchical(context, 10, 1, restore_clustering=False)
+            run_fedavg_hierarchical(context, 5, 1, restore_clustering=False)
         elif args.search_grid:
             param_grid = {'lr': list(lr_gen([1], [-1])) + list(lr_gen([1, 2.5, 5, 7.5], [-2])) +
                                 list(lr_gen([5, 7.5], [-3])), 'local_epochs': [1, 5],
