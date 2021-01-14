@@ -74,6 +74,8 @@ def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, exp
 
 def log_goal_test_acc(model_name: str, acc: torch.Tensor,
                       experiment_logger: LightningLoggerBase, global_step: int):
+    if acc.dim() == 0:
+        acc = torch.tensor([acc])
     over80 = acc[acc >= 0.80]
     percentage = over80.shape[0] / acc.shape[0]
     experiment_logger.experiment.add_scalar('test/80'.format(model_name), percentage, global_step=global_step)
@@ -168,8 +170,7 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
                             restore_clustering=False):
     assert context.cluster_args is not None, 'Please set cluster args to run hierarchical experiment'
 
-    #saved_model_state = load_fedavg_state(context, num_rounds_init - 1)
-    saved_model_state = None
+    saved_model_state = load_fedavg_state(context, num_rounds_init - 1)
     if saved_model_state is None:
         server, clients = run_fedavg(context, num_rounds_init, save_states=True)
     else:
