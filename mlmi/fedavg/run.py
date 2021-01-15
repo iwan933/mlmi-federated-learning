@@ -79,7 +79,7 @@ def log_goal_test_acc(model_name: str, acc: torch.Tensor,
         acc = torch.tensor([acc])
     over80 = acc[acc >= 0.80]
     percentage = over80.shape[0] / acc.shape[0]
-    experiment_logger.experiment.add_scalar('test/80'.format(model_name), percentage, global_step=global_step)
+    experiment_logger.experiment.add_scalar('test/80/{}'.format(model_name), percentage, global_step=global_step)
 
 
 def initialize_clients(context: ExperimentContext, initial_model_state: Dict[str, Tensor]):
@@ -175,14 +175,15 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
 
     if saved_model_state is None or not restore_fedavg:
         server, clients = run_fedavg(context, num_rounds_init, save_states=True)
+        logger.debug('starting local training before clustering.')
+        overwrite_participants_models(server.model.state_dict(), clients)
+        run_train_round(clients, context.train_args)
     else:
         server = FedAvgServer('initial_server', context.model_args, context)
         server.overwrite_model_state(saved_model_state)
         clients = initialize_clients(context, initial_model_state=saved_model_state)
 
-    logger.debug('starting local training before clustering.')
-    overwrite_participants_models(server.model.state_dict(), clients)
-    run_train_round(clients, context.train_args)
+
 
     cluster_ids, cluster_clients = None, None
     if restore_clustering:
@@ -205,10 +206,8 @@ def run_fedavg_hierarchical(context: ExperimentContext, num_rounds_init: int, nu
     eval_result = evaluate_global_model(global_model_participant=server, participants=clients)
     acc = eval_result.get('test/acc')
     loss = eval_result.get('test/loss')
-    log_loss_and_acc('post clustering', loss, acc, context.experiment_logger, num_rounds_init)
-    log_goal_test_acc('post clustering', acc, context.experiment_logger, num_rounds_init)
-
-
+    log_loss_and_acc('post clustering', loss, acc, context.experiment_logger, num_rounds_init-1)
+    log_goal_test_acc('post clustering', acc, context.experiment_logger, num_rounds_init-1)
 
     # Initialize cluster models
     cluster_server_dic = {}
@@ -332,7 +331,7 @@ if __name__ == '__main__':
             context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=3,
                                                         lr=0.1, batch_size=10, fed_dataset=fed_dataset,
                                                         cluster_args=cluster_args)
-            run_fedavg_hierarchical(context, 10, 40, restore_clustering=False, restore_fedavg=True)
+            run_fedavg_hierarchical(context, 10, 40, restore_clustering=False, restore_fedavg=False)
 
         elif args.search_grid:
             param_grid = {'lr': list(lr_gen([1], [-1])) + list(lr_gen([1, 2.5, 5, 7.5], [-2])) +
