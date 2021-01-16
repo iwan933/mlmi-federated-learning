@@ -5,6 +5,7 @@ from typing import List, Dict, Optional, Tuple, Union
 import torch
 from torch import Tensor
 
+from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.participant import (
     BaseTrainingParticipant, BaseAggregatorParticipant,
 )
@@ -12,7 +13,7 @@ from mlmi.exceptions import ExecutionError
 
 from mlmi.log import getLogger
 from mlmi.settings import REPO_ROOT
-from mlmi.struct import TrainArgs, ExperimentContext
+from mlmi.structs import TrainArgs
 from mlmi.utils import overwrite_participants_models, overwrite_participants_optimizers
 
 logger = getLogger(__name__)
@@ -69,7 +70,7 @@ def run_fedavg_round(aggregator: BaseAggregatorParticipant, participants: List[B
 
 
 def save_fedavg_hierarchical_cluster_configuration(
-        experiment_context: ExperimentContext,
+        experiment_context: FedAvgExperimentContext,
         cluster_names: List[str],
         client_ids: Dict[str, List[str]]
 ):
@@ -86,7 +87,7 @@ def save_fedavg_hierarchical_cluster_configuration(
 
 
 def load_fedavg_hierarchical_cluster_configuration(
-        experiment_context: ExperimentContext
+        experiment_context: FedAvgExperimentContext
 ) -> Tuple[Optional[List[str]], Optional[Dict[str, List[str]]]]:
     # save client assignments
 
@@ -100,7 +101,7 @@ def load_fedavg_hierarchical_cluster_configuration(
 
 
 def save_fedavg_hierarchical_cluster_model_state(
-        experiment_context: ExperimentContext,
+        experiment_context: FedAvgExperimentContext,
         fl_round: int,
         cluster_name: str,
         cluster_round: int,
@@ -124,7 +125,7 @@ def save_fedavg_hierarchical_cluster_model_state(
 
 
 def load_fedavg_hierarchical_cluster_model_state(
-        experiment_context: ExperimentContext,
+        experiment_context: FedAvgExperimentContext,
         fl_round: int, cluster_name: str,
         cluster_round: int
 ) -> Optional[Dict[str, Tensor]]:
@@ -137,21 +138,21 @@ def load_fedavg_hierarchical_cluster_model_state(
 
 
 def load_fedavg_hierarchical_cluster_state(
-        experiment_context: 'ExperimentContext', fl_round: int) -> Union[Dict[str, Tensor], None]:
+        experiment_context: 'FedAvgExperimentContext', fl_round: int) -> Union[Dict[str, Tensor], None]:
     path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{experiment_context}r{fl_round}.mdl'
     if not path.exists():
         return None
     return torch.load(path)
 
 
-def load_fedavg_state(experiment_context: 'ExperimentContext', fl_round: int) -> Union[Dict[str, Tensor], None]:
+def load_fedavg_state(experiment_context: 'FedAvgExperimentContext', fl_round: int) -> Union[Dict[str, Tensor], None]:
     path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{experiment_context}r{fl_round}.mdl'
     if not path.exists():
         return None
     return torch.load(path)
 
 
-def save_fedavg_state(experiment_context: 'ExperimentContext', fl_round: int, model_state: Dict[str, Tensor]):
+def save_fedavg_state(experiment_context: 'FedAvgExperimentContext', fl_round: int, model_state: Dict[str, Tensor]):
     path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{experiment_context}r{fl_round}.mdl'
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model_state, path)

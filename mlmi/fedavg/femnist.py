@@ -1,6 +1,6 @@
 from fedml_api.data_preprocessing.FederatedEMNIST.data_loader import load_partition_data_federated_emnist
 
-from mlmi.struct import FederatedDatasetData
+from mlmi.structs import FederatedDatasetData
 
 
 def load_femnist_dataset(data_dir, num_clients=3400, batch_size=20) -> FederatedDatasetData:
