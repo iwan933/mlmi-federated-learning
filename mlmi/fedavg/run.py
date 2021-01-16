@@ -353,8 +353,8 @@ if __name__ == '__main__':
             for (configuration, round_configuration) in configuration_generator(50):
                 cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech="ward", criterion="distance",
                                            dis_metric="euclidean", max_value_criterion=10.0, plot_dendrogram=False)
-
-                context = create_femnist_experiment_context(name='fedavg_hierarchical', local_epochs=3, lr=0.1,
+                experiment_name = 'briggs' if not args.scratch_data else 'briggs_scratch'
+                context = create_femnist_experiment_context(name=experiment_name, local_epochs=3, lr=0.1,
                                                             batch_size=10, **configuration,
                                                             dataset_name=fed_dataset.name, cluster_args=cluster_args)
                 context.cluster_args = cluster_args
