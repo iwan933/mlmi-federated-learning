@@ -9,7 +9,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import LightningLoggerBase
 from pytorch_lightning.callbacks.base import Callback
 
-from mlmi.struct import ExperimentContext, TrainArgs, ModelArgs
+from mlmi.structs import TrainArgs, ModelArgs
 from mlmi.log import getLogger
 from mlmi.settings import CHECKPOINT_DIR
 
@@ -19,7 +19,7 @@ logger = getLogger(__name__)
 
 class BaseParticipant(object):
 
-    def __init__(self, participant_name: str, model_args: ModelArgs, context: ExperimentContext):
+    def __init__(self, participant_name: str, model_args: ModelArgs, context):
         assert participant_name is not None, 'A participant name is required to load and save logs'
         assert model_args is not None, 'Model args are required to initialize a model for the participant'
         assert context is not None, 'Experiment context is required for participant'
@@ -90,7 +90,7 @@ class BaseParticipant(object):
 
 
 class BaseTrainingParticipant(BaseParticipant):
-    def __init__(self, client_id: str, model_args: ModelArgs, context: ExperimentContext,
+    def __init__(self, client_id: str, model_args: ModelArgs, context,
                  train_dataloader: data.DataLoader, num_train_samples: int,
                  test_dataloader: data.DataLoader, num_test_samples: int,
                  lightning_logger: LightningLoggerBase, *args, **kwargs):
@@ -180,7 +180,7 @@ class BaseTrainingParticipant(BaseParticipant):
 
 class BaseAggregatorParticipant(BaseParticipant):
 
-    def __init__(self, participant_name: str, model_args: ModelArgs, context: ExperimentContext):
+    def __init__(self, participant_name: str, model_args: ModelArgs, context):
         super().__init__(participant_name, model_args, context)
 
     def aggregate(self, participants: List[BaseParticipant], *args, **kwargs):

@@ -11,7 +11,7 @@ from fedml_api.model.cv.cnn import CNN_DropOut, CNN_OriginalFedAvg
 
 from mlmi.log import getLogger
 from mlmi.participant import BaseParticipantModel, BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
-from mlmi.struct import ExperimentContext, ModelArgs, OptimizerArgs
+from mlmi.structs import ModelArgs, OptimizerArgs
 
 
 logger = getLogger(__name__)

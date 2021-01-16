@@ -3,11 +3,8 @@ import random
 import logging
 
 from mlmi.participant import BaseParticipant
-from mlmi.struct import ClusterArgs
 
 import scipy.cluster.hierarchy as hac
-import torch
-from torch import mean
 import numpy as np
 import matplotlib.pyplot as plt
 

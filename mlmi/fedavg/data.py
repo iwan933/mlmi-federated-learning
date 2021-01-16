@@ -7,7 +7,7 @@ import numpy as np
 from torch import Tensor
 from torch.utils import data
 
-from mlmi.struct import FederatedDatasetData
+from mlmi.structs import FederatedDatasetData
 
 
 def select_random_fed_dataset_partitions(fed_dataset: FederatedDatasetData, n: int):
