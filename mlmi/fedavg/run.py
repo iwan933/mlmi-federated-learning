@@ -250,16 +250,20 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
         for cluster_id, cluster_clients in cluster_clients_dic.items():
             cluster_server = cluster_server_dic[cluster_id]
             result = evaluate_global_model(global_model_participant=cluster_server, participants=cluster_clients)
-            if result.get('test/loss').dim() == 0:
-                result.get['test/loss'] = torch.tensor([result.get('test/loss')])
-            if result.get('test/acc').dim() == 0:
-                result.get['test/acc'] = torch.tensor([result.get('test/acc')])
             if global_losses is None:
                 global_losses = result.get('test/loss')
                 global_acc = result.get('test/acc')
             else:
-                global_losses = torch.cat((global_losses, result.get('test/loss')), dim=0)
-                global_acc = torch.cat((global_acc, result.get('test/acc')), dim=0)
+                if result.get('test/loss').dim() == 0:
+                    loss_test = torch.tensor([result.get('test/loss')])
+                    global_losses = torch.cat((global_losses, loss_test), dim=0)
+                else:
+                    global_losses = torch.cat((global_losses, result.get('test/loss')), dim=0)
+                if result.get('test/acc').dim() == 0:
+                    acc_test = torch.tensor([result.get('test/acc')])
+                    global_acc = torch.cat((global_acc, acc_test), dim=0)
+                else:
+                    global_acc = torch.cat((global_acc, result.get('test/acc')), dim=0)
         log_loss_and_acc('total hierarchical', global_losses, global_acc, context.experiment_logger,
                          num_rounds_init + i)
         log_goal_test_acc('total 80%', global_acc, context.experiment_logger, num_rounds_init + i)
@@ -340,7 +344,7 @@ if __name__ == '__main__':
             fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=3400,
                                                batch_size=context.batch_size)
             # select 367 clients as in briggs paper
-            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 50)
+            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 367)
 
         if args.scratch_data:
             scratch_data(fed_dataset, client_fraction_to_scratch=0.75, fraction_to_scratch=0.9)
