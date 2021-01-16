@@ -250,6 +250,10 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
         for cluster_id, cluster_clients in cluster_clients_dic.items():
             cluster_server = cluster_server_dic[cluster_id]
             result = evaluate_global_model(global_model_participant=cluster_server, participants=cluster_clients)
+            if result.get('test/loss').dim() == 0:
+                result.get['test/loss'] = torch.tensor([result.get('test/loss')])
+            if result.get('test/acc').dim() == 0:
+                result.get['test/acc'] = torch.tensor([result.get('test/acc')])
             if global_losses is None:
                 global_losses = result.get('test/loss')
                 global_acc = result.get('test/acc')
@@ -336,7 +340,7 @@ if __name__ == '__main__':
             fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=3400,
                                                batch_size=context.batch_size)
             # select 367 clients as in briggs paper
-            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 367)
+            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 50)
 
         if args.scratch_data:
             scratch_data(fed_dataset, client_fraction_to_scratch=0.75, fraction_to_scratch=0.9)
@@ -364,11 +368,11 @@ if __name__ == '__main__':
             cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech="ward", criterion="distance",
                                        dis_metric="euclidean", max_value_criterion=10.0, plot_dendrogram=False)
 
-            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=3,
+            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=1,
                                                         lr=0.1, batch_size=10, dataset_name=fed_dataset.name,
                                                         cluster_args=cluster_args)
             context.cluster_args = cluster_args
-            run_fedavg_hierarchical(context, 10, 2, restore_clustering=False, restore_fedavg=True, dataset=fed_dataset)
+            run_fedavg_hierarchical(context, 1, 1, restore_clustering=False, restore_fedavg=True, dataset=fed_dataset)
         elif args.search_grid:
             param_grid = {'lr': list(lr_gen([1], [-1])) + list(lr_gen([1, 2.5, 5, 7.5], [-2])) +
                                 list(lr_gen([5, 7.5], [-3])), 'local_epochs': [1, 5],
