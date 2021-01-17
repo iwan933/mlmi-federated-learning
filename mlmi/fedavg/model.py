@@ -1,17 +1,17 @@
 from typing import Dict, List, Optional
 
 import torch
-from torch import Tensor, nn, optim
+from torch import Tensor, optim
 from torch.nn import functional as F
 
 import pytorch_lightning as pl
 from pytorch_lightning.metrics import Accuracy
 
-from fedml_api.model.cv.cnn import CNN_DropOut, CNN_OriginalFedAvg
+from fedml_api.model.cv.cnn import CNN_OriginalFedAvg
 
 from mlmi.log import getLogger
 from mlmi.participant import BaseParticipantModel, BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
-from mlmi.structs import ModelArgs, OptimizerArgs
+from mlmi.structs import OptimizerArgs
 
 
 logger = getLogger(__name__)
@@ -61,7 +61,6 @@ class FedAvgServer(BaseAggregatorParticipant):
         # make next optimizer step
         self.model.optimizer.zero_grad()
         self.model.optimizer.step()
-        self.save_model_state()
 
 
 class CNNLightning(BaseParticipantModel, pl.LightningModule):
