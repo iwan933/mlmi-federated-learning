@@ -1,73 +1,6 @@
 from mlmi.structs import ModelArgs, OptimizerArgs, TrainArgs, ClusterArgs
 
 
-class ReptileTrainingArgs:
-    """
-    Container for meta-learning parameters
-    :param model: Base model
-    :param inner_optimizer: Optimizer on task level
-    :param inner_learning_rate: Learning rate for task level optimizer
-    :param num_inner_steps: Number of training steps on task level
-    :param log_every_n_steps:
-    :param inner_batch_size: Batch size for training on task level. A value of -1
-        means batch size is equal to local training set size (full batch
-        training)
-    :param meta_batch_size: Batch size of tasks for single meta-training step.
-        A value of -1 means meta batch size is equal to total number of training
-        tasks (full batch meta training)
-    :param meta_learning_rate_initial: Learning rate for meta training (initial
-        value). Learning rate decreases linearly with training progress to reach
-        meta_learning_rate_final at end of training.
-    :param meta_learning_rate_final: Final value for learning rate for meta
-        training. If None, this will be equal to meta_learning_rate_initial and
-        learning rate will remain constant over training.
-    :param num_meta_steps: Number of total meta training steps
-    :return:
-    """
-    def __init__(self,
-                 model,
-                 inner_optimizer,
-                 inner_learning_rate=0.03,
-                 num_inner_steps=1,
-                 log_every_n_steps=3,
-                 inner_batch_size=5,
-                 meta_batch_size=-1,
-                 meta_learning_rate_initial=0.03,
-                 meta_learning_rate_final=None,
-                 num_meta_steps=1000):
-        self.model = model
-        self.inner_optimizer = inner_optimizer
-        self.inner_learning_rate = inner_learning_rate
-        self.num_inner_steps = num_inner_steps
-        self.log_every_n_steps = log_every_n_steps
-        self.inner_batch_size = inner_batch_size
-        self.meta_batch_size = meta_batch_size
-        self.meta_learning_rate_initial = meta_learning_rate_initial
-        self.meta_learning_rate_final = meta_learning_rate_final
-        if self.meta_learning_rate_final is None:
-            self.meta_learning_rate_final = self.meta_learning_rate_initial
-        self.num_meta_steps = num_meta_steps
-
-    def get_inner_training_args(self):
-        """
-        Return TrainArgs for inner training (training on task level)
-        """
-
-        if torch.cuda.is_available():
-            inner_training_args.kwargs['gpus'] = 1
-        return inner_training_args
-
-    def get_meta_training_args(self, frac_done: float):
-        """
-        Return TrainArgs for meta training
-        :param frac_done: Fraction of meta training steps already done
-        """
-        return TrainArgs(
-            meta_learning_rate=frac_done * self.meta_learning_rate_final +
-                               (1 - frac_done) * self.meta_learning_rate_initial
-        )
-
-
 class ReptileExperimentContext(object):
     """
     Structure to hold experiment context information
@@ -135,7 +68,8 @@ class ReptileExperimentContext(object):
         """
         w = '1' if self.weighted_aggregation else '0'
         id = (
-            f'{self.dataset_name}_bs{self.batch_size}lr{self.lr:.2E}cf{self.client_fraction:.2f}e{self.local_epochs}'
-            f'ml{self.meta_learning_rate:.2f}w{w}'
+            f'{self.dataset_name}_ibs{self.inner_batch_size}ilr{self.inner_learning_rate:.2E}'
+            f'is{self.inner_training_steps}'
+            f'mbs{self.meta_batch_size}mlr{self.meta_learning_rate_initial}w{w}'
         )
         return id
