@@ -6,7 +6,7 @@ from PIL import Image
 import numpy as np
 from torch.utils.data import DataLoader
 
-from mlmi.struct import FederatedDatasetData
+from mlmi.structs import FederatedDatasetData
 
 
 def load_omniglot_datasets(data_dir,
@@ -123,6 +123,7 @@ def _sample_mini_dataset(dataset, num_classes, num_shots):
         for sample in class_obj.sample(num_shots):
             yield (sample, class_idx)
 
+
 def read_dataset(data_dir):
     """
     Iterate over the characters in a data directory.
@@ -145,6 +146,7 @@ def read_dataset(data_dir):
                 continue
             yield Character(os.path.join(alphabet_dir, char_name), 0)
 
+
 def split_dataset(dataset, num_train=1200):
     """
     Split the dataset into a training and test set.
@@ -158,6 +160,7 @@ def split_dataset(dataset, num_train=1200):
     all_data = list(dataset)
     random.shuffle(all_data)
     return all_data[:num_train], all_data[num_train:]
+
 
 def augment_dataset(dataset):
     """
@@ -173,7 +176,7 @@ def augment_dataset(dataset):
         for rotation in [0, 90, 180, 270]:
             yield Character(character.dir_path, rotation=rotation)
 
-# pylint: disable=R0903
+
 class Character:
     """
     A single character class.
@@ -207,6 +210,7 @@ class Character:
             self._cache[path] = np.array(img).astype('float32').reshape((1, 28, 28))
             return self._cache[path]
 
+
 def _split_train_test(samples, test_shots=1):
     """
     Split a few-shot task into a train and a test set.
@@ -233,6 +237,7 @@ def _split_train_test(samples, test_shots=1):
     if len(test_set) < len(labels) * test_shots:
         raise IndexError('not enough examples of each class for test set')
     return train_set, test_set
+
 
 def add_channel(dataset):
     pass

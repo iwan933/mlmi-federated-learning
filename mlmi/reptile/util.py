@@ -27,7 +27,6 @@ def run_train_round(participants: List[BaseTrainingParticipant], training_args: 
     for participant in participants:
         try:
             # invoke local training
-            #logger.debug('invoking training on participant {0}'.format(participant._name))
             participant.train(training_args)
             successful_participants += 1
         except Exception as e:
@@ -35,6 +34,7 @@ def run_train_round(participants: List[BaseTrainingParticipant], training_args: 
 
     if success_threshold != -1 and successful_participants < success_threshold:
         raise ExecutionError('Failed to execute training round, not enough clients participated successfully')
+
 
 def reptile_train_step(aggregator: ReptileServer,
                        participants: List[ReptileClient],
@@ -48,9 +48,9 @@ def reptile_train_step(aggregator: ReptileServer,
     :param participants: training participants in this round
     :param inner_training_args: training arguments for participant models
     :param meta_training_args: training arguments for meta model
+    :param evaluation_mode: is evaluation step
     :return:
     """
-
     logger.debug('distribute the initial model to the clients.')
     initial_model_state = aggregator.model.state_dict()
     overwrite_participants_models(

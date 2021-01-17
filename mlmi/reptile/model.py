@@ -3,22 +3,26 @@ from collections import OrderedDict
 
 import torch
 from torch import Tensor
+from torch import nn
 from torch.nn import functional as F
 import pytorch_lightning as pl
 from pytorch_lightning.metrics import Accuracy
 
 from mlmi.log import getLogger
 from mlmi.participant import BaseParticipantModel, BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
-from mlmi.struct import TrainArgs, ModelArgs, ExperimentContext, OptimizerArgs
+from mlmi.reptile.structs import ReptileExperimentContext
+from mlmi.structs import TrainArgs, ModelArgs, OptimizerArgs
 
 
 logger = getLogger(__name__)
+
 
 def weight_model(model: Dict[str, Tensor], num_samples: int, num_total_samples: int) -> Dict[str, Tensor]:
     weighted_model_state = OrderedDict()
     for key, w in model.items():
         weighted_model_state[key] = (num_samples / num_total_samples) * w
     return weighted_model_state
+
 
 def sum_model_states(model_state_list: List[Dict[str, Tensor]]) -> Dict[str, Tensor]:
     result_state = model_state_list[0].copy()
@@ -27,8 +31,9 @@ def sum_model_states(model_state_list: List[Dict[str, Tensor]]) -> Dict[str, Ten
             result_state[key] += w
     return result_state
 
-def subtract_model_states(minuend: OrderedDict,
-                          subtrahend: OrderedDict) -> OrderedDict:
+
+def subtract_model_states(minuend: Dict[str, Tensor],
+                          subtrahend: Dict[str, Tensor]) -> Dict[str, Tensor]:
     """
     Returns difference of two model_states: minuend - subtrahend
     """
@@ -36,6 +41,7 @@ def subtract_model_states(minuend: OrderedDict,
     for key, w in subtrahend.items():
         result_state[key] -= w
     return result_state
+
 
 class ReptileClient(BaseTrainingParticipant):
     pass
@@ -45,7 +51,7 @@ class ReptileServer(BaseAggregatorParticipant):
     def __init__(self,
                  participant_name: str,
                  model_args,
-                 context: ExperimentContext,
+                 context: ReptileExperimentContext,
                  initial_model_state: OrderedDict = None):
         super().__init__(participant_name, model_args, context)
         # Initialize model parameters
@@ -56,13 +62,7 @@ class ReptileServer(BaseAggregatorParticipant):
     def model_args(self):
         return self._model_args
 
-    def aggregate(self,
-                  participants: List[BaseParticipant],
-                  meta_learning_rate: float,
-                  weighted: bool = True):
-
-        # Collect participants' model states and calculate model differences to
-        # initial model (= model deltas)
+    def aggregate(self, participants: List[BaseParticipant], meta_learning_rate=0.9, weight=True, *args, **kwargs):
         initial_model_state = self.model.state_dict()
         participant_model_deltas = []
         for participant in participants:
@@ -71,7 +71,7 @@ class ReptileServer(BaseAggregatorParticipant):
                     participant.model.state_dict(), initial_model_state
                 )
             )
-        if weighted:
+        if weight:
             # meta_gradient = weighted (by number of samples) average of
             # participants' model updates
             num_train_samples = []
@@ -158,39 +158,60 @@ class OmniglotModel(torch.nn.Module):
     def __init__(self, num_classes: int):
         super().__init__()
 
-        self.conv2d = []
-        self.batchnorm = []
-        self.relu = []
+        # The below layers could be more conveniently generated as an array.
+        # However, the class function state_dict() does not work then. For this
+        # reason, we define all layers individually.
+        self.conv2d_1 = self._make_conv2d_layer(1)
+        self.batchnorm_1 = self._make_batchnorm_layer()
+        self.relu_1 = self._make_relu_layer()
 
-        kernel_size = 3
-        for i in range(4):
-            self.conv2d.append(
-                torch.nn.Conv2d(
-                    in_channels=1 if i == 0 else 64,
-                    out_channels=64,
-                    kernel_size=kernel_size,
-                    stride=2,
-                    padding=int((kernel_size - 1) / 2)  # Apply same padding
-                )
-            )
-            self.batchnorm.append(
-                torch.nn.BatchNorm2d(
-                    num_features=64,
-                    eps=1e-3,
-                    momentum=0.01
-                )
-            )
-            self.relu.append(
-                torch.nn.ReLU()
-            )
+        self.conv2d_2 = self._make_conv2d_layer(64)
+        self.batchnorm_2 = self._make_batchnorm_layer()
+        self.relu_2 = self._make_relu_layer()
+
+        self.conv2d_3 = self._make_conv2d_layer(64)
+        self.batchnorm_3 = self._make_batchnorm_layer()
+        self.relu_3 = self._make_relu_layer()
+
+        self.conv2d_4 = self._make_conv2d_layer(64)
+        self.batchnorm_4 = self._make_batchnorm_layer()
+        self.relu_4 = self._make_relu_layer()
+
         self.flatten = torch.nn.Flatten(start_dim=1)
         self.logits = torch.nn.Linear(in_features=256, out_features=num_classes)
 
+    def _make_conv2d_layer(self, in_channels, kernel_size=3):
+        return torch.nn.Conv2d(
+            in_channels=in_channels,
+            out_channels=64,
+            kernel_size=kernel_size,
+            stride=2,
+            padding=int((kernel_size - 1) / 2)  # Apply same padding
+        )
+
+    def _make_batchnorm_layer(self):
+        return torch.nn.BatchNorm2d(num_features=64, eps=1e-3, momentum=0.01)
+
+    def _make_relu_layer(self):
+        return torch.nn.ReLU()
+
     def forward(self, x):
-        for i in range(4):
-            x = self.conv2d[i](x)
-            x = self.batchnorm[i](x)
-            x = self.relu[i](x)
+        x = self.conv2d_1(x)
+        x = self.batchnorm_1(x)
+        x = self.relu_1(x)
+
+        x = self.conv2d_2(x)
+        x = self.batchnorm_2(x)
+        x = self.relu_2(x)
+
+        x = self.conv2d_3(x)
+        x = self.batchnorm_3(x)
+        x = self.relu_3(x)
+
+        x = self.conv2d_4(x)
+        x = self.batchnorm_4(x)
+        x = self.relu_4(x)
+
         x = self.flatten(x)
         x = self.logits(x)
         return x

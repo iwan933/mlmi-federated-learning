@@ -33,6 +33,7 @@ def overwrite_participants_models(model_state: Dict[str, Tensor], participants, 
     Overwrites the participants models with a initial state
     :param model_state: state to save on the client side
     :param participants: list of participants to apply the model to
+    :param verbose: if true logs model sending
     :return:
     """
     for participant in participants:
