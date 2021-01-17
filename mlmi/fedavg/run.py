@@ -50,6 +50,8 @@ def add_args(parser: argparse.ArgumentParser):
     parser.add_argument('--max-last', type=int, dest='max_last', default=-1)
     parser.add_argument('--briggs', dest='briggs', action='store_const',
                         const=True, default=False)
+    parser.add_argument('--no-progress-bar', dest='no_progress_bar', action='store_const',
+                        const=True, default=False)
 
 
 def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, experiment_logger: LightningLoggerBase,
@@ -270,12 +272,19 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
 
 
 def create_femnist_experiment_context(name: str, local_epochs: int, batch_size: int, lr: float, client_fraction: float,
-                                      dataset_name: str, fixed_logger_version=None,
+                                      dataset_name: str, fixed_logger_version=None, no_progress_bar=False,
                                       cluster_args: Optional[ClusterArgs] = None):
     logger.debug('creating experiment context ...')
     optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     model_args = ModelArgs(CNNLightning, optimizer_args, only_digits=False)
-    training_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, gradient_clip_val=0.5)
+    train_args_dict = {
+        'max_epochs': local_epochs,
+        'min_epochs': local_epochs,
+        'gradient_clip_val': 0.5
+    }
+    if no_progress_bar:
+        train_args_dict['progress_bar_refresh_rate'] = 0
+    training_args = TrainArgs(**train_args_dict)
     context = FedAvgExperimentContext(name=name, client_fraction=client_fraction, local_epochs=local_epochs,
                                       lr=lr, batch_size=batch_size, optimizer_args=optimizer_args,
                                       model_args=model_args, train_args=training_args, dataset_name=dataset_name)
@@ -339,7 +348,8 @@ if __name__ == '__main__':
             pass
         else:
             context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=3,
-                                                        lr=0.1, batch_size=10, dataset_name='femnist')
+                                                        lr=0.1, batch_size=10, dataset_name='femnist',
+                                                        no_progress_bar=args.no_progress_bar)
             # default to femnist dataset
             fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=3400,
                                                batch_size=context.batch_size)
@@ -364,7 +374,8 @@ if __name__ == '__main__':
                 experiment_name = 'briggs' if not args.scratch_data else 'briggs_scratch'
                 context = create_femnist_experiment_context(name=experiment_name, local_epochs=3, lr=0.1,
                                                             batch_size=10, **configuration,
-                                                            dataset_name=fed_dataset.name, cluster_args=cluster_args)
+                                                            dataset_name=fed_dataset.name, cluster_args=cluster_args,
+                                                            no_progress_bar=args.no_progress_bar)
                 context.cluster_args = cluster_args
                 run_fedavg_hierarchical(context, restore_clustering=False, restore_fedavg=True,
                                         dataset=fed_dataset, **round_configuration)
@@ -374,7 +385,7 @@ if __name__ == '__main__':
 
             context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=1,
                                                         lr=0.1, batch_size=10, dataset_name=fed_dataset.name,
-                                                        cluster_args=cluster_args)
+                                                        cluster_args=cluster_args, no_progress_bar=args.no_progress_bar)
             context.cluster_args = cluster_args
             run_fedavg_hierarchical(context, 1, 1, restore_clustering=False, restore_fedavg=True, dataset=fed_dataset)
         elif args.search_grid:
@@ -386,7 +397,7 @@ if __name__ == '__main__':
                     logger.info(f'running FedAvg with the following configuration: {configuration}')
                     context = create_femnist_experiment_context(name='fedavg_default', batch_size=10,
                                                                 dataset_name=fed_dataset.name, fixed_logger_version=0,
-                                                                **configuration)
+                                                                no_progress_bar=args.no_progress_bar, **configuration)
                     if args.load_last_state:
                         last_state, last_round = load_last_state_for_configuration(context, args.max_last)
                     else:
