@@ -52,7 +52,6 @@ class BaseParticipant(object):
         :param model_state: The model state to load
         """
         self._model.load_state_dict(model_state)
-        self.save_model_state()
 
     def overwrite_optimizer_state(self, optimizer_state: Dict[str, Tensor]):
         """
@@ -158,7 +157,6 @@ class BaseTrainingParticipant(BaseParticipant):
         trainer = self.create_trainer(enable_logging=False, **training_args.kwargs)
         train_dataloader = self.train_data_loader
         trainer.fit(self.model, train_dataloader, train_dataloader)
-        self.save_model_state()
 
     def test(self, model: Optional[torch.nn.Module] = None, use_local_model: bool = False):
         """
