@@ -1,5 +1,6 @@
 from typing import Dict, List
 from collections import OrderedDict
+import copy
 
 import torch
 from torch import Tensor
@@ -21,7 +22,7 @@ def weight_model(model: Dict[str, Tensor], num_samples: int, num_total_samples: 
     return weighted_model_state
 
 def sum_model_states(model_state_list: List[Dict[str, Tensor]]) -> Dict[str, Tensor]:
-    result_state = model_state_list[0].copy()
+    result_state = copy.deepcopy(model_state_list[0])
     for model_state in model_state_list[1:]:
         for key, w in model_state.items():
             result_state[key] += w
@@ -32,13 +33,33 @@ def subtract_model_states(minuend: OrderedDict,
     """
     Returns difference of two model_states: minuend - subtrahend
     """
-    result_state = minuend.copy()
+    result_state = copy.deepcopy(minuend)
     for key, w in subtrahend.items():
         result_state[key] -= w
     return result_state
 
 class ReptileClient(BaseTrainingParticipant):
-    pass
+
+    def create_trainer(self, enable_logging=True, **kwargs) -> pl.Trainer:
+        """
+        Creates a new trainer instance for each training round.
+        :param kwargs: additional keyword arguments to send to the trainer for configuration
+        :return: a pytorch lightning trainer instance
+        """
+        _kwargs = kwargs.copy()
+        if enable_logging:
+            _kwargs['logger'] = self.logger
+        # Do not save checkpoints (not enough disc space for thousands of model states)
+        return pl.Trainer(checkpoint_callback=False, limit_val_batches=0.0, **_kwargs)
+
+    def save_model_state(self):
+        """
+        Saves the model state of the aggregated model
+        :param target_path: The path to save the model at
+        :return:
+        """
+        # Do not save model state (not enough disc space for thousands of model states)
+        # torch.save(self._model.state_dict(), self.get_checkpoint_path())
 
 
 class ReptileServer(BaseAggregatorParticipant):
@@ -107,10 +128,13 @@ class ReptileServer(BaseAggregatorParticipant):
         """
         # TODO (optional): Extend this function with other optimizer options
         #                  than vanilla GD
-        new_model_state = self.model.state_dict().copy()
+        new_model_state = self.model.state_dict()
         for key, w in new_model_state.items():
-            new_model_state[key] = w + \
-                learning_rate * gradient[key]
+            if key.endswith('running_mean') or key.endswith('running_var') \
+                or key.endswith('num_batches_tracked'):
+                # Do not update non-trainable batch norm parameters
+                continue
+            new_model_state[key] = w + learning_rate * gradient[key]
         self.model.load_state_dict(new_model_state)
 
 
@@ -148,6 +172,9 @@ class OmniglotLightning(BaseParticipantModel, pl.LightningModule):
         self.log('test/acc/{}'.format(self.participant_name), self.accuracy(preds, y))
         self.log('test/loss/{}'.format(self.participant_name), loss)
         return loss
+
+    def forward(self, x):
+        return self.model(x)
 
 
 class OmniglotModel(torch.nn.Module):
@@ -191,7 +218,9 @@ class OmniglotModel(torch.nn.Module):
         )
 
     def _make_batchnorm_layer(self):
-        return torch.nn.BatchNorm2d(num_features=64, eps=1e-3, momentum=0.01)
+        return torch.nn.BatchNorm2d(
+            num_features=64, eps=1e-3, momentum=0.01, track_running_stats=False
+        )
 
     def _make_relu_layer(self):
         return torch.nn.ReLU()

@@ -14,7 +14,8 @@ def load_omniglot_datasets(data_dir,
                            num_clients_test: int = 200,
                            num_classes_per_client: int = 5,
                            num_shots_per_class: int = 1,
-                           inner_batch_size: int = 5)\
+                           inner_batch_size: int = 5,
+                           tensorflow: bool = False)\
         -> (FederatedDatasetData, FederatedDatasetData):
     """
     Load the Omniglot dataset.
@@ -29,8 +30,8 @@ def load_omniglot_datasets(data_dir,
     :return:
     """
 
-    omniglot_train, omniglot_test = split_dataset(read_dataset(data_dir))
-    omniglot_train = list(augment_dataset(omniglot_train))
+    omniglot_train, omniglot_test = split_dataset(read_dataset(data_dir, tensorflow))
+    omniglot_train = list(augment_dataset(omniglot_train, tensorflow))
     omniglot_test = list(omniglot_test)
 
     omniglot_args = {
@@ -123,7 +124,7 @@ def _sample_mini_dataset(dataset, num_classes, num_shots):
         for sample in class_obj.sample(num_shots):
             yield (sample, class_idx)
 
-def read_dataset(data_dir):
+def read_dataset(data_dir, tensorflow: bool):
     """
     Iterate over the characters in a data directory.
 
@@ -143,7 +144,7 @@ def read_dataset(data_dir):
         for char_name in sorted(os.listdir(alphabet_dir)):
             if not char_name.startswith('character'):
                 continue
-            yield Character(os.path.join(alphabet_dir, char_name), 0)
+            yield Character(os.path.join(alphabet_dir, char_name), tensorflow, 0)
 
 def split_dataset(dataset, num_train=1200):
     """
@@ -159,7 +160,7 @@ def split_dataset(dataset, num_train=1200):
     random.shuffle(all_data)
     return all_data[:num_train], all_data[num_train:]
 
-def augment_dataset(dataset):
+def augment_dataset(dataset, tensorflow: bool):
     """
     Augment the dataset by adding 90 degree rotations.
 
@@ -171,7 +172,7 @@ def augment_dataset(dataset):
     """
     for character in dataset:
         for rotation in [0, 90, 180, 270]:
-            yield Character(character.dir_path, rotation=rotation)
+            yield Character(character.dir_path, tensorflow=tensorflow, rotation=rotation)
 
 # pylint: disable=R0903
 class Character:
@@ -179,8 +180,9 @@ class Character:
     A single character class.
     """
 
-    def __init__(self, dir_path, rotation=0):
+    def __init__(self, dir_path, tensorflow: bool, rotation=0):
         self.dir_path = dir_path
+        self.tensorflow = tensorflow
         self.rotation = rotation
         self._cache = {}
 
@@ -204,7 +206,10 @@ class Character:
             return self._cache[path]
         with open(path, 'rb') as in_file:
             img = Image.open(in_file).resize((28, 28)).rotate(self.rotation)
-            self._cache[path] = np.array(img).astype('float32').reshape((1, 28, 28))
+            if self.tensorflow:
+                self._cache[path] = np.array(img).astype('float32')
+            else:
+                self._cache[path] = np.array(img).astype('float32').reshape((1, 28, 28))
             return self._cache[path]
 
 def _split_train_test(samples, test_shots=1):

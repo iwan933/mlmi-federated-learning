@@ -14,11 +14,11 @@ config = {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'detailed',
-            'level': 'DEBUG',
+            #'level': 'DEBUG',
         },
     },
     'root': {
-        'level': 'DEBUG',
+        #'level': 'DEBUG',
         'handlers': ['console']
     },
 }

@@ -18,6 +18,10 @@ from mlmi.struct import ExperimentContext, ModelArgs, TrainArgs, OptimizerArgs
 from mlmi.settings import REPO_ROOT
 from mlmi.utils import create_tensorboard_logger, evaluate_local_models
 
+from mlmi.reptile.dataloading_ours_model_nichol.supervised_reptile_2 import OmniglotModel, Reptile
+from mlmi.reptile.dataloading_ours_model_nichol.variables_2 import weight_decay
+import tensorflow.compat.v1 as tf
+from mlmi.reptile.omniglot import read_dataset, split_dataset, augment_dataset
 
 logger = getLogger(__name__)
 
@@ -25,6 +29,12 @@ logger = getLogger(__name__)
 def add_args(parser: argparse.ArgumentParser):
     parser.add_argument('--hierarchical', dest='hierarchical', action='store_const',
                         const=True, default=False)
+
+def cyclerange(start, stop, len):
+    assert start < len and stop < len, "Error: start and stop must be < len"
+    if start > stop:
+        return list(range(start, len)) + list(range(0, stop))
+    return list(range(start, stop))
 
 
 def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, experiment_logger: LightningLoggerBase,
@@ -120,7 +130,7 @@ class ReptileTrainingArgs:
 
 def run_reptile(context: ExperimentContext, initial_model_state=None):
 
-    num_clients_train = 25000
+    num_clients_train = 10000
     num_clients_test = 1000
     num_classes_per_client = 5
     num_shots_per_class = 5
@@ -131,33 +141,37 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
         model=OmniglotLightning,
         inner_optimizer=optim.Adam,
         inner_learning_rate=0.001,
-        num_inner_steps=6,
+        num_inner_steps=5,
         num_inner_steps_eval=50,
         log_every_n_steps=3,
         inner_batch_size=10,
         meta_batch_size=5,
         meta_learning_rate_initial=1,
         meta_learning_rate_final=0,
-        num_meta_steps=10000
+        num_meta_steps=3000
     )
     experiment_logger = create_tensorboard_logger(
         context.name,
-        (f"c{num_clients_train};{num_classes_per_client}-way{num_shots_per_class}-shot;"
-         f"mlr{str(reptile_args.meta_learning_rate_initial).replace('.', '')}"
-         f"ilr{str(reptile_args.inner_learning_rate).replace('.', '')}"
-         f"is{reptile_args.num_inner_steps}")
+        "dataloading_ours;models_nichol"
     )
 
     # Load and prepare Omniglot data
     data_dir = REPO_ROOT / 'data' / 'omniglot'
+
+    #######
+    tf.disable_eager_execution()
+    #######
+
     omniglot_train_clients, omniglot_test_clients = load_omniglot_datasets(
         str(data_dir.absolute()),
         num_clients_train=num_clients_train,
         num_clients_test=num_clients_test,
         num_classes_per_client=num_classes_per_client,
         num_shots_per_class=num_shots_per_class,
-        inner_batch_size=reptile_args.inner_batch_size
+        inner_batch_size=reptile_args.inner_batch_size,
+        tensorflow=True
     )
+    """
     # Prepare ModelArgs for task training
     inner_optimizer_args = OptimizerArgs(
         optimizer_class=reptile_args.inner_optimizer,
@@ -217,8 +231,54 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
         model_args=meta_model_args,
         context=context,
         initial_model_state=initial_model_state
-    )
+    )"""
 
+    with tf.Session() as sess:
+        model = OmniglotModel(num_classes_per_client,
+                              learning_rate=reptile_args.inner_learning_rate)
+        reptile = Reptile(sess,
+                          transductive=True,
+                          pre_step_op=weight_decay(1))
+        accuracy_ph = tf.placeholder(tf.float32, shape=())
+        tf.summary.scalar('accuracy', accuracy_ph)
+        merged = tf.summary.merge_all()
+        tf.global_variables_initializer().run()
+        sess.run(tf.global_variables_initializer())
+        for i in range(reptile_args.num_meta_steps):
+            frac_done = i / reptile_args.num_meta_steps
+            cur_meta_step_size = frac_done * reptile_args.meta_learning_rate_final + (1 - frac_done) * reptile_args.meta_learning_rate_initial
+
+            meta_batch = {k:omniglot_train_clients.train_data_local_dict[k] for k in cyclerange(
+                    i*reptile_args.meta_batch_size % len(omniglot_train_clients.train_data_local_dict),
+                    (i+1)*reptile_args.meta_batch_size % len(omniglot_train_clients.train_data_local_dict),
+                    len(omniglot_train_clients.train_data_local_dict)
+                )}
+
+            reptile.train_step(meta_batch, model.input_ph, model.label_ph, model.minimize_op,
+                               inner_iters=reptile_args.num_inner_steps,
+                               meta_step_size=cur_meta_step_size)
+            if i % eval_iters == 0:
+                accuracies = []
+                k = random.randrange(len(omniglot_train_clients.train_data_local_dict))
+                train_train = omniglot_train_clients.train_data_local_dict[k]
+                train_test = omniglot_train_clients.test_data_local_dict[k]
+                k = random.randrange(len(omniglot_test_clients.train_data_local_dict))
+                test_train = omniglot_test_clients.train_data_local_dict[k]
+                test_test = omniglot_test_clients.test_data_local_dict[k]
+
+                for train_dl, test_dl in [(train_train, train_test), (test_train, test_test)]:
+                    correct = reptile.evaluate(train_dl, test_dl, model.input_ph, model.label_ph,
+                                               model.minimize_op, model.predictions,
+                                               inner_iters=reptile_args.num_inner_steps_eval)
+                    summary = sess.run(merged, feed_dict={accuracy_ph: correct/num_classes_per_client})
+                    accuracies.append(correct / num_classes_per_client)
+                print('batch %d: train=%f test=%f' % (i, accuracies[0], accuracies[1]))
+
+                # Write to TensorBoard
+                experiment_logger.experiment.add_scalar('train-test/acc/{}/mean'.format('global_model'), accuracies[0], global_step=i)
+                experiment_logger.experiment.add_scalar('test-test/acc/{}/mean'.format('global_model'), accuracies[1], global_step=i)
+
+    """
     # Perform training
     if reptile_args.meta_batch_size == -1:
         client_batches = [train_clients]
@@ -287,7 +347,7 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
     log_loss_and_acc('global_model', result.get('test/loss'), result.get('test/acc'),
                      experiment_logger, global_step=reptile_args.num_meta_steps)
     print(f"Final test accuracy: {torch.mean(result.get('test/acc'))}")
-
+    """
 
 if __name__ == '__main__':
     def run():
