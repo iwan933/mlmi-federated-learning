@@ -8,7 +8,7 @@ from mlmi.reptile.model import (
 from mlmi.exceptions import ClientError, ExecutionError
 
 from mlmi.log import getLogger
-from mlmi.struct import TrainArgs
+from mlmi.structs import TrainArgs
 from mlmi.utils import overwrite_participants_models
 from mlmi.participant import BaseTrainingParticipant
 

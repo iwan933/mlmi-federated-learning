@@ -105,7 +105,7 @@ def _make_omniglot_dataset(dataset,
         federated_dataset_args['data_local_num_dict'][i] = \
             len(train_data) + len(test_data)
 
-    return FederatedDatasetData(**federated_dataset_args)
+    return FederatedDatasetData(name='omniglot', **federated_dataset_args)
 
 
 # The below code is taken from the supervised-reptile repository (code from the
