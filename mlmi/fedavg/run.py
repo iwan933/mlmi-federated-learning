@@ -65,16 +65,16 @@ def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, exp
     :param global_step: global step
     :return:
     """
-    experiment_logger.experiment.add_histogram('test/acc/{}'.format(model_name), acc, global_step=global_step)
-    experiment_logger.experiment.add_scalar('test/acc/{}/mean'.format(model_name), torch.mean(acc),
+    experiment_logger.experiment.add_histogram(f'{model_name}/acc/test', acc, global_step=global_step)
+    experiment_logger.experiment.add_scalar(f'{model_name}/acc/test/mean', torch.mean(acc),
                                             global_step=global_step)
     if loss.dim() == 0:
         loss = torch.tensor([loss])
     for x in loss:
         if torch.isnan(x) or torch.isinf(x):
             return
-    experiment_logger.experiment.add_histogram('test/loss/{}'.format(model_name), loss, global_step=global_step)
-    experiment_logger.experiment.add_scalar('test/loss/{}/mean'.format(model_name), torch.mean(loss),
+    experiment_logger.experiment.add_histogram(f'{model_name}/loss/test/', loss, global_step=global_step)
+    experiment_logger.experiment.add_scalar(f'{model_name}/loss/test/mean', torch.mean(loss),
                                             global_step=global_step)
 
 
@@ -84,7 +84,7 @@ def log_goal_test_acc(model_name: str, acc: torch.Tensor,
         acc = torch.tensor([acc])
     over80 = acc[acc >= 0.80]
     percentage = over80.shape[0] / acc.shape[0]
-    experiment_logger.experiment.add_scalar('test/80/{}'.format(model_name), percentage, global_step=global_step)
+    experiment_logger.experiment.add_scalar(f'{model_name}/80/test', percentage, global_step=global_step)
 
 
 def initialize_clients(context: 'FedAvgExperimentContext', dataset: 'FederatedDatasetData', initial_model_state: Dict[str, Tensor]):
@@ -167,7 +167,7 @@ def run_fedavg(context: FedAvgExperimentContext, num_rounds: int, save_states: b
         # log and save
         if save_states:
             save_fedavg_state(context, i, server.model.state_dict())
-        log_loss_and_acc('global_model', result.get('test/loss'), result.get('test/acc'), context.experiment_logger, i)
+        log_loss_and_acc('fedavg', result.get('test/loss'), result.get('test/acc'), context.experiment_logger, i)
         logger.info('... finished training round')
     return server, clients
 
@@ -211,8 +211,8 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
     eval_result = evaluate_global_model(global_model_participant=server, participants=clients)
     acc = eval_result.get('test/acc')
     loss = eval_result.get('test/loss')
-    log_loss_and_acc('post clustering', loss, acc, context.experiment_logger, num_rounds_init)
-    log_goal_test_acc('post clustering', acc, context.experiment_logger, num_rounds_init)
+    log_loss_and_acc('post_clustering', loss, acc, context.experiment_logger, num_rounds_init)
+    log_goal_test_acc('post_clustering', acc, context.experiment_logger, num_rounds_init)
 
 
     # Initialize cluster models
@@ -242,7 +242,7 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
             result = evaluate_global_model(global_model_participant=cluster_server, participants=cluster_clients)
             log_loss_and_acc(f'cluster{cluster_id}', result.get('test/loss'), result.get('test/acc'),
                              context.experiment_logger, i)
-            log_goal_test_acc(f'cluster{cluster_id}_80', result.get('test/acc'), context.experiment_logger, i)
+            log_goal_test_acc(f'cluster{cluster_id}', result.get('test/acc'), context.experiment_logger, i)
             save_fedavg_hierarchical_cluster_model_state(context, num_rounds_init, cluster_id, i,
                                                          cluster_server.model.state_dict())
             logger.info(f'finished training cluster {cluster_id}')
@@ -266,9 +266,9 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
                     global_acc = torch.cat((global_acc, acc_test), dim=0)
                 else:
                     global_acc = torch.cat((global_acc, result.get('test/acc')), dim=0)
-        log_loss_and_acc('total hierarchical', global_losses, global_acc, context.experiment_logger,
+        log_loss_and_acc('final hierarchical', global_losses, global_acc, context.experiment_logger,
                          num_rounds_init + i)
-        log_goal_test_acc('total 80%', global_acc, context.experiment_logger, num_rounds_init + i)
+        log_goal_test_acc('final hierarchical', global_acc, context.experiment_logger, num_rounds_init + i)
 
 
 def create_femnist_experiment_context(name: str, local_epochs: int, batch_size: int, lr: float, client_fraction: float,
