@@ -288,9 +288,11 @@ def create_femnist_experiment_context(name: str, local_epochs: int, batch_size: 
     context = FedAvgExperimentContext(name=name, client_fraction=client_fraction, local_epochs=local_epochs,
                                       lr=lr, batch_size=batch_size, optimizer_args=optimizer_args,
                                       model_args=model_args, train_args=training_args, dataset_name=dataset_name)
+    experiment_specification = f'{context}'
     if cluster_args is not None:
         context.cluster_args = cluster_args
-    experiment_logger = create_tensorboard_logger(context.name, str(context), fixed_logger_version)
+        experiment_specification += f'_{cluster_args}'
+    experiment_logger = create_tensorboard_logger(context.name, experiment_specification, fixed_logger_version)
     context.experiment_logger = experiment_logger
     return context
 
