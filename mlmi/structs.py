@@ -18,10 +18,13 @@ class ClusterArgs(object):
     """
     Arguments for clustering
     """
-    def __init__(self, partitioner_class: Type['BaseClusterPartitioner'], *args, **kwargs):
+    def __init__(self, partitioner_class: Type['BaseClusterPartitioner'],
+                 num_rounds_init, num_rounds_cluster, *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
         self.partitioner_class = partitioner_class
+        self.num_rounds_init = num_rounds_init
+        self.num_rounds_cluster = num_rounds_cluster
         self._config_string = self._create_config_string(**kwargs)
 
     def _create_config_string(self, **kwargs):
@@ -54,7 +57,7 @@ class ClusterArgs(object):
             unique_str += '_cos'
         else:
             raise ValueError(f'No shortform of dis_metric "{dis_metric}" known')
-        unique_str += f'{max_value_criterion:.2f}'
+        unique_str += f'{max_value_criterion:.2f}ri{self.num_rounds_init}rc{self.num_rounds_cluster}'
         return unique_str
 
     def __str__(self):
