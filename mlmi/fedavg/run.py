@@ -320,17 +320,6 @@ def lr_gen(bases: List[float], powers: List[int]):
             yield x * math.pow(10, y)
 
 
-def configuration_generator(total_rounds=50):
-    for fraction in [0.1, 0.2, 0.5, 1.0]:
-        for fedavg_rounds in [1, 3, 5, 10]:
-            yield ({
-                'client_fraction': fraction,
-            }, {
-                'num_rounds_init': fedavg_rounds,
-                'num_rounds_cluster': total_rounds - fedavg_rounds
-            })
-
-
 if __name__ == '__main__':
     def run():
         # fix for experiment reproducability
@@ -371,19 +360,34 @@ if __name__ == '__main__':
         assert context is not None, 'Please create a context before running experiment'
 
         if args.briggs:
-            for (configuration, round_configuration) in configuration_generator(50):
-                cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech="ward", criterion="distance",
-                                           dis_metric="euclidean", max_value_criterion=10.0, plot_dendrogram=False,
-                                           **round_configuration)
+            total_rounds = 50
+            for fraction in [0.1, 0.2, 0.5, 1.0]:
+                configuration = {
+                    'client_fraction': fraction,
+                }
                 experiment_name = 'briggs' if not args.scratch_data else 'briggs_scratch'
                 context = create_femnist_experiment_context(name=experiment_name, local_epochs=3, lr=0.1,
                                                             batch_size=10, **configuration,
-                                                            dataset_name=fed_dataset.name, cluster_args=cluster_args,
+                                                            dataset_name=fed_dataset.name,
                                                             no_progress_bar=args.no_progress_bar)
-                context.cluster_args = cluster_args
-                run_fedavg_hierarchical(context, restore_clustering=False, restore_fedavg=True,
-                                        dataset=fed_dataset, num_rounds_init=cluster_args.num_rounds_init,
-                                        num_rounds_cluster=cluster_args.num_rounds_cluster)
+                run_fedavg(context, num_rounds=total_rounds, dataset=fed_dataset, save_states=True)
+                for fedavg_rounds in [1, 3, 5, 10]:
+                    round_configuration = {
+                       'num_rounds_init': fedavg_rounds,
+                       'num_rounds_cluster': total_rounds - fedavg_rounds
+                    }
+                    cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech="ward", criterion="distance",
+                                               dis_metric="euclidean", max_value_criterion=10.0, plot_dendrogram=False,
+                                               **round_configuration)
+                    context = create_femnist_experiment_context(name=experiment_name, local_epochs=3, lr=0.1,
+                                                                batch_size=10, **configuration,
+                                                                dataset_name=fed_dataset.name,
+                                                                cluster_args=cluster_args,
+                                                                no_progress_bar=args.no_progress_bar)
+                    context.cluster_args = cluster_args
+                    run_fedavg_hierarchical(context, restore_clustering=False, restore_fedavg=True,
+                                            dataset=fed_dataset, num_rounds_init=cluster_args.num_rounds_init,
+                                            num_rounds_cluster=cluster_args.num_rounds_cluster)
         elif args.hierarchical:
             cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech="ward", criterion="distance",
                                        dis_metric="euclidean", max_value_criterion=10.0, plot_dendrogram=False,
