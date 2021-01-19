@@ -224,11 +224,12 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
     # Train in clusters
     for i in range(num_rounds_cluster):
         for cluster_id in cluster_clients_dic.keys():
-            logger.info('starting training cluster {1} in round {0}'.format(str(i + 1), cluster_id))
             # train
             cluster_server = cluster_server_dic[cluster_id]
-            cluster_clients = cluster_clients_dic[cluster_id]
-            cluster_clients = sample_randomly_by_fraction(cluster_clients, context.client_fraction)
+            cluster_clients_all = cluster_clients_dic[cluster_id]
+            cluster_clients = sample_randomly_by_fraction(cluster_clients_all, context.client_fraction)
+            logger.info(f'starting training cluster {cluster_id} in round {str(i + 1)} '
+                        f'with {len(cluster_clients)}/{len(cluster_clients_all)}')
             loaded_state = load_fedavg_hierarchical_cluster_model_state(context, num_rounds_init, cluster_id, i)
             if restore_clustering and loaded_state is not None:
                 cluster_server.overwrite_model_state(loaded_state)
