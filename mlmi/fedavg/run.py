@@ -229,6 +229,7 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
             # train
             cluster_server = cluster_server_dic[cluster_id]
             cluster_clients = cluster_clients_dic[cluster_id]
+            cluster_clients = sample_randomly_by_fraction(cluster_clients, context.client_fraction)
             loaded_state = load_fedavg_hierarchical_cluster_model_state(context, num_rounds_init, cluster_id, i)
             if restore_clustering and loaded_state is not None:
                 cluster_server.overwrite_model_state(loaded_state)
@@ -356,7 +357,7 @@ if __name__ == '__main__':
             fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=3400,
                                                batch_size=context.batch_size)
             # select 367 clients as in briggs paper
-            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 367)
+            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 20)
 
         if args.scratch_data:
             scratch_data(fed_dataset, client_fraction_to_scratch=0.75, fraction_to_scratch=0.9)
