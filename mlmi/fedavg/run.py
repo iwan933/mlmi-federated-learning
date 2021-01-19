@@ -357,7 +357,7 @@ if __name__ == '__main__':
             fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=3400,
                                                batch_size=context.batch_size)
             # select 367 clients as in briggs paper
-            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 20)
+            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 367)
 
         if args.scratch_data:
             scratch_data(fed_dataset, client_fraction_to_scratch=0.75, fraction_to_scratch=0.9)
