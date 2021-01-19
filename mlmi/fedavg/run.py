@@ -181,6 +181,7 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
     if saved_model_state is None or not restore_fedavg:
         server, clients = run_fedavg(context, num_rounds_init, save_states=True, dataset=dataset)
     else:
+        logger.debug('skipping fedavg training, model found on disk')
         server = FedAvgServer('initial_server', context.model_args, context)
         server.overwrite_model_state(saved_model_state)
         clients = initialize_clients(context, dataset, initial_model_state=saved_model_state)
@@ -188,7 +189,6 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
     logger.debug('starting local training before clustering.')
     overwrite_participants_models(server.model.state_dict(), clients)
     run_train_round(clients, context.train_args)
-
 
     cluster_ids, cluster_clients = None, None
     if restore_clustering:
@@ -213,7 +213,6 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
     loss = eval_result.get('test/loss')
     log_loss_and_acc('post_clustering', loss, acc, context.experiment_logger, num_rounds_init)
     log_goal_test_acc('post_clustering', acc, context.experiment_logger, num_rounds_init)
-
 
     # Initialize cluster models
     cluster_server_dic = {}
