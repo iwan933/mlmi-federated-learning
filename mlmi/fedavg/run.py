@@ -360,7 +360,7 @@ if __name__ == '__main__':
         assert context is not None, 'Please create a context before running experiment'
 
         if args.briggs:
-            total_rounds = 2
+            total_rounds = 50
             for fraction in [0.1, 0.2, 0.5, 1.0]:
                 configuration = {
                     'client_fraction': fraction,
