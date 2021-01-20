@@ -170,6 +170,7 @@ def run_fedavg(context: FedAvgExperimentContext, num_rounds: int, save_states: b
         if save_states:
             save_fedavg_state(context, i, server.model.state_dict())
         log_loss_and_acc('fedavg', loss, acc, context.experiment_logger, i)
+        log_goal_test_acc('fedavg', acc, context.experiment_logger, i)
         logger.info(f'... finished training round (mean loss: {torch.mean(loss):.2f}, mean acc: {torch.mean(acc):.2f})')
     return server, clients
 
