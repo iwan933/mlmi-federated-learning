@@ -233,8 +233,8 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
             result = evaluate_global_model(global_model_participant=cluster_server, participants=cluster_clients)
             loss, acc = result.get('test/loss'), result.get('test/acc')
             # log
-            log_loss_and_acc(f'cluster{cluster_id}', loss, acc, context.experiment_logger, i)
-            log_goal_test_acc(f'cluster{cluster_id}', acc, context.experiment_logger, i)
+            log_loss_and_acc(f'cluster{cluster_id}', loss, acc, context.experiment_logger, num_rounds_init + i)
+            log_goal_test_acc(f'cluster{cluster_id}', acc, context.experiment_logger, num_rounds_init + i)
             # save
             save_fedavg_hierarchical_cluster_model_state(context, num_rounds_init, cluster_id, i,
                                                          cluster_server.model.state_dict())
