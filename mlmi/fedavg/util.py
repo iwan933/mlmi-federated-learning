@@ -12,6 +12,7 @@ from mlmi.participant import (
 from mlmi.exceptions import ExecutionError
 
 from mlmi.log import getLogger
+from mlmi.selectors import sample_randomly_by_fraction
 from mlmi.settings import REPO_ROOT
 from mlmi.structs import TrainArgs
 from mlmi.utils import overwrite_participants_models, overwrite_participants_optimizers
@@ -42,7 +43,7 @@ def run_train_round(participants: List[BaseTrainingParticipant], training_args: 
 
 
 def run_fedavg_round(aggregator: BaseAggregatorParticipant, participants: List[BaseTrainingParticipant],
-                     training_args: TrainArgs, *args, **kwargs):
+                     training_args: TrainArgs, client_fraction: float = 1.0):
     """
     Routine to run a training round with the given clients based on the server model and then aggregate the results
     :param aggregator: aggregator participant that will aggregate the resulting training models
@@ -53,16 +54,14 @@ def run_fedavg_round(aggregator: BaseAggregatorParticipant, participants: List[B
     logger.debug('distribute the initial model to the clients.')
     initial_model_state = aggregator.model.state_dict()
     overwrite_participants_models(initial_model_state, participants)
-    # reset gradients // first check how to handle optimizers in federated learning
-    # aggregator.model.optimizer.zero_grad()
-    # optimizer_state = aggregator.model.optimizer.state_dict()
-    # overwrite_participants_optimizers(optimizer_state, participants)
 
-    logger.debug('starting training round.')
-    run_train_round(participants, training_args)
+    participant_fraction = sample_randomly_by_fraction(participants, client_fraction)
+    num_train_samples = sum([p.num_train_samples for p in participant_fraction])
+    logger.debug(f'starting training round with {len(participant_fraction)}/{len(participants)}.')
+    run_train_round(participant_fraction, training_args)
 
     logger.debug('starting aggregation.')
-    aggregator.aggregate(participants, *args, **kwargs)
+    aggregator.aggregate(participant_fraction, num_train_samples=num_train_samples)
 
     logger.debug('distribute the aggregated global model to clients')
     resulting_model_state = aggregator.model.state_dict()

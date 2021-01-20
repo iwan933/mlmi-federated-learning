@@ -167,7 +167,7 @@ class BaseTrainingParticipant(BaseParticipant):
         """
         assert use_local_model or model is not None
 
-        trainer = self.create_trainer(enable_logging=False)
+        trainer = self.create_trainer(enable_logging=False, progress_bar_refresh_rate=0)
 
         if use_local_model:
             model = self.model
