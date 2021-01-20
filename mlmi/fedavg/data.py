@@ -41,7 +41,7 @@ def select_random_fed_dataset_partitions(fed_dataset: FederatedDatasetData, n: i
                                           class_num=fed_dataset.class_num,
                                           train_data_local_dict=train_data_local_dict,
                                           test_data_local_dict=test_data_local_dict,
-                                          name=f'{fed_dataset.name}{n}')
+                                          name=f'{fed_dataset.name}{n}', batch_size=fed_dataset.batch_size)
     return result_dataset
 
 

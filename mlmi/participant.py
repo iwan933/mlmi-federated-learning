@@ -96,7 +96,7 @@ class BaseTrainingParticipant(BaseParticipant):
         super().__init__(client_id, model_args, context)
         self._train_dataloader = train_dataloader
         self._test_dataloader = test_dataloader
-        self._num_train_samples = num_train_samples
+        self._num_train_samples = sum([len(batch) for batch in train_dataloader])
         self._num_test_samples = num_test_samples
         self._lightning_logger = lightning_logger
         self._callbacks = None

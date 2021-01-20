@@ -74,9 +74,7 @@ class ReptileServer(BaseAggregatorParticipant):
         if weight:
             # meta_gradient = weighted (by number of samples) average of
             # participants' model updates
-            num_train_samples = []
-            for participant in participants:
-                num_train_samples.append(participant.num_train_samples)
+            num_train_samples = [participant.num_train_samples for participant in participants]
             weighted_model_delta_list = []
             num_total_samples = sum(num_train_samples)
             for num_samples, pmd in zip(num_train_samples, participant_model_deltas):

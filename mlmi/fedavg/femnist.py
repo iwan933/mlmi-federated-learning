@@ -3,13 +3,14 @@ from fedml_api.data_preprocessing.FederatedEMNIST.data_loader import load_partit
 from mlmi.structs import FederatedDatasetData
 
 
-def load_femnist_dataset(data_dir, num_clients=3400, batch_size=20) -> FederatedDatasetData:
+def load_femnist_dataset(data_dir, num_clients=3400, batch_size=10) -> FederatedDatasetData:
     """
     Load the federated tensorflow emnist dataset, originally split up into 3400 clients.
     :param data_dir: data directory
     :param num_clients: number of clients to use for split
+    :param batch_size: number samples per batch
     :return:
     """
     federated_dataset_args = load_partition_data_federated_emnist('', data_dir, client_number=num_clients,
                                                                   batch_size=batch_size)
-    return FederatedDatasetData(*federated_dataset_args, name='femnist')
+    return FederatedDatasetData(*federated_dataset_args, name='femnist', batch_size=batch_size)

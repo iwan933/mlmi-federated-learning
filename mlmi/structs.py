@@ -92,7 +92,7 @@ class FederatedDatasetData(object):
                  test_data_global: data.DataLoader, data_local_num_dict: Dict[int, int],
                  data_local_train_num_dict: Dict[int, int], data_local_test_num_dict: Dict[int, int],
                  train_data_local_dict: Dict[int, data.DataLoader], test_data_local_dict: Dict[int, data.DataLoader],
-                 class_num: int, name: str):
+                 class_num: int, name: str, batch_size: int):
         self.client_num = client_num
         self.train_data_num = train_data_num
         self.test_data_num = test_data_num
@@ -105,3 +105,4 @@ class FederatedDatasetData(object):
         self.test_data_local_dict = test_data_local_dict
         self.class_num = class_num
         self.name = name
+        self.batch_size = batch_size

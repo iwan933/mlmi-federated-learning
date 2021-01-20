@@ -44,8 +44,8 @@ class FedAvgClient(BaseTrainingParticipant):
 
 class FedAvgServer(BaseAggregatorParticipant):
 
-    def aggregate(self, participants: List[BaseParticipant], *args, **kwargs):
-        num_train_samples: List[int] = kwargs.pop('num_train_samples', [])
+    def aggregate(self, participants: List[BaseParticipant], num_train_samples: List[int] = None, *args, **kwargs):
+        assert num_train_samples is not None, 'Place pass num_train_samples to the aggregation function.'
         assert len(num_train_samples) == len(participants), 'Please provide the keyword argument num_train_samples, ' \
                                                             'containing the number of training samples for each ' \
                                                             'participant'
@@ -58,9 +58,6 @@ class FedAvgServer(BaseAggregatorParticipant):
                                                         num_samples, num_total_samples)
 
         self.model.load_state_dict(aggregated_model_state)
-        # make next optimizer step
-        self.model.optimizer.zero_grad()
-        self.model.optimizer.step()
 
 
 class CNNLightning(BaseParticipantModel, pl.LightningModule):

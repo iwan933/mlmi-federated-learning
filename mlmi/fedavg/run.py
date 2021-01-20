@@ -34,7 +34,7 @@ logger = getLogger(__name__)
 
 def add_args(parser: argparse.ArgumentParser):
     parser.add_argument('--hierarchical', dest='hierarchical', action='store_const',
-                        const=True, default=True)
+                        const=True, default=False)
     parser.add_argument('--search-grid', dest='search_grid', action='store_const',
                         const=True, default=False)
     parser.add_argument('--cifar10', dest='cifar10', action='store_const',
@@ -332,12 +332,9 @@ if __name__ == '__main__':
         elif args.cifar100:
             pass
         else:
-            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=3,
-                                                        lr=0.1, batch_size=10, dataset_name='femnist',
-                                                        no_progress_bar=args.no_progress_bar)
             # default to femnist dataset
             fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=3400,
-                                               batch_size=context.batch_size)
+                                               batch_size=10)
             # select 367 clients as in briggs paper
             fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 367)
 
@@ -354,8 +351,6 @@ if __name__ == '__main__':
             log_data_distribution(fed_dataset, experiment_logger)
             return
 
-        assert context is not None, 'Please create a context before running experiment'
-
         if args.briggs:
             total_rounds = 50
             for fraction in [0.1, 0.2, 0.5, 1.0]:
@@ -364,7 +359,7 @@ if __name__ == '__main__':
                 }
                 experiment_name = 'briggs' if not args.scratch_data else 'briggs_scratch'
                 context = create_femnist_experiment_context(name=experiment_name, local_epochs=3, lr=0.1,
-                                                            batch_size=10, **configuration,
+                                                            batch_size=fed_dataset.batch_size, **configuration,
                                                             dataset_name=fed_dataset.name,
                                                             no_progress_bar=args.no_progress_bar)
                 run_fedavg(context, num_rounds=total_rounds, dataset=fed_dataset, save_states=True)
@@ -377,7 +372,7 @@ if __name__ == '__main__':
                                                dis_metric="euclidean", max_value_criterion=10.0, plot_dendrogram=False,
                                                **round_configuration)
                     context = create_femnist_experiment_context(name=experiment_name, local_epochs=3, lr=0.1,
-                                                                batch_size=10, **configuration,
+                                                                batch_size=fed_dataset.batch_size, **configuration,
                                                                 dataset_name=fed_dataset.name,
                                                                 cluster_args=cluster_args,
                                                                 no_progress_bar=args.no_progress_bar)
@@ -391,7 +386,7 @@ if __name__ == '__main__':
                                        num_rounds_init=1, num_rounds_cluster=1)
 
             context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=1,
-                                                        lr=0.1, batch_size=10, dataset_name=fed_dataset.name,
+                                                        lr=0.1, batch_size=fed_dataset.batch_size, dataset_name=fed_dataset.name,
                                                         cluster_args=cluster_args, no_progress_bar=args.no_progress_bar)
             context.cluster_args = cluster_args
             run_fedavg_hierarchical(context, restore_clustering=False, restore_fedavg=True, dataset=fed_dataset,
@@ -404,7 +399,8 @@ if __name__ == '__main__':
             for configuration in ParameterGrid(param_grid):
                 try:
                     logger.info(f'running FedAvg with the following configuration: {configuration}')
-                    context = create_femnist_experiment_context(name='fedavg_default', batch_size=10,
+                    context = create_femnist_experiment_context(name='fedavg_default',
+                                                                batch_size=fed_dataset.batch_size,
                                                                 dataset_name=fed_dataset.name, fixed_logger_version=0,
                                                                 no_progress_bar=args.no_progress_bar, **configuration)
                     if args.load_last_state:
@@ -420,13 +416,12 @@ if __name__ == '__main__':
             default: run fed avg with fixed parameters
             """
             try:
+                context = create_femnist_experiment_context(name='fedavg', client_fraction=0.2,
+                                                            local_epochs=3,
+                                                            lr=0.1, batch_size=fed_dataset.batch_size, dataset_name='femnist',
+                                                            no_progress_bar=args.no_progress_bar)
                 logger.info(f'running FedAvg with the following configuration: {context}')
-                if args.load_last_state:
-                    last_state, last_round = load_last_state_for_configuration(context, args.max_last)
-                else:
-                    last_state, last_round = None, -1
-                run_fedavg(context, 10, save_states=False, initial_model_state=last_state,
-                           start_round=last_round + 1, dataset=fed_dataset)
+                run_fedavg(context, 10, save_states=False, dataset=fed_dataset)
             except Exception as e:
                 logger.exception(f'Failed to execute configuration {context}', e)
     run()
