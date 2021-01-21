@@ -51,6 +51,7 @@ class Reptile:
           meta_batch_size: how many inner-loops to run.
         """
         old_vars = copy.deepcopy(self.model.state_dict())
+        old_vars_optim = copy.deepcopy(self.optimizer.state_dict())
         new_vars = []
         for key, data_loader in meta_batch.items():
             for i, (inputs, labels) in zip(range(self.inner_iterations), cycle(data_loader)):
@@ -61,6 +62,7 @@ class Reptile:
                 self.optimizer.step()
             new_vars.append(copy.deepcopy(self.model.state_dict()))
             self.model.load_state_dict(old_vars)
+            self.optimizer.load_state_dict(old_vars_optim)
         new_vars = average_vars(new_vars)
         self.model.load_state_dict(interpolate_vars(old_vars, new_vars, meta_step_size))
 

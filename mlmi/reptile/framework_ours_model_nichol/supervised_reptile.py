@@ -10,16 +10,17 @@ from itertools import cycle
 from mlmi.reptile.dataloading_ours_model_nichol.variables_2 import (interpolate_vars, average_vars,
                                                                     VariableState)
 
+from mlmi.struct import OptimizerArgs
+
 from functools import partial
 
-DEFAULT_OPTIMIZER = partial(tf.train.AdamOptimizer, beta1=0)
 
 # pylint: disable=R0903
 class OmniglotModel:
     """
     A model for Omniglot classification.
     """
-    def __init__(self, num_classes, optimizer=DEFAULT_OPTIMIZER, **optim_kwargs):
+    def __init__(self, num_classes, participant_name, optimizer_args: OptimizerArgs):
         self.input_ph = tf.placeholder(tf.float32, shape=(None, 28, 28))
         out = tf.reshape(self.input_ph, (-1, 28, 28, 1))
         for _ in range(4):
@@ -32,7 +33,9 @@ class OmniglotModel:
         self.loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.label_ph,
                                                                    logits=self.logits)
         self.predictions = tf.argmax(self.logits, axis=-1)
-        self.minimize_op = optimizer(**optim_kwargs).minimize(self.loss)
+        self.minimize_op = optimizer_args.optimizer_class(**optimizer_args.optimizer_kwargs).minimize(self.loss)
+
+        self.participant_name = participant_name
 
 
 class Reptile:

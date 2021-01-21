@@ -2,48 +2,23 @@
 Tools for manipulating sets of variables.
 """
 
+import numpy as np
 import tensorflow.compat.v1 as tf
-from collections import OrderedDict
-import torch
 
 def interpolate_vars(old_vars, new_vars, epsilon):
     """
     Interpolate between two sequences of variables.
     """
-    #return add_vars(old_vars, scale_vars(subtract_vars(new_vars, old_vars), epsilon))
-    res = OrderedDict()
-    for key, item in old_vars.items():
-        if key.endswith('running_mean') or key.endswith('num_batches_tracked'):
-            res[key] = torch.zeros_like(item)
-            continue
-        if key.endswith('running_var'):
-            res[key] = torch.ones_like(item)
-            continue
-        res[key] = old_vars[key] + (new_vars[key] - old_vars[key]) * epsilon
-    return res
+    return add_vars(old_vars, scale_vars(subtract_vars(new_vars, old_vars), epsilon))
 
 def average_vars(var_seqs):
     """
     Average a sequence of variable sequences.
     """
-    #res = []
-    #for variables in zip(*var_seqs):
-    #    res.append(np.mean(variables, axis=0))
-    #return res
-    res = OrderedDict()
-    for key, item in var_seqs[0].items():
-        if key.endswith('running_mean') or key.endswith('num_batches_tracked'):
-            res[key] = torch.zeros_like(item)
-            continue
-        if key.endswith('running_var'):
-            res[key] = torch.ones_like(item)
-            continue
-        res[key] = torch.zeros_like(item)
-        for i in range(len(var_seqs)):
-            res[key] += var_seqs[i][key]
-        res[key] /= len(var_seqs)
+    res = []
+    for variables in zip(*var_seqs):
+        res.append(np.mean(variables, axis=0))
     return res
-
 
 def subtract_vars(var_seq_1, var_seq_2):
     """

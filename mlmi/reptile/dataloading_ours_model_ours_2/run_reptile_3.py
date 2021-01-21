@@ -14,8 +14,7 @@ from mlmi.struct import ExperimentContext, ModelArgs, TrainArgs, OptimizerArgs
 from mlmi.settings import REPO_ROOT
 from mlmi.utils import create_tensorboard_logger
 
-from mlmi.reptile.dataloading_ours_model_ours.supervised_reptile_3 import Reptile
-from mlmi.reptile.dataloading_ours_model_ours.variables_3 import weight_decay
+from mlmi.reptile.dataloading_ours_model_ours_2.supervised_reptile_3 import Reptile
 import tensorflow.compat.v1 as tf
 
 logger = getLogger(__name__)
