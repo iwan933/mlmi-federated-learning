@@ -62,15 +62,11 @@ class FedAvgServer(BaseAggregatorParticipant):
 
 class CNNLightning(BaseParticipantModel, pl.LightningModule):
 
-    def __init__(self, optimizer_args: OptimizerArgs, only_digits=False, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.model = CNN_OriginalFedAvg(only_digits=only_digits)
-        self.optimizer_args = optimizer_args
+    def __init__(self, only_digits=False, *args, **kwargs):
+        model = CNN_OriginalFedAvg(only_digits=only_digits)
+        super().__init__(*args, model=model, **kwargs)
+        self.model = model
         self.accuracy = Accuracy()
-        self._optimizer = optimizer_args(self.model.parameters())
-
-    def configure_optimizers(self):
-        return self._optimizer
 
     def training_step(self, train_batch, batch_idx):
         x, y = train_batch
@@ -115,15 +111,11 @@ class CNNMnist(nn.Module):
 
 class CNNMnistLightning(BaseParticipantModel, pl.LightningModule):
 
-    def __init__(self, optimizer_args: OptimizerArgs, num_classes, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.model = CNNMnist(input_channels=1, num_classes=num_classes)
-        self.optimizer_args = optimizer_args
+    def __init__(self, num_classes, *args, **kwargs):
+        model = CNNMnist(input_channels=1, num_classes=num_classes)
+        super().__init__(*args, model=model, **kwargs)
+        self.model = model
         self.accuracy = Accuracy()
-        self._optimizer = optimizer_args(self.model.parameters())
-
-    def configure_optimizers(self):
-        return self._optimizer
 
     def training_step(self, train_batch, batch_idx):
         x, y = train_batch

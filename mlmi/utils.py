@@ -88,7 +88,7 @@ def evaluate_local_models(participants: List['BaseTrainingParticipant']):
     return {'test/loss': losses, 'test/acc': acc}
 
 
-def evaluate_global_model(global_model_participant: BaseParticipant, participants: List['BaseTrainingParticipant']):
+def evaluate_global_model(global_model_participant: 'BaseParticipant', participants: List['BaseTrainingParticipant']):
 
     def _eval(participant):
         return participant.test(model=global_model_participant.model)

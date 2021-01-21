@@ -9,12 +9,29 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import LightningLoggerBase
 from pytorch_lightning.callbacks.base import Callback
 
-from mlmi.structs import TrainArgs, ModelArgs
+from mlmi.structs import OptimizerArgs, TrainArgs, ModelArgs
 from mlmi.log import getLogger
 from mlmi.settings import CHECKPOINT_DIR
 
 
 logger = getLogger(__name__)
+
+
+def optimizer_state_dict_to_cpu(optimizer_state_dict):
+    o = {}
+    state_dict = optimizer_state_dict.get('state')
+    r = {}
+    for key, state in state_dict.items():
+        s = {}
+        for k, v in state.items():
+            if torch.is_tensor(v):
+                s[k] = v.cpu()
+            else:
+                s[k] = v
+        r[key] = s
+    o['state'] = r
+    o['param_groups'] = optimizer_state_dict.get('param_groups')
+    return o
 
 
 class BaseParticipant(object):
@@ -31,7 +48,7 @@ class BaseParticipant(object):
         self._model = model_args(participant_name=participant_name)
 
     @property
-    def model(self) -> pl.LightningModule:
+    def model(self) -> Union[pl.LightningModule, 'BaseParticipantModel']:
         """
         The model to train
         :return: The model
@@ -52,14 +69,6 @@ class BaseParticipant(object):
         :param model_state: The model state to load
         """
         self._model.load_state_dict(model_state)
-
-    def overwrite_optimizer_state(self, optimizer_state: Dict[str, Tensor]):
-        """
-        Overwrites the optimizer state
-        :param optimizer_state: state to write
-        :return:
-        """
-        self.model.optimizer.load_state_dict(optimizer_state)
 
     def load_model_state_from_checkpoint(self):
         """
@@ -157,6 +166,8 @@ class BaseTrainingParticipant(BaseParticipant):
         trainer = self.create_trainer(enable_logging=False, **training_args.kwargs)
         train_dataloader = self.train_data_loader
         trainer.fit(self.model, train_dataloader, train_dataloader)
+        optimizer: optim.Optimizer = self.model.optimizers()
+        self.model.optimizer_state = optimizer_state_dict_to_cpu(optimizer.state_dict())
 
     def test(self, model: Optional[torch.nn.Module] = None, use_local_model: bool = False):
         """
@@ -192,12 +203,31 @@ class BaseAggregatorParticipant(BaseParticipant):
 
 class BaseParticipantModel(object):
 
-    def __init__(self, *args, **kwargs):
-        assert 'participant_name' in kwargs, 'Please provide a participant name parameter in model args to identify' \
+    def __init__(self, *args, participant_name=None, optimizer_args: Optional[OptimizerArgs]=None,
+                 model=None, **kwargs):
+        assert participant_name is not None, 'Please provide a participant name parameter in model args to identify' \
                                              'your model in logging'
-        self.participant_name = kwargs.pop('participant_name', None)
+        assert optimizer_args is not None, 'Optimizer args not set!'
+        assert model is not None, 'Model not passed!'
+        self.participant_name = participant_name
+        self.optimizer_args = optimizer_args
         super().__init__(*args, **kwargs)
+        self.model = model
+        self._optimizer_state = None
 
     @property
-    def optimizer(self) -> optim.Optimizer:
-        raise NotImplementedError()
+    def optimizer_state(self):
+        return self._optimizer_state
+
+    @optimizer_state.setter
+    def optimizer_state(self, value):
+        self._optimizer_state = value
+
+    def configure_optimizers(self):
+        return self.optimizer_args(self.model.parameters())
+        """
+        Do not restore state.
+        if self.optimizer_state is not None:
+            optimizer.load_state_dict(self.optimizer_state)
+        return optimizer
+        """

@@ -80,7 +80,7 @@ def load_mnist_dataset(data_dir, num_clients=100, batch_size=10):
                                           class_num=10,
                                           train_data_local_dict=train_data_local_dict,
                                           test_data_local_dict=test_data_local_dict,
-                                          name=f'mnist', batch_size=batch_size)
+                                          name='mnist', batch_size=batch_size)
     return result_dataset
 
 
@@ -92,11 +92,11 @@ def load_femnist_dataset(data_dir, num_clients=3400, batch_size=10) -> Federated
     :param batch_size: number samples per batch
     :return:
     """
-    federated_dataset_args = load_partition_data_federated_emnist('', data_dir, client_number=num_clients,
+    client_number, train_data_num, test_data_num, train_data_global, test_data_global, \
+    data_local_num_dict, data_local_train_num_dict, data_local_test_num_dict, train_data_local_dict, \
+    test_data_local_dict, class_num = load_partition_data_federated_emnist('', data_dir, client_number=num_clients,
                                                                   batch_size=batch_size)
+    federated_dataset_args = (client_number, train_data_global, test_data_global,
+                              data_local_num_dict, data_local_train_num_dict, data_local_test_num_dict,
+                              train_data_local_dict, test_data_local_dict, class_num)
     return FederatedDatasetData(*federated_dataset_args, name='femnist', batch_size=batch_size)
-
-
-if __name__ == '__main__':
-    data_dir = Path(__file__).parent.parent.parent / Path('data/mnist/')
-    load_mnist_dataset_noniid(str(data_dir.absolute()))
