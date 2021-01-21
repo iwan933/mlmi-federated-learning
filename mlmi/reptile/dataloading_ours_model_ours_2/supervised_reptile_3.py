@@ -8,6 +8,7 @@ import random
 import torch
 from itertools import cycle
 
+from mlmi.reptile.model import weight_model, sum_model_states, subtract_model_states
 from .variables_3 import (interpolate_vars, average_vars, subtract_vars, add_vars, scale_vars,
                           VariableState)
 
@@ -61,10 +62,31 @@ class Reptile:
                 loss.backward()
                 self.optimizer.step()
             new_vars.append(copy.deepcopy(self.model.state_dict()))
+            #new_vars.append(weight_model(copy.deepcopy(self.model.state_dict()), 1, len(meta_batch)))
             self.model.load_state_dict(old_vars)
             self.optimizer.load_state_dict(old_vars_optim)
-        new_vars = average_vars(new_vars)
+
+        new_vars = average_vars(new_vars)  #sum_model_states(new_vars)
+        #meta_gradient = subtract_model_states(new_vars, old_vars)
+        #self.update_model_state(old_vars, meta_gradient, meta_step_size)
         self.model.load_state_dict(interpolate_vars(old_vars, new_vars, meta_step_size))
+
+    def update_model_state(self, old_vars, gradient, learning_rate):
+        """
+        Update model state with vanilla gradient descent
+        :param gradient: OrderedDict[str, Tensor]
+        :return:
+        """
+        # TODO (optional): Extend this function with other optimizer options
+        #                  than vanilla GD
+        new_model_state = copy.deepcopy(old_vars)
+        for key, w in new_model_state.items():
+            if key.endswith('running_mean') or key.endswith('running_var') \
+                or key.endswith('num_batches_tracked'):
+                # Do not update non-trainable batch norm parameters
+                continue
+            new_model_state[key] = w + learning_rate * gradient[key]
+        self.model.load_state_dict(new_model_state)
 
     def evaluate(self,
                  train_data_loader,
@@ -96,6 +118,7 @@ class Reptile:
         """
 
         old_vars = copy.deepcopy(self.model.state_dict())
+        old_vars_optim = copy.deepcopy(self.optimizer.state_dict())
         for i, (inputs, labels) in zip(range(self.inner_iterations_eval), cycle(train_data_loader)):
             self.optimizer.zero_grad()
             outputs = self.model(inputs)
@@ -106,6 +129,7 @@ class Reptile:
         test_preds = self.model(inputs).argmax(dim=1)
         num_correct = int(sum([pred == label for pred, label in zip(test_preds, labels)]))
         self.model.load_state_dict(old_vars)
+        self.optimizer.load_state_dict(old_vars_optim)
         return num_correct
 
 
