@@ -79,8 +79,8 @@ class ClusterBriggsPartitioner(BaseClusterPartitioner):
             clusters_hac_dic[participant.cluster_id].append(participant)
             i += 1
 
-        for cluster_id in range(num_cluster+1):
-            logging.info(f'cluster {cluster_id} has {np.count_nonzero(cluster_ids == cluster_id)} clients')
+        for cluster_id in range(num_cluster):
+            logging.info(f'cluster {cluster_id+1} has {np.count_nonzero(cluster_ids == cluster_id+1)} clients')
             if np.count_nonzero(cluster_ids == cluster_id) == 1:
                 logging.info('cluster {} has only one client!'.format(cluster_id))
 
