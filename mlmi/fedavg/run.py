@@ -18,8 +18,8 @@ from mlmi.selectors import sample_randomly_by_fraction
 from mlmi.structs import ClusterArgs, FederatedDatasetData
 from mlmi.clustering import RandomClusterPartitioner, GradientClusterPartitioner
 from mlmi.log import getLogger
-from mlmi.fedavg.femnist import load_femnist_dataset
-from mlmi.fedavg.model import FedAvgClient, FedAvgServer, CNNLightning
+from mlmi.fedavg.femnist import load_femnist_dataset, load_mnist_dataset
+from mlmi.fedavg.model import CNNMnist, CNNMnistLightning, FedAvgClient, FedAvgServer, CNNLightning
 from mlmi.fedavg.util import load_fedavg_hierarchical_cluster_configuration, \
     load_fedavg_hierarchical_cluster_model_state, load_fedavg_state, run_fedavg_round, \
     save_fedavg_hierarchical_cluster_configuration, save_fedavg_hierarchical_cluster_model_state, save_fedavg_state, \
@@ -49,6 +49,8 @@ def add_args(parser: argparse.ArgumentParser):
                         const=True, default=False)
     parser.add_argument('--max-last', type=int, dest='max_last', default=-1)
     parser.add_argument('--briggs', dest='briggs', action='store_const',
+                        const=True, default=False)
+    parser.add_argument('--mnist', dest='mnist', action='store_const',
                         const=True, default=False)
     parser.add_argument('--no-progress-bar', dest='no_progress_bar', action='store_const',
                         const=True, default=False)
@@ -204,17 +206,26 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
             _cluster_clients_dic[cluster_id] = [c._name for c in participants]
         save_fedavg_hierarchical_cluster_configuration(context, list(cluster_clients_dic.keys()), _cluster_clients_dic)
 
-    eval_result = evaluate_global_model(global_model_participant=server, participants=clients)
-    loss, acc = eval_result.get('test/loss'), eval_result.get('test/acc')
-    log_loss_and_acc('post_clustering', loss, acc, context.experiment_logger, num_rounds_init)
-    log_goal_test_acc('post_clustering', acc, context.experiment_logger, num_rounds_init)
-
     # Initialize cluster models
     cluster_server_dic = {}
     for cluster_id, participants in cluster_clients_dic.items():
         cluster_server = FedAvgServer('cluster_server' + cluster_id, context.model_args, context)
-        cluster_server.overwrite_model_state(server.model.state_dict())
+        num_train_samples = [p.num_train_samples for p in participants]
+
+        loaded_state = load_fedavg_hierarchical_cluster_model_state(context, num_rounds_init, cluster_id, -1)
+        if restore_clustering and loaded_state is not None:
+            cluster_server.overwrite_model_state(loaded_state)
+            logger.info(f'skipping training cluster {cluster_id}, loaded state from disk ...')
+        else:
+            cluster_server.aggregate(participants, num_train_samples=num_train_samples)
+        save_fedavg_hierarchical_cluster_model_state(context, num_rounds_init, cluster_id, -1,
+                                                     cluster_server.model.state_dict())
         cluster_server_dic[cluster_id] = cluster_server
+
+    eval_result = evaluate_global_model(global_model_participant=server, participants=clients)
+    loss, acc = eval_result.get('test/loss'), eval_result.get('test/acc')
+    log_loss_and_acc('post_clustering', loss, acc, context.experiment_logger, num_rounds_init)
+    log_goal_test_acc('post_clustering', acc, context.experiment_logger, num_rounds_init)
 
     # Train in clusters
     for i in range(num_rounds_cluster):
@@ -291,6 +302,32 @@ def create_femnist_experiment_context(name: str, local_epochs: int, batch_size: 
     return context
 
 
+def create_mnist_experiment_context(name: str, local_epochs: int, batch_size: int, lr: float, client_fraction: float,
+                                    dataset_name: str, num_classes: int, fixed_logger_version=None, no_progress_bar=False,
+                                    cluster_args: Optional[ClusterArgs] = None):
+    logger.debug('creating experiment context ...')
+    optimizer_args = OptimizerArgs(optim.SGD, lr=lr, momentum=0.5)
+    model_args = ModelArgs(CNNMnistLightning, optimizer_args, num_classes=num_classes)
+    train_args_dict = {
+        'max_epochs': local_epochs,
+        'min_epochs': local_epochs,
+        'gradient_clip_val': 0.5
+    }
+    if no_progress_bar:
+        train_args_dict['progress_bar_refresh_rate'] = 0
+    training_args = TrainArgs(**train_args_dict)
+    context = FedAvgExperimentContext(name=name, client_fraction=client_fraction, local_epochs=local_epochs,
+                                      lr=lr, batch_size=batch_size, optimizer_args=optimizer_args,
+                                      model_args=model_args, train_args=training_args, dataset_name=dataset_name)
+    experiment_specification = f'{context}'
+    if cluster_args is not None:
+        context.cluster_args = cluster_args
+        experiment_specification += f'_{cluster_args}'
+    experiment_logger = create_tensorboard_logger(context.name, experiment_specification, fixed_logger_version)
+    context.experiment_logger = experiment_logger
+    return context
+
+
 def load_last_state_for_configuration(context: FedAvgExperimentContext, max_last: int = -1):
     last_round = -1
     last_state = None
@@ -331,6 +368,8 @@ if __name__ == '__main__':
             pass
         elif args.cifar100:
             pass
+        elif args.mnist:
+            fed_dataset = load_mnist_dataset(str(data_dir.absolute()), num_clients=100, batch_size=10)
         else:
             # default to femnist dataset
             fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=3400,
@@ -416,12 +455,13 @@ if __name__ == '__main__':
             default: run fed avg with fixed parameters
             """
             try:
-                context = create_femnist_experiment_context(name='fedavg', client_fraction=0.2,
-                                                            local_epochs=3,
-                                                            lr=0.1, batch_size=fed_dataset.batch_size, dataset_name='femnist',
-                                                            no_progress_bar=args.no_progress_bar)
+                context = create_mnist_experiment_context(name='fedavg', client_fraction=0.1,
+                                                          local_epochs=5, num_classes=10,
+                                                          lr=0.1, batch_size=fed_dataset.batch_size,
+                                                          dataset_name='mnist_momentum0.5',
+                                                          no_progress_bar=args.no_progress_bar)
                 logger.info(f'running FedAvg with the following configuration: {context}')
-                run_fedavg(context, 10, save_states=False, dataset=fed_dataset)
+                run_fedavg(context, 50, save_states=False, dataset=fed_dataset)
             except Exception as e:
                 logger.exception(f'Failed to execute configuration {context}', e)
     run()

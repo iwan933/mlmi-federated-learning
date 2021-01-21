@@ -56,11 +56,11 @@ def run_fedavg_round(aggregator: BaseAggregatorParticipant, participants: List[B
     overwrite_participants_models(initial_model_state, participants)
 
     participant_fraction = sample_randomly_by_fraction(participants, client_fraction)
-    num_train_samples = [p.num_train_samples for p in participant_fraction]
     logger.debug(f'starting training round with {len(participant_fraction)}/{len(participants)}.')
     run_train_round(participant_fraction, training_args)
 
     logger.debug('starting aggregation.')
+    num_train_samples = [p.num_train_samples for p in participant_fraction]
     aggregator.aggregate(participant_fraction, num_train_samples=num_train_samples)
 
     logger.debug('distribute the aggregated global model to clients')

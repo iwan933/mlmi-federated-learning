@@ -73,6 +73,9 @@ class OptimizerArgs(object):
         self.optimizer_args = args
         self.optimizer_kwargs = kwargs
 
+    def __call__(self, model_parameters, *args, **kwargs):
+        return self.optimizer_class(model_parameters, *self.optimizer_args, **self.optimizer_kwargs)
+
 
 class ModelArgs(object):
     """
@@ -83,19 +86,20 @@ class ModelArgs(object):
         self.kwargs = kwargs
         self.model_class = model_class
 
+    def __call__(self, **kwargs):
+        return self.model_class(*self.args, **self.kwargs, **kwargs)
+
 
 class FederatedDatasetData(object):
     """
     Dataset type resulting from FedML dataset loader
     """
-    def __init__(self, client_num, train_data_num: int, test_data_num: int, train_data_global: data.DataLoader,
+    def __init__(self, client_num, train_data_global: data.DataLoader,
                  test_data_global: data.DataLoader, data_local_num_dict: Dict[int, int],
                  data_local_train_num_dict: Dict[int, int], data_local_test_num_dict: Dict[int, int],
                  train_data_local_dict: Dict[int, data.DataLoader], test_data_local_dict: Dict[int, data.DataLoader],
-                 class_num: int, name: str, batch_size: int):
+                 class_num: int, name: str, batch_size: int, *args, **kwargs):
         self.client_num = client_num
-        self.train_data_num = train_data_num
-        self.test_data_num = test_data_num
         self.train_data_global = train_data_global
         self.test_data_global = test_data_global
         self.data_local_num_dict = data_local_num_dict
@@ -106,3 +110,5 @@ class FederatedDatasetData(object):
         self.class_num = class_num
         self.name = name
         self.batch_size = batch_size
+        self.args = args
+        self.kwargs = kwargs

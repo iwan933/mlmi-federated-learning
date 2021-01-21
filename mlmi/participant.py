@@ -28,7 +28,7 @@ class BaseParticipant(object):
         self._cluster_id = None
         self._experiment_context = context
         self._model_args = model_args
-        self._model = model_args.model_class(*model_args.args, **model_args.kwargs, participant_name=participant_name)
+        self._model = model_args(participant_name=participant_name)
 
     @property
     def model(self) -> pl.LightningModule:
@@ -96,7 +96,7 @@ class BaseTrainingParticipant(BaseParticipant):
         super().__init__(client_id, model_args, context)
         self._train_dataloader = train_dataloader
         self._test_dataloader = test_dataloader
-        self._num_train_samples = sum([len(batch) for batch in train_dataloader])
+        self._num_train_samples = sum([len(y) for x, y in train_dataloader])
         self._num_test_samples = num_test_samples
         self._lightning_logger = lightning_logger
         self._callbacks = None

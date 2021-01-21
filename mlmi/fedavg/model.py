@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional
 
 import torch
-from torch import Tensor, optim
+from torch import Tensor, optim, nn
 from torch.nn import functional as F
 
 import pytorch_lightning as pl
@@ -67,12 +67,60 @@ class CNNLightning(BaseParticipantModel, pl.LightningModule):
         self.model = CNN_OriginalFedAvg(only_digits=only_digits)
         self.optimizer_args = optimizer_args
         self.accuracy = Accuracy()
-        o = self.optimizer_args
-        self._optimizer = o.optimizer_class(self.model.parameters(), *o.optimizer_args, **o.optimizer_kwargs)
+        self._optimizer = optimizer_args(self.model.parameters())
 
-    @property
-    def optimizer(self) -> optim.Optimizer:
+    def configure_optimizers(self):
         return self._optimizer
+
+    def training_step(self, train_batch, batch_idx):
+        x, y = train_batch
+        y = y.long()
+        logits = self.model(x)
+        loss = F.cross_entropy(logits, y)
+        preds = torch.argmax(logits, dim=1)
+        # TODO: this should actually be calculated on a validation set (missing cross entropy implementation)
+        self.log('train/acc/{}'.format(self.participant_name), self.accuracy(preds, y).item())
+        self.log('train/loss/{}'.format(self.participant_name), loss.item())
+        return loss
+
+    def test_step(self, test_batch, batch_idx):
+        x, y = test_batch
+        y = y.long()
+        logits = self.model(x)
+        loss = F.cross_entropy(logits, y)
+        preds = torch.argmax(logits, dim=1)
+        self.log(f'test/acc/{self.participant_name}', self.accuracy(preds, y).item())
+        self.log(f'test/loss/{self.participant_name}', loss.item())
+        return loss
+
+
+class CNNMnist(nn.Module):
+    def __init__(self, input_channels, num_classes):
+        super(CNNMnist, self).__init__()
+        self.conv1 = nn.Conv2d(input_channels, 10, kernel_size=5)
+        self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
+        self.conv2_drop = nn.Dropout2d()
+        self.fc1 = nn.Linear(320, 50)
+        self.fc2 = nn.Linear(50, num_classes)
+
+    def forward(self, x):
+        x = F.relu(F.max_pool2d(self.conv1(x), 2))
+        x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
+        x = x.view(-1, x.shape[1]*x.shape[2]*x.shape[3])
+        x = F.relu(self.fc1(x))
+        x = F.dropout(x, training=self.training)
+        x = self.fc2(x)
+        return x
+
+
+class CNNMnistLightning(BaseParticipantModel, pl.LightningModule):
+
+    def __init__(self, optimizer_args: OptimizerArgs, num_classes, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.model = CNNMnist(input_channels=1, num_classes=num_classes)
+        self.optimizer_args = optimizer_args
+        self.accuracy = Accuracy()
+        self._optimizer = optimizer_args(self.model.parameters())
 
     def configure_optimizers(self):
         return self._optimizer
