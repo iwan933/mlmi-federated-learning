@@ -280,7 +280,7 @@ def create_femnist_experiment_context(name: str, local_epochs: int, batch_size: 
                                       dataset_name: str, fixed_logger_version=None, no_progress_bar=False,
                                       cluster_args: Optional[ClusterArgs] = None):
     logger.debug('creating experiment context ...')
-    optimizer_args = OptimizerArgs(optim.SGD, lr=lr, momentum=0.5)
+    optimizer_args = OptimizerArgs(optim.SGD, lr=lr, momentum=0.9)
     model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
     train_args_dict = {
         'max_epochs': local_epochs,

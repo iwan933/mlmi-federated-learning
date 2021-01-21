@@ -1,3 +1,4 @@
+import copy
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
@@ -18,8 +19,9 @@ logger = getLogger(__name__)
 
 
 def optimizer_state_dict_to_cpu(optimizer_state_dict):
+    c = copy.deepcopy(optimizer_state_dict)
     o = {}
-    state_dict = optimizer_state_dict.get('state')
+    state_dict = c.get('state')
     r = {}
     for key, state in state_dict.items():
         s = {}
@@ -30,7 +32,7 @@ def optimizer_state_dict_to_cpu(optimizer_state_dict):
                 s[k] = v
         r[key] = s
     o['state'] = r
-    o['param_groups'] = optimizer_state_dict.get('param_groups')
+    o['param_groups'] = c.get('param_groups')
     return o
 
 
@@ -166,8 +168,10 @@ class BaseTrainingParticipant(BaseParticipant):
         trainer = self.create_trainer(enable_logging=False, **training_args.kwargs)
         train_dataloader = self.train_data_loader
         trainer.fit(self.model, train_dataloader, train_dataloader)
+        self._model = self.model.cpu()
         optimizer: optim.Optimizer = self.model.optimizers()
         self.model.optimizer_state = optimizer_state_dict_to_cpu(optimizer.state_dict())
+        optimizer.load_state_dict(self.model.optimizer_state)
 
     def test(self, model: Optional[torch.nn.Module] = None, use_local_model: bool = False):
         """
@@ -226,7 +230,7 @@ class BaseParticipantModel(object):
     def configure_optimizers(self):
         return self.optimizer_args(self.model.parameters())
         """
-        Do not restore state.
+        Do not restore state
         if self.optimizer_state is not None:
             optimizer.load_state_dict(self.optimizer_state)
         return optimizer
