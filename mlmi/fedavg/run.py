@@ -16,7 +16,7 @@ from mlmi.fedavg.data import scratch_data, select_random_fed_dataset_partitions
 from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.selectors import sample_randomly_by_fraction
 from mlmi.structs import ClusterArgs, FederatedDatasetData
-from mlmi.clustering import RandomClusterPartitioner, GradientClusterPartitioner
+from mlmi.clustering import RandomClusterPartitioner, GradientClusterPartitioner, ClusterBriggsPartitioner
 from mlmi.log import getLogger
 from mlmi.fedavg.femnist import load_femnist_dataset, load_mnist_dataset
 from mlmi.fedavg.model import CNNMnist, CNNMnistLightning, FedAvgClient, FedAvgServer, CNNLightning
@@ -200,7 +200,7 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
     else:
         # Clustering of participants by model updates
         partitioner = context.cluster_args.partitioner_class(*context.cluster_args.args, **context.cluster_args.kwargs)
-        cluster_clients_dic = partitioner.cluster(clients)
+        cluster_clients_dic = partitioner.cluster(clients, server)
         _cluster_clients_dic = dict()
         for cluster_id, participants in cluster_clients_dic.items():
             _cluster_clients_dic[cluster_id] = [c._name for c in participants]
@@ -420,11 +420,11 @@ if __name__ == '__main__':
                                             dataset=fed_dataset, num_rounds_init=cluster_args.num_rounds_init,
                                             num_rounds_cluster=cluster_args.num_rounds_cluster)
         elif args.hierarchical:
-            cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech="ward", criterion="distance",
-                                       dis_metric="euclidean", max_value_criterion=10.0, plot_dendrogram=False,
+            cluster_args = ClusterArgs(ClusterBriggsPartitioner, linkage_mech="ward", criterion="distance",
+                                       dis_metric="euclidean", max_value_criterion=8.0, plot_dendrogram=False,
                                        num_rounds_init=1, num_rounds_cluster=1)
 
-            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=1,
+            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=3,
                                                         lr=0.1, batch_size=fed_dataset.batch_size, dataset_name=fed_dataset.name,
                                                         cluster_args=cluster_args, no_progress_bar=args.no_progress_bar)
             context.cluster_args = cluster_args
