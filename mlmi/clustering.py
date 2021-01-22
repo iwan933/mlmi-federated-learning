@@ -131,6 +131,8 @@ class ModelFlattenWeightsPartitioner(BaseClusterPartitioner):
         # Compute distance matrix of model updates: Using mean of weights from last layer of each participant
         model_states: List[Dict[str, Tensor]] = [p.model.state_dict() for p in participants]
         keys = list(model_states[0].keys())
+        # to flatten models without bias use version below
+        # keys = list(filter(lambda k: not k.endswith('bias'), model_states[0].keys()))
         model_parameter = np.array([flatten_model_parameter(m, keys).numpy() for m in model_states], dtype=float)
         cluster_ids = hac.fclusterdata(model_parameter, self.max_value_criterion, self.criterion,
                                        method=self.linkage_mech, metric=self.dis_metric)
@@ -157,4 +159,3 @@ class ModelFlattenWeightsPartitioner(BaseClusterPartitioner):
         logging.info('Finished clustering')
 
         return clusters_hac_dic
-

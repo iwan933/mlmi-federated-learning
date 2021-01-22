@@ -307,7 +307,7 @@ def create_mnist_experiment_context(name: str, local_epochs: int, batch_size: in
                                     dataset_name: str, num_classes: int, fixed_logger_version=None, no_progress_bar=False,
                                     cluster_args: Optional[ClusterArgs] = None):
     logger.debug('creating experiment context ...')
-    optimizer_args = OptimizerArgs(optim.Adam, lr=lr, betas=(0.5, 0.999))
+    optimizer_args = OptimizerArgs(optim.SGD, lr=lr, momentum=0.5)
     model_args = ModelArgs(CNNMnistLightning, num_classes=num_classes, optimizer_args=optimizer_args)
     train_args_dict = {
         'max_epochs': local_epochs,
@@ -402,7 +402,7 @@ if __name__ == '__main__':
                                                             batch_size=fed_dataset.batch_size, **configuration,
                                                             dataset_name=fed_dataset.name,
                                                             no_progress_bar=args.no_progress_bar)
-                run_fedavg(context, num_rounds=total_rounds, dataset=fed_dataset, save_states=True, restore_state=True)
+                run_fedavg(context, num_rounds=5, dataset=fed_dataset, save_states=True, restore_state=True)
                 for fedavg_rounds in [5]: #[1, 3, 5, 10]:
                     round_configuration = {
                        'num_rounds_init': fedavg_rounds,
