@@ -281,7 +281,7 @@ def create_femnist_experiment_context(name: str, local_epochs: int, batch_size: 
                                       dataset_name: str, fixed_logger_version=None, no_progress_bar=False,
                                       cluster_args: Optional[ClusterArgs] = None):
     logger.debug('creating experiment context ...')
-    optimizer_args = OptimizerArgs(optim.SGD, lr=lr, momentum=0.9)
+    optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
     train_args_dict = {
         'max_epochs': local_epochs,
@@ -307,7 +307,7 @@ def create_mnist_experiment_context(name: str, local_epochs: int, batch_size: in
                                     dataset_name: str, num_classes: int, fixed_logger_version=None, no_progress_bar=False,
                                     cluster_args: Optional[ClusterArgs] = None):
     logger.debug('creating experiment context ...')
-    optimizer_args = OptimizerArgs(optim.Adam, lr=lr, betas=(0.5, 0.999))
+    optimizer_args = OptimizerArgs(optim.SGD, lr=lr, momentum=0.9)
     model_args = ModelArgs(CNNMnistLightning, num_classes=num_classes, optimizer_args=optimizer_args)
     train_args_dict = {
         'max_epochs': local_epochs,
@@ -457,10 +457,9 @@ if __name__ == '__main__':
             default: run fed avg with fixed parameters
             """
             try:
-                context = create_mnist_experiment_context(name='fedavg', client_fraction=0.1,
-                                                          local_epochs=5, num_classes=10,
-                                                          lr=0.03, batch_size=fed_dataset.batch_size,
-                                                          dataset_name='mnist_momentum0.5',
+                context = create_femnist_experiment_context(name='fedavg', client_fraction=0.1,
+                                                          local_epochs=3, lr=0.1, batch_size=fed_dataset.batch_size,
+                                                          dataset_name='femnist_momentum367',
                                                           no_progress_bar=args.no_progress_bar)
                 logger.info(f'running FedAvg with the following configuration: {context}')
                 run_fedavg(context, 50, save_states=False, dataset=fed_dataset)

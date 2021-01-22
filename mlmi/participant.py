@@ -10,30 +10,13 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import LightningLoggerBase
 from pytorch_lightning.callbacks.base import Callback
 
+from mlmi.model import fit, test
 from mlmi.structs import OptimizerArgs, TrainArgs, ModelArgs
 from mlmi.log import getLogger
 from mlmi.settings import CHECKPOINT_DIR
 
 
 logger = getLogger(__name__)
-
-
-def optimizer_state_dict_to_cpu(optimizer_state_dict):
-    c = copy.deepcopy(optimizer_state_dict)
-    o = {}
-    state_dict = c.get('state')
-    r = {}
-    for key, state in state_dict.items():
-        s = {}
-        for k, v in state.items():
-            if torch.is_tensor(v):
-                s[k] = v.cpu()
-            else:
-                s[k] = v
-        r[key] = s
-    o['state'] = r
-    o['param_groups'] = c.get('param_groups')
-    return o
 
 
 class BaseParticipant(object):
@@ -165,10 +148,8 @@ class BaseTrainingParticipant(BaseParticipant):
         :param kwargs:
         :return:
         """
-        trainer = self.create_trainer(enable_logging=False, **training_args.kwargs)
         train_dataloader = self.train_data_loader
-        trainer.fit(self.model, train_dataloader, train_dataloader)
-        del self.model.trainer
+        fit(self.model, train_dataloader, **training_args.kwargs)
 
     def test(self, model: Optional[torch.nn.Module] = None, use_local_model: bool = False):
         """
@@ -179,12 +160,10 @@ class BaseTrainingParticipant(BaseParticipant):
         """
         assert use_local_model or model is not None
 
-        trainer = self.create_trainer(enable_logging=False, progress_bar_refresh_rate=0)
-
         if use_local_model:
             model = self.model
 
-        result = trainer.test(model=model, test_dataloaders=self.test_data_loader, verbose=False)
+        result = test(model, self.test_data_loader)
         return result
 
 
@@ -200,35 +179,3 @@ class BaseAggregatorParticipant(BaseParticipant):
         :return:
         """
         raise NotImplementedError()
-
-
-class BaseParticipantModel(object):
-
-    def __init__(self, *args, participant_name=None, optimizer_args: Optional[OptimizerArgs]=None,
-                 model=None, **kwargs):
-        assert participant_name is not None, 'Please provide a participant name parameter in model args to identify' \
-                                             'your model in logging'
-        assert optimizer_args is not None, 'Optimizer args not set!'
-        assert model is not None, 'Model not passed!'
-        self.participant_name = participant_name
-        self.optimizer_args = optimizer_args
-        super().__init__(*args, **kwargs)
-        self.model = model
-        self._optimizer_state = None
-
-    @property
-    def optimizer_state(self):
-        return self._optimizer_state
-
-    @optimizer_state.setter
-    def optimizer_state(self, value):
-        self._optimizer_state = value
-
-    def configure_optimizers(self):
-        return self.optimizer_args(self.model.parameters())
-        """
-        Do not restore state
-        if self.optimizer_state is not None:
-            optimizer.load_state_dict(self.optimizer_state)
-        return optimizer
-        """

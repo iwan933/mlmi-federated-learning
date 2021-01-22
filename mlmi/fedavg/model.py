@@ -1,17 +1,16 @@
 from typing import Dict, List, Optional
 
 import torch
-from torch import Tensor, optim, nn
+from torch import Tensor, nn
 from torch.nn import functional as F
 
-import pytorch_lightning as pl
 from pytorch_lightning.metrics import Accuracy
 
 from fedml_api.model.cv.cnn import CNN_OriginalFedAvg
 
 from mlmi.log import getLogger
-from mlmi.participant import BaseParticipantModel, BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
-from mlmi.structs import OptimizerArgs
+from mlmi.model import BaseParticipantModel
+from mlmi.participant import BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
 
 
 logger = getLogger(__name__)
@@ -60,12 +59,11 @@ class FedAvgServer(BaseAggregatorParticipant):
         self.model.load_state_dict(aggregated_model_state)
 
 
-class CNNLightning(BaseParticipantModel, pl.LightningModule):
+class CNNLightning(BaseParticipantModel):
 
     def __init__(self, only_digits=False, *args, **kwargs):
-        model = CNN_OriginalFedAvg(only_digits=only_digits)
-        super().__init__(*args, model=model, **kwargs)
-        self.model = model
+        super().__init__(*args, **kwargs)
+        self.model = CNN_OriginalFedAvg(only_digits=only_digits)
         self.accuracy = Accuracy()
 
     def training_step(self, train_batch, batch_idx):
@@ -109,12 +107,11 @@ class CNNMnist(nn.Module):
         return x
 
 
-class CNNMnistLightning(BaseParticipantModel, pl.LightningModule):
+class CNNMnistLightning(BaseParticipantModel):
 
     def __init__(self, num_classes, *args, **kwargs):
-        model = CNNMnist(input_channels=1, num_classes=num_classes)
-        super().__init__(*args, model=model, **kwargs)
-        self.model = model
+        super().__init__(*args, **kwargs)
+        self.model = CNNMnist(input_channels=1, num_classes=num_classes)
         self.accuracy = Accuracy()
 
     def training_step(self, train_batch, batch_idx):
