@@ -12,7 +12,7 @@ from mlmi.participant import (
 from mlmi.exceptions import ExecutionError
 
 from mlmi.log import getLogger
-from mlmi.selectors import sample_randomly_by_fraction
+from mlmi.sampling import sample_randomly_by_fraction
 from mlmi.settings import REPO_ROOT
 from mlmi.structs import TrainArgs
 from mlmi.utils import overwrite_participants_models, overwrite_participants_optimizers

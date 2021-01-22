@@ -14,9 +14,9 @@ from torch.utils import data as data
 
 from mlmi.fedavg.data import scratch_data, select_random_fed_dataset_partitions
 from mlmi.fedavg.structs import FedAvgExperimentContext
-from mlmi.selectors import sample_randomly_by_fraction
+from mlmi.sampling import sample_randomly_by_fraction
 from mlmi.structs import ClusterArgs, FederatedDatasetData
-from mlmi.clustering import RandomClusterPartitioner, GradientClusterPartitioner
+from mlmi.clustering import ModelFlattenWeightsPartitioner, RandomClusterPartitioner, GradientClusterPartitioner
 from mlmi.log import getLogger
 from mlmi.fedavg.femnist import load_femnist_dataset, load_mnist_dataset
 from mlmi.fedavg.model import CNNMnist, CNNMnistLightning, FedAvgClient, FedAvgServer, CNNLightning
@@ -165,15 +165,16 @@ def run_fedavg(context: FedAvgExperimentContext, num_rounds: int, save_states: b
             server.overwrite_model_state(round_model_state)
         else:
             run_fedavg_round(server, clients, context.train_args, client_fraction=context.client_fraction)
-        # test over all clients
-        result = evaluate_global_model(global_model_participant=server, participants=clients)
-        loss, acc = result.get('test/loss'), result.get('test/acc')
+            # test over all clients
+            result = evaluate_global_model(global_model_participant=server, participants=clients)
+            loss, acc = result.get('test/loss'), result.get('test/acc')
+            log_loss_and_acc('fedavg', loss, acc, context.experiment_logger, i)
+            log_goal_test_acc('fedavg', acc, context.experiment_logger, i)
+            logger.info(
+                f'... finished training round (mean loss: {torch.mean(loss):.2f}, mean acc: {torch.mean(acc):.2f})')
         # log and save
         if save_states:
             save_fedavg_state(context, i, server.model.state_dict())
-        log_loss_and_acc('fedavg', loss, acc, context.experiment_logger, i)
-        log_goal_test_acc('fedavg', acc, context.experiment_logger, i)
-        logger.info(f'... finished training round (mean loss: {torch.mean(loss):.2f}, mean acc: {torch.mean(acc):.2f})')
     return server, clients
 
 
@@ -401,15 +402,15 @@ if __name__ == '__main__':
                                                             batch_size=fed_dataset.batch_size, **configuration,
                                                             dataset_name=fed_dataset.name,
                                                             no_progress_bar=args.no_progress_bar)
-                run_fedavg(context, num_rounds=total_rounds, dataset=fed_dataset, save_states=True)
-                for fedavg_rounds in [1, 3, 5, 10]:
+                run_fedavg(context, num_rounds=total_rounds, dataset=fed_dataset, save_states=True, restore_state=True)
+                for fedavg_rounds in [5]: #[1, 3, 5, 10]:
                     round_configuration = {
                        'num_rounds_init': fedavg_rounds,
                        'num_rounds_cluster': total_rounds - fedavg_rounds
                     }
-                    cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech="ward", criterion="distance",
-                                               dis_metric="euclidean", max_value_criterion=10.0, plot_dendrogram=False,
-                                               **round_configuration)
+                    cluster_args = ClusterArgs(ModelFlattenWeightsPartitioner, linkage_mech="ward",
+                                               criterion="distance", dis_metric="euclidean", max_value_criterion=10.0,
+                                               plot_dendrogram=False, **round_configuration)
                     context = create_femnist_experiment_context(name=experiment_name, local_epochs=3, lr=0.1,
                                                                 batch_size=fed_dataset.batch_size, **configuration,
                                                                 dataset_name=fed_dataset.name,
@@ -420,13 +421,14 @@ if __name__ == '__main__':
                                             dataset=fed_dataset, num_rounds_init=cluster_args.num_rounds_init,
                                             num_rounds_cluster=cluster_args.num_rounds_cluster)
         elif args.hierarchical:
-            cluster_args = ClusterArgs(GradientClusterPartitioner, linkage_mech="ward", criterion="distance",
+            cluster_args = ClusterArgs(ModelFlattenWeightsPartitioner, linkage_mech="ward", criterion="distance",
                                        dis_metric="euclidean", max_value_criterion=10.0, plot_dendrogram=False,
                                        num_rounds_init=1, num_rounds_cluster=1)
 
-            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=1,
-                                                        lr=0.1, batch_size=fed_dataset.batch_size, dataset_name=fed_dataset.name,
-                                                        cluster_args=cluster_args, no_progress_bar=args.no_progress_bar)
+            context = create_mnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=1,
+                                                      lr=0.1, batch_size=fed_dataset.batch_size,
+                                                      dataset_name=fed_dataset.name, num_classes=10,
+                                                      cluster_args=cluster_args, no_progress_bar=args.no_progress_bar)
             context.cluster_args = cluster_args
             run_fedavg_hierarchical(context, restore_clustering=False, restore_fedavg=True, dataset=fed_dataset,
                                     num_rounds_init=cluster_args.num_rounds_init,
