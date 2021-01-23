@@ -2,6 +2,7 @@ from typing import Optional, Type, Dict
 from torch import optim
 from torch.utils import data
 import pytorch_lightning as pl
+import re
 
 
 class TrainArgs(object):
@@ -72,6 +73,17 @@ class OptimizerArgs(object):
         self.optimizer_class = optimizer_class
         self.optimizer_args = args
         self.optimizer_kwargs = kwargs
+        self._config_string = self._create_config_string(**kwargs)
+
+    def _create_config_string(self, **kwargs):
+        self.lr = kwargs.get('lr', None)
+        self.momentum = kwargs.get('momentum', None)
+        self.optimizer = re.sub(r'[a-z.<>\' ]', '', str(self.optimizer_class))
+        unique_str = f'opt{self.optimizer}mom{self.momentum}'
+        return unique_str
+
+    def __str__(self):
+        return self._config_string
 
     def __call__(self, model_parameters, *args, **kwargs):
         return self.optimizer_class(model_parameters, *self.optimizer_args, **self.optimizer_kwargs)
