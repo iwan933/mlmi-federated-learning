@@ -295,6 +295,7 @@ def create_femnist_experiment_context(name: str, local_epochs: int, batch_size: 
                                       lr=lr, batch_size=batch_size, optimizer_args=optimizer_args,
                                       model_args=model_args, train_args=training_args, dataset_name=dataset_name)
     experiment_specification = f'{context}'
+    experiment_specification += f'_{optimizer_args}'
     if cluster_args is not None:
         context.cluster_args = cluster_args
         experiment_specification += f'_{cluster_args}'
@@ -321,6 +322,7 @@ def create_mnist_experiment_context(name: str, local_epochs: int, batch_size: in
                                       lr=lr, batch_size=batch_size, optimizer_args=optimizer_args,
                                       model_args=model_args, train_args=training_args, dataset_name=dataset_name)
     experiment_specification = f'{context}'
+    experiment_specification += f'_{optimizer_args}'
     if cluster_args is not None:
         context.cluster_args = cluster_args
         experiment_specification += f'_{cluster_args}'
@@ -425,9 +427,9 @@ if __name__ == '__main__':
                                        dis_metric="euclidean", max_value_criterion=10.0, plot_dendrogram=False,
                                        num_rounds_init=1, num_rounds_cluster=1)
 
-            context = create_mnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=1,
+            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=1,
                                                       lr=0.1, batch_size=fed_dataset.batch_size,
-                                                      dataset_name=fed_dataset.name, num_classes=10,
+                                                      dataset_name=fed_dataset.name,
                                                       cluster_args=cluster_args, no_progress_bar=args.no_progress_bar)
             context.cluster_args = cluster_args
             run_fedavg_hierarchical(context, restore_clustering=False, restore_fedavg=True, dataset=fed_dataset,
