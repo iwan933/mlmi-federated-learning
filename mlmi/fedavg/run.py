@@ -287,7 +287,7 @@ def create_femnist_experiment_context(name: str, local_epochs: int, batch_size: 
     train_args_dict = {
         'max_epochs': local_epochs,
         'min_epochs': local_epochs,
-        'gradient_clip_val': 0.5
+        'gradient_clip_val': 10.0
     }
     if no_progress_bar:
         train_args_dict['progress_bar_refresh_rate'] = 0
@@ -308,12 +308,12 @@ def create_mnist_experiment_context(name: str, local_epochs: int, batch_size: in
                                     dataset_name: str, num_classes: int, fixed_logger_version=None, no_progress_bar=False,
                                     cluster_args: Optional[ClusterArgs] = None):
     logger.debug('creating experiment context ...')
-    optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
+    optimizer_args = OptimizerArgs(optim.SGD, lr=lr, momentum=0.0)
     model_args = ModelArgs(CNNMnistLightning, num_classes=num_classes, optimizer_args=optimizer_args)
     train_args_dict = {
         'max_epochs': local_epochs,
         'min_epochs': local_epochs,
-        'gradient_clip_val': 0.5
+        'gradient_clip_val': 10.0
     }
     if no_progress_bar:
         train_args_dict['progress_bar_refresh_rate'] = 0
@@ -460,9 +460,9 @@ if __name__ == '__main__':
             """
             try:
                 context = create_mnist_experiment_context(name='fedavg', client_fraction=0.1,
-                                                          local_epochs=3, num_classes=10,
-                                                          lr=0.01, batch_size=fed_dataset.batch_size,
-                                                          dataset_name='mnist_momentum0.5',
+                                                          local_epochs=5, num_classes=10,
+                                                          lr=0.1, batch_size=fed_dataset.batch_size,
+                                                          dataset_name='mnist',
                                                           no_progress_bar=args.no_progress_bar)
                 logger.info(f'running FedAvg with the following configuration: {context}')
                 run_fedavg(context, 50, save_states=False, dataset=fed_dataset, restore_state=False)

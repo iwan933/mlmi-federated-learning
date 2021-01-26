@@ -167,7 +167,9 @@ class BaseTrainingParticipant(BaseParticipant):
         """
         trainer = self.create_trainer(enable_logging=False, **training_args.kwargs)
         train_dataloader = self.train_data_loader
-        trainer.fit(self.model, train_dataloader, train_dataloader)
+        s1 = copy.deepcopy(self.model.state_dict())
+        trainer.fit(self.model, train_dataloader)
+        s2 = copy.deepcopy(self.model.state_dict())
         del self.model.trainer
 
     def test(self, model: Optional[torch.nn.Module] = None, use_local_model: bool = False):
@@ -225,7 +227,8 @@ class BaseParticipantModel(object):
         self._optimizer_state = value
 
     def configure_optimizers(self):
-        return self.optimizer_args(self.model.parameters())
+        optimizer = self.optimizer_args(self.model.parameters())
+        return optimizer
         """
         Do not restore state
         if self.optimizer_state is not None:
