@@ -1,3 +1,5 @@
+import copy
+import numpy as np
 from typing import Dict, List, Optional
 
 import torch
@@ -9,6 +11,7 @@ from pytorch_lightning.metrics import Accuracy
 
 from fedml_api.model.cv.cnn import CNN_OriginalFedAvg
 
+from mlmi.clustering import flatten_model_parameter
 from mlmi.log import getLogger
 from mlmi.participant import BaseParticipantModel, BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
 from mlmi.structs import OptimizerArgs
@@ -19,9 +22,9 @@ logger = getLogger(__name__)
 
 def add_weighted_model(previous: Optional[Dict[str, Tensor]], next: Dict[str, Tensor], num_samples: int,
                        num_total_samples: int) -> Dict[str, Tensor]:
-    weighted_model_state = dict() if previous is None else previous
+    weighted_model_state = dict() if previous is None else copy.deepcopy(previous)
     for key, w in next.items():
-        weighted_parameter = (num_samples / num_total_samples) * w
+        weighted_parameter = (float(num_samples) / float(num_total_samples)) * w
         if previous is None:
             weighted_model_state[key] = weighted_parameter
         else:
@@ -52,12 +55,33 @@ class FedAvgServer(BaseAggregatorParticipant):
         num_total_samples = sum(num_train_samples)
 
         aggregated_model_state = None
+        keys = list(participants[0].model.state_dict().keys())
+        sample_counter = 0
         for num_samples, participant in zip(num_train_samples, participants):
+            sample_counter += num_samples
+            assert num_samples == participant.num_train_samples, f'aggregation num: {num_samples} != ' \
+                                                                       f'{participant.num_train_samples}'
+            # flatten all dimensions and take the sum
+            sum0 = np.sum(np.array([flatten_model_parameter(p.model.state_dict(), keys).numpy() for p in participants],
+                                   dtype=float))
+
             aggregated_model_state = add_weighted_model(aggregated_model_state,
                                                         load_participant_model_state(participant),
                                                         num_samples, num_total_samples)
 
-        self.model.load_state_dict(aggregated_model_state)
+            sum1 = np.sum(np.array([flatten_model_parameter(p.model.state_dict(), keys).numpy() for p in participants],
+                                   dtype=float))
+            # check if the models were not influenced during aggregation
+            assert sum0 == sum1, 'other models influenced'
+        assert sample_counter == num_total_samples
+        comparison = None
+        for p in participants:
+            if comparison is None:
+                comparison = copy.deepcopy(p.model.state_dict())
+            else:
+                for k, v in p.model.state_dict().items():
+                    comparison[k] += v
+        self.overwrite_model_state(aggregated_model_state)
 
 
 class CNNLightning(BaseParticipantModel, pl.LightningModule):

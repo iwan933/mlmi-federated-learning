@@ -77,7 +77,7 @@ class OptimizerArgs(object):
 
     def _create_config_string(self, **kwargs):
         self.lr = kwargs.get('lr', None)
-        self.momentum = kwargs.get('momentum', None)
+        self.momentum = kwargs.get('momentum', 0.0)
         self.optimizer = re.sub(r'[a-z.<>\' ]', '', str(self.optimizer_class))
         unique_str = f'opt{self.optimizer}mom{self.momentum}'
         return unique_str

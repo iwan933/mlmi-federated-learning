@@ -28,7 +28,7 @@ def create_tensorboard_logger(experiment_name: str, experiment_specification: Op
     return TensorBoardLogger(experiment_path.absolute(), version=version)
 
 
-def overwrite_participants_models(model_state: Dict[str, Tensor], participants):
+def overwrite_participants_models(model_state: Dict[str, Tensor], participants: List['BaseTrainingParticipant']):
     """
     Overwrites the participants models with a initial state
     :param model_state: state to save on the client side

@@ -1,4 +1,5 @@
 import argparse
+import copy
 import math
 import random
 from typing import Dict, List, Optional
@@ -281,7 +282,7 @@ def create_femnist_experiment_context(name: str, local_epochs: int, batch_size: 
                                       dataset_name: str, fixed_logger_version=None, no_progress_bar=False,
                                       cluster_args: Optional[ClusterArgs] = None):
     logger.debug('creating experiment context ...')
-    optimizer_args = OptimizerArgs(optim.SGD, lr=lr, momentum=0.9)
+    optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
     train_args_dict = {
         'max_epochs': local_epochs,
@@ -295,7 +296,6 @@ def create_femnist_experiment_context(name: str, local_epochs: int, batch_size: 
                                       lr=lr, batch_size=batch_size, optimizer_args=optimizer_args,
                                       model_args=model_args, train_args=training_args, dataset_name=dataset_name)
     experiment_specification = f'{context}'
-    experiment_specification += f'_{optimizer_args}'
     if cluster_args is not None:
         context.cluster_args = cluster_args
         experiment_specification += f'_{cluster_args}'
@@ -308,7 +308,7 @@ def create_mnist_experiment_context(name: str, local_epochs: int, batch_size: in
                                     dataset_name: str, num_classes: int, fixed_logger_version=None, no_progress_bar=False,
                                     cluster_args: Optional[ClusterArgs] = None):
     logger.debug('creating experiment context ...')
-    optimizer_args = OptimizerArgs(optim.SGD, lr=lr, momentum=0.5)
+    optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     model_args = ModelArgs(CNNMnistLightning, num_classes=num_classes, optimizer_args=optimizer_args)
     train_args_dict = {
         'max_epochs': local_epochs,
@@ -404,7 +404,7 @@ if __name__ == '__main__':
                                                             batch_size=fed_dataset.batch_size, **configuration,
                                                             dataset_name=fed_dataset.name,
                                                             no_progress_bar=args.no_progress_bar)
-                run_fedavg(context, num_rounds=5, dataset=fed_dataset, save_states=True, restore_state=True)
+                run_fedavg(context, num_rounds=5, dataset=fed_dataset, save_states=True, restore_state=False)
                 for fedavg_rounds in [5]: #[1, 3, 5, 10]:
                     round_configuration = {
                        'num_rounds_init': fedavg_rounds,
@@ -460,12 +460,12 @@ if __name__ == '__main__':
             """
             try:
                 context = create_mnist_experiment_context(name='fedavg', client_fraction=0.1,
-                                                          local_epochs=5, num_classes=10,
-                                                          lr=0.03, batch_size=fed_dataset.batch_size,
+                                                          local_epochs=3, num_classes=10,
+                                                          lr=0.01, batch_size=fed_dataset.batch_size,
                                                           dataset_name='mnist_momentum0.5',
                                                           no_progress_bar=args.no_progress_bar)
                 logger.info(f'running FedAvg with the following configuration: {context}')
-                run_fedavg(context, 50, save_states=False, dataset=fed_dataset)
+                run_fedavg(context, 50, save_states=False, dataset=fed_dataset, restore_state=False)
             except Exception as e:
                 logger.exception(f'Failed to execute configuration {context}', e)
     run()

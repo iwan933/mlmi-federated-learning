@@ -1,10 +1,11 @@
-import threading
+import numpy as np
 import json
 from typing import List, Dict, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
 
+from mlmi.clustering import flatten_model_parameter
 from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.participant import (
     BaseTrainingParticipant, BaseAggregatorParticipant,
@@ -17,10 +18,11 @@ from mlmi.settings import REPO_ROOT
 from mlmi.structs import TrainArgs
 from mlmi.utils import overwrite_participants_models, overwrite_participants_optimizers
 
+
 logger = getLogger(__name__)
 
 
-def run_train_round(participants: List[BaseTrainingParticipant], training_args: TrainArgs, success_threshold=-1):
+def run_train_round(participants: List['BaseTrainingParticipant'], training_args: TrainArgs, success_threshold=-1):
     """
     Routine to run a single round of training on the clients and return the results additional args are passed to the
     clients training routines.
@@ -30,11 +32,26 @@ def run_train_round(participants: List[BaseTrainingParticipant], training_args: 
     :return:
     """
     successful_participants = 0
+    keys = list(participants[0].model.state_dict().keys())
     for participant in participants:
         try:
             logger.debug('invoking training on participant {0}'.format(participant._name))
+            # flatten all dimensions and take the sum
+            sum0 = np.sum(np.array([flatten_model_parameter(p.model.state_dict(), keys).numpy() for p in participants
+                                    if p._name != participant._name], dtype=float))
+            sum_trained0 = np.sum(flatten_model_parameter(participant.model.state_dict(), keys).numpy())
+            state__ = participant.model.state_dict()
             participant.train(training_args)
             successful_participants += 1
+            # flatten all dimensions and take the sum
+            sum_trained1 = np.sum(flatten_model_parameter(participant.model.state_dict(), keys).numpy())
+            sum1 = np.sum(np.array([flatten_model_parameter(p.model.state_dict(), keys).numpy() for p in participants
+                                    if p._name != participant._name], dtype=float))
+
+            # check if the models that were not trained were not influenced
+            assert sum0 == sum1, 'other models influenced'
+            # check that the model that was trained has changed (could fail by chance)
+            assert sum_trained0 != sum_trained1, 'model sum stood the same'
         except Exception as e:
             logger.error('training on participant {0} failed'.format(participant._name), e)
 
