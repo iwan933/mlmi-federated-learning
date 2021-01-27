@@ -44,7 +44,7 @@ def add_args(parser: argparse.ArgumentParser):
     parser.add_argument('--scratch-data', dest='scratch_data', action='store_const',
                         const=True, default=False)
     parser.add_argument('--max-last', type=int, dest='max_last', default=-1)
-    parser.add_argument('--gradient-clip-val', type=float, dest='gradient_clip_val', default=10.0)
+    parser.add_argument('--gradient-clip-val', type=float, dest='gradient_clip_val', default=5.0)
     parser.add_argument('--briggs', dest='briggs', action='store_const',
                         const=True, default=False)
     parser.add_argument('--mnist', dest='mnist', action='store_const',
@@ -375,7 +375,7 @@ if __name__ == '__main__':
         if args.briggs:
             total_rounds = 50
             # execution of larger client fractions takes very long, skipping these for now 0.2, 0.5, 1.0]:
-            for fraction in [0.1]:
+            for fraction in [0.1, 0.2, 0.5]:
                 configuration = {
                     'client_fraction': fraction,
                 }
