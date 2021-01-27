@@ -20,7 +20,7 @@ from mlmi.clustering import ModelFlattenWeightsPartitioner, RandomClusterPartiti
 from mlmi.log import getLogger
 from mlmi.fedavg.femnist import load_femnist_dataset, load_mnist_dataset
 from mlmi.fedavg.model import CNNMnist, CNNMnistLightning, FedAvgClient, FedAvgServer, CNNLightning
-from mlmi.fedavg.util import load_fedavg_hierarchical_cluster_configuration, \
+from mlmi.fedavg.util import evaluate_cluster_models, load_fedavg_hierarchical_cluster_configuration, \
     load_fedavg_hierarchical_cluster_model_state, load_fedavg_state, run_fedavg_round, \
     save_fedavg_hierarchical_cluster_configuration, save_fedavg_hierarchical_cluster_model_state, save_fedavg_state, \
     run_train_round
@@ -228,6 +228,9 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
     loss, acc = eval_result.get('test/loss'), eval_result.get('test/acc')
     log_loss_and_acc('post_clustering', loss, acc, context.experiment_logger, num_rounds_init)
     log_goal_test_acc('post_clustering', acc, context.experiment_logger, num_rounds_init)
+    global_losses, global_acc = evaluate_cluster_models(cluster_server_dic, cluster_clients_dic)
+    log_loss_and_acc('post_clustering', global_losses, global_acc, context.experiment_logger, num_rounds_init + 1)
+    log_goal_test_acc('post_clustering', global_acc, context.experiment_logger, num_rounds_init + 1)
 
     # Train in clusters
     for i in range(num_rounds_cluster):
@@ -254,25 +257,7 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
                                                          cluster_server.model.state_dict())
             logger.info(f'finished training cluster {cluster_id}')
         logger.info('testing clustering round results')
-        global_losses = None
-        global_acc = None
-        for cluster_id, cluster_clients in cluster_clients_dic.items():
-            cluster_server = cluster_server_dic[cluster_id]
-            result = evaluate_global_model(global_model_participant=cluster_server, participants=cluster_clients)
-            if global_losses is None:
-                global_losses = result.get('test/loss')
-                global_acc = result.get('test/acc')
-            else:
-                if result.get('test/loss').dim() == 0:
-                    loss_test = torch.tensor([result.get('test/loss')])
-                    global_losses = torch.cat((global_losses, loss_test), dim=0)
-                else:
-                    global_losses = torch.cat((global_losses, result.get('test/loss')), dim=0)
-                if result.get('test/acc').dim() == 0:
-                    acc_test = torch.tensor([result.get('test/acc')])
-                    global_acc = torch.cat((global_acc, acc_test), dim=0)
-                else:
-                    global_acc = torch.cat((global_acc, result.get('test/acc')), dim=0)
+        global_losses, global_acc = evaluate_cluster_models(cluster_server_dic, cluster_clients_dic)
         log_loss_and_acc('final hierarchical', global_losses, global_acc, context.experiment_logger,
                          num_rounds_init + i)
         log_goal_test_acc('final hierarchical', global_acc, context.experiment_logger, num_rounds_init + i)
@@ -396,8 +381,8 @@ if __name__ == '__main__':
 
         if args.briggs:
             total_rounds = 50
-            # execution of larger client fractions takes very long, skipping these for now 0.5, 1.0]:
-            for fraction in [0.1, 0.2]:
+            # execution of larger client fractions takes very long, skipping these for now 0.2, 0.5, 1.0]:
+            for fraction in [0.1]:
                 configuration = {
                     'client_fraction': fraction,
                 }

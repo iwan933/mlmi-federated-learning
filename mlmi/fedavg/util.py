@@ -15,7 +15,7 @@ from mlmi.log import getLogger
 from mlmi.sampling import sample_randomly_by_fraction
 from mlmi.settings import REPO_ROOT
 from mlmi.structs import TrainArgs
-from mlmi.utils import overwrite_participants_models, overwrite_participants_optimizers
+from mlmi.utils import evaluate_global_model, overwrite_participants_models, overwrite_participants_optimizers
 
 logger = getLogger(__name__)
 
@@ -155,3 +155,28 @@ def save_fedavg_state(experiment_context: 'FedAvgExperimentContext', fl_round: i
     path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{experiment_context}r{fl_round}.mdl'
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model_state, path)
+
+
+def evaluate_cluster_models(cluster_server_dic: Dict[str, 'BaseAggregatorParticipant'],
+                            cluster_clients_dic: Dict[str, List['BaseTrainingParticipant']])\
+        -> Tuple[Tensor, Tensor]:
+    global_losses = None
+    global_acc = None
+    for cluster_id, cluster_clients in cluster_clients_dic.items():
+        cluster_server = cluster_server_dic[cluster_id]
+        result = evaluate_global_model(global_model_participant=cluster_server, participants=cluster_clients)
+        if global_losses is None:
+            global_losses = result.get('test/loss')
+            global_acc = result.get('test/acc')
+        else:
+            if result.get('test/loss').dim() == 0:
+                loss_test = torch.tensor([result.get('test/loss')])
+                global_losses = torch.cat((global_losses, loss_test), dim=0)
+            else:
+                global_losses = torch.cat((global_losses, result.get('test/loss')), dim=0)
+            if result.get('test/acc').dim() == 0:
+                acc_test = torch.tensor([result.get('test/acc')])
+                global_acc = torch.cat((global_acc, acc_test), dim=0)
+            else:
+                global_acc = torch.cat((global_acc, result.get('test/acc')), dim=0)
+    return global_losses, global_acc
