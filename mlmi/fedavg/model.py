@@ -22,7 +22,7 @@ logger = getLogger(__name__)
 
 def add_weighted_model(previous: Optional[Dict[str, Tensor]], next: Dict[str, Tensor], num_samples: int,
                        num_total_samples: int) -> Dict[str, Tensor]:
-    weighted_model_state = dict() if previous is None else copy.deepcopy(previous)
+    weighted_model_state = dict() if previous is None else previous
     for key, w in next.items():
         weighted_parameter = (float(num_samples) / float(num_total_samples)) * w
         if previous is None:
