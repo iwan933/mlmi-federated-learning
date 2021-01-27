@@ -18,7 +18,7 @@ class TrainArgs(object):
     def _create_config_string(self, **kwargs):
         epochs = kwargs.get('max_epochs', None)
         steps = kwargs.get('max_steps', None)
-        gradient_clipping_value = kwargs.get('gradient_clipping_value', 0.0)
+        gradient_clipping_value = kwargs.get('gradient_clip_val', 0.0)
         config_str = f'gc{gradient_clipping_value}'
         if epochs is not None:
             config_str += f'e{epochs}'
