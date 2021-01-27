@@ -165,13 +165,13 @@ def run_fedavg(context: FedAvgExperimentContext, num_rounds: int, save_states: b
             server.overwrite_model_state(round_model_state)
         else:
             run_fedavg_round(server, clients, context.train_args, client_fraction=context.client_fraction)
-            # test over all clients
-            result = evaluate_global_model(global_model_participant=server, participants=clients)
-            loss, acc = result.get('test/loss'), result.get('test/acc')
-            log_loss_and_acc('fedavg', loss, acc, context.experiment_logger, i)
-            log_goal_test_acc('fedavg', acc, context.experiment_logger, i)
-            logger.info(
-                f'... finished training round (mean loss: {torch.mean(loss):.2f}, mean acc: {torch.mean(acc):.2f})')
+        # test over all clients
+        result = evaluate_global_model(global_model_participant=server, participants=clients)
+        loss, acc = result.get('test/loss'), result.get('test/acc')
+        log_loss_and_acc('fedavg', loss, acc, context.experiment_logger, i)
+        log_goal_test_acc('fedavg', acc, context.experiment_logger, i)
+        logger.info(
+            f'... finished training round (mean loss: {torch.mean(loss):.2f}, mean acc: {torch.mean(acc):.2f})')
         # log and save
         if save_states:
             save_fedavg_state(context, i, server.model.state_dict())
