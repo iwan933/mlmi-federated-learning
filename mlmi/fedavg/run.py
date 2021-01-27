@@ -431,10 +431,11 @@ if __name__ == '__main__':
                                        dis_metric="euclidean", max_value_criterion=10.0, plot_dendrogram=False,
                                        num_rounds_init=1, num_rounds_cluster=1)
 
-            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.2, local_epochs=1,
+            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.1, local_epochs=3,
                                                         lr=0.1, batch_size=fed_dataset.batch_size,
                                                         dataset_name=fed_dataset.name,
-                                                        cluster_args=cluster_args, no_progress_bar=args.no_progress_bar)
+                                                        cluster_args=cluster_args, no_progress_bar=args.no_progress_bar,
+                                                        gradient_clip_val=19)
             context.cluster_args = cluster_args
             run_fedavg_hierarchical(context, restore_clustering=False, restore_fedavg=True, dataset=fed_dataset,
                                     num_rounds_init=cluster_args.num_rounds_init,
