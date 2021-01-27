@@ -13,6 +13,21 @@ class TrainArgs(object):
     def __init__(self, *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
+        self._config_string = self._create_config_string(**kwargs)
+
+    def _create_config_string(self, **kwargs):
+        epochs = kwargs.get('max_epochs', None)
+        steps = kwargs.get('max_steps', None)
+        gradient_clipping_value = kwargs.get('gradient_clipping_value', 0.0)
+        config_str = f'gc{gradient_clipping_value}'
+        if epochs is not None:
+            config_str += f'e{epochs}'
+        elif steps is not None:
+            config_str += f's{steps}'
+        return config_str
+
+    def __str__(self):
+        return self._config_string
 
 
 class ClusterArgs(object):

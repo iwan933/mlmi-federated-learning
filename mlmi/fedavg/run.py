@@ -48,6 +48,7 @@ def add_args(parser: argparse.ArgumentParser):
     parser.add_argument('--scratch-data', dest='scratch_data', action='store_const',
                         const=True, default=False)
     parser.add_argument('--max-last', type=int, dest='max_last', default=-1)
+    parser.add_argument('--gradient-clip-val', type=float, dest='gradient_clip_val', default=10.0)
     parser.add_argument('--briggs', dest='briggs', action='store_const',
                         const=True, default=False)
     parser.add_argument('--mnist', dest='mnist', action='store_const',
@@ -279,14 +280,14 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
 
 def create_femnist_experiment_context(name: str, local_epochs: int, batch_size: int, lr: float, client_fraction: float,
                                       dataset_name: str, fixed_logger_version=None, no_progress_bar=False,
-                                      cluster_args: Optional[ClusterArgs] = None):
+                                      cluster_args: Optional[ClusterArgs] = None, gradient_clip_val=30.0):
     logger.debug('creating experiment context ...')
     optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
     train_args_dict = {
         'max_epochs': local_epochs,
         'min_epochs': local_epochs,
-        'gradient_clip_val': 50.0
+        'gradient_clip_val': gradient_clip_val
     }
     if no_progress_bar:
         train_args_dict['progress_bar_refresh_rate'] = 0
@@ -404,7 +405,8 @@ if __name__ == '__main__':
                 context = create_femnist_experiment_context(name=experiment_name, local_epochs=3, lr=0.1,
                                                             batch_size=fed_dataset.batch_size, **configuration,
                                                             dataset_name=fed_dataset.name,
-                                                            no_progress_bar=args.no_progress_bar)
+                                                            no_progress_bar=args.no_progress_bar,
+                                                            gradient_clip_val=args.gradient_clip_val)
                 run_fedavg(context, num_rounds=total_rounds, dataset=fed_dataset, save_states=True, restore_state=True)
                 for fedavg_rounds in [1, 3, 5, 10]:
                     round_configuration = {
@@ -418,7 +420,8 @@ if __name__ == '__main__':
                                                                 batch_size=fed_dataset.batch_size, **configuration,
                                                                 dataset_name=fed_dataset.name,
                                                                 cluster_args=cluster_args,
-                                                                no_progress_bar=args.no_progress_bar)
+                                                                no_progress_bar=args.no_progress_bar,
+                                                                gradient_clip_val=args.gradient_clip_val)
                     context.cluster_args = cluster_args
                     run_fedavg_hierarchical(context, restore_clustering=False, restore_fedavg=True,
                                             dataset=fed_dataset, num_rounds_init=cluster_args.num_rounds_init,
