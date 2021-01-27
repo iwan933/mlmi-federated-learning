@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional
 
 import torch
-from torch import Tensor, optim, nn
+from torch import Tensor, nn
 from torch.nn import functional as F
 
 import pytorch_lightning as pl
@@ -11,7 +11,6 @@ from fedml_api.model.cv.cnn import CNN_OriginalFedAvg
 
 from mlmi.log import getLogger
 from mlmi.participant import BaseParticipantModel, BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
-from mlmi.structs import OptimizerArgs
 
 
 logger = getLogger(__name__)

@@ -1,22 +1,18 @@
 import argparse
 import math
-import random
 from typing import Dict, List, Optional
 
-import numpy as np
 from sklearn.model_selection import ParameterGrid
 
 import torch
 from pytorch_lightning.loggers import LightningLoggerBase
 from torch import Tensor, optim
 from torch.distributions import Categorical
-from torch.utils import data as data
 
-from mlmi.fedavg.data import scratch_data, select_random_fed_dataset_partitions
+from mlmi.fedavg.data import scratch_data
 from mlmi.fedavg.structs import FedAvgExperimentContext
-from mlmi.sampling import sample_randomly_by_fraction
 from mlmi.structs import ClusterArgs, FederatedDatasetData
-from mlmi.clustering import ModelFlattenWeightsPartitioner, RandomClusterPartitioner, GradientClusterPartitioner
+from mlmi.clustering import ModelFlattenWeightsPartitioner
 from mlmi.log import getLogger
 from mlmi.fedavg.femnist import load_femnist_dataset, load_mnist_dataset
 from mlmi.fedavg.model import CNNMnist, CNNMnistLightning, FedAvgClient, FedAvgServer, CNNLightning
@@ -361,10 +357,7 @@ if __name__ == '__main__':
             fed_dataset = load_mnist_dataset(str(data_dir.absolute()), num_clients=100, batch_size=10)
         else:
             # default to femnist dataset
-            fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=3400,
-                                               batch_size=10)
-            # select 367 clients as in briggs paper
-            fed_dataset = select_random_fed_dataset_partitions(fed_dataset, 367)
+            fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=367, batch_size=10)
 
         if args.scratch_data:
             client_fraction_to_scratch = 0.75

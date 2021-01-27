@@ -118,9 +118,7 @@ class ModelArgs(object):
 
 
 class FederatedDatasetData(object):
-    """
-    Dataset type resulting from FedML dataset loader
-    """
+
     def __init__(self, client_num, train_data_global: data.DataLoader,
                  test_data_global: data.DataLoader, data_local_num_dict: Dict[int, int],
                  data_local_train_num_dict: Dict[int, int], data_local_test_num_dict: Dict[int, int],

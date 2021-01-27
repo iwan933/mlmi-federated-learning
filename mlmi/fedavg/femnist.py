@@ -1,9 +1,11 @@
 from pathlib import Path
+from typing import List, Optional, Tuple
 
-from fedml_api.data_preprocessing.FederatedEMNIST.data_loader import load_partition_data_federated_emnist
 from torch.utils import data
+from torch.utils.data.dataset import T_co
 from torchvision.datasets import MNIST, vision
 
+from mlmi.settings import REPO_ROOT
 from mlmi.structs import FederatedDatasetData
 
 import numpy as np
@@ -37,21 +39,21 @@ def load_mnist_dataset(data_dir, num_clients=100, batch_size=10):
     num_shards, num_imgs = 200, 300
     idx_shard = [i for i in range(num_shards)]
     partitions = {i: np.array([], dtype='int64') for i in range(num_clients)}
-    idxs = np.arange(num_shards*num_imgs)
+    idxs = np.arange(num_shards * num_imgs)
 
     labels = dataset_train.targets.numpy()
 
     # sort labels
     idxs_labels = np.vstack((idxs, labels))
-    idxs_labels = idxs_labels[:,idxs_labels[1,:].argsort()]
-    idxs = idxs_labels[0,:]
+    idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
+    idxs = idxs_labels[0, :]
 
     # divide and assign
     for i in range(num_clients):
         rand_set = set(np.random.choice(idx_shard, 2, replace=False))
         idx_shard = list(set(idx_shard) - rand_set)
         for rand in rand_set:
-            partitions[i] = np.concatenate((partitions[i], idxs[rand*num_imgs:(rand+1)*num_imgs]), axis=0)
+            partitions[i] = np.concatenate((partitions[i], idxs[rand * num_imgs:(rand + 1) * num_imgs]), axis=0)
     test_idxs = np.split(np.arange(len(dataset_test.targets)), num_shards)
 
     data_local_num_dict = dict()
@@ -84,19 +86,59 @@ def load_mnist_dataset(data_dir, num_clients=100, batch_size=10):
     return result_dataset
 
 
-def load_femnist_dataset(data_dir, num_clients=3400, batch_size=10) -> FederatedDatasetData:
-    """
-    Load the federated tensorflow emnist dataset, originally split up into 3400 clients.
-    :param data_dir: data directory
-    :param num_clients: number of clients to use for split
-    :param batch_size: number samples per batch
-    :return:
-    """
-    client_number, train_data_num, test_data_num, train_data_global, test_data_global, \
-    data_local_num_dict, data_local_train_num_dict, data_local_test_num_dict, train_data_local_dict, \
-    test_data_local_dict, class_num = load_partition_data_federated_emnist('', data_dir, client_number=num_clients,
-                                                                  batch_size=batch_size)
-    federated_dataset_args = (client_number, train_data_global, test_data_global,
-                              data_local_num_dict, data_local_train_num_dict, data_local_test_num_dict,
-                              train_data_local_dict, test_data_local_dict, class_num)
-    return FederatedDatasetData(*federated_dataset_args, name='femnist', batch_size=batch_size)
+class FEMNISTDataset(data.Dataset):
+
+    def __init__(self, labels, pixels):
+        self.labels = labels
+        self.pixels = pixels
+
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, index) -> T_co:
+        return self.pixels[index], self.labels[index]
+
+
+def load_femnist_dataset(data_dir, num_clients=367, batch_size=10, only_digits=False):
+    import os, collections
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    import tensorflow_federated as tff
+    from tensorflow_federated.python.simulation import HDF5ClientData
+    import multiprocessing
+
+    _datasets: Tuple[HDF5ClientData, HDF5ClientData] = tff.simulation.datasets.emnist.load_data(only_digits=only_digits,
+                                                                                                cache_dir=data_dir)
+    emnist_train, emnist_test = _datasets
+    selected_client_ids = np.random.choice(emnist_train.client_ids, size=num_clients, replace=False)
+    train_data_local_dict = dict()
+    data_local_num_dict = dict()
+    data_local_train_num_dict = dict()
+    test_data_local_dict = dict()
+    data_local_test_num_dict = dict()
+    for client_id in selected_client_ids:
+        h5data_train = collections.OrderedDict((name, ds[()]) for name, ds in sorted(
+            emnist_train._h5_file[HDF5ClientData._EXAMPLES_GROUP][client_id].items()))
+        femnist_train = FEMNISTDataset(h5data_train['label'], h5data_train['pixels'])
+        h5data_test = collections.OrderedDict((name, ds[()]) for name, ds in sorted(
+            emnist_train._h5_file[HDF5ClientData._EXAMPLES_GROUP][client_id].items()))
+        femnist_test = FEMNISTDataset(h5data_train['label'], h5data_train['pixels'])
+        dl_train = data.DataLoader(femnist_train, batch_size=batch_size)
+        dl_test = data.DataLoader(femnist_test, batch_size=batch_size)
+        train_data_local_dict[client_id] = dl_train
+        data_local_train_num_dict[client_id] = len(femnist_train)
+        test_data_local_dict[client_id] = dl_test
+        data_local_test_num_dict[client_id] = len(femnist_test)
+        data_local_num_dict[client_id] = len(femnist_train)
+    train_data_num = sum([num for num in data_local_train_num_dict.values()])
+    test_data_num = sum([num for num in data_local_test_num_dict.values()])
+    result_dataset = FederatedDatasetData(client_num=num_clients, train_data_num=train_data_num, test_data_num=test_data_num,
+                                          train_data_global=dict(),
+                                          test_data_global=dict(),
+                                          data_local_num_dict=data_local_num_dict,
+                                          data_local_test_num_dict=data_local_test_num_dict,
+                                          data_local_train_num_dict=data_local_train_num_dict,
+                                          class_num=10 if only_digits else 62,
+                                          train_data_local_dict=train_data_local_dict,
+                                          test_data_local_dict=test_data_local_dict,
+                                          name=f'femnist{num_clients}', batch_size=batch_size)
+    return result_dataset
