@@ -70,7 +70,7 @@ class BaseParticipant(object):
         Loads the model state into the current model instance
         :param model_state: The model state to load
         """
-        self._model.load_state_dict(copy.deepcopy(model_state))
+        self._model.load_state_dict(model_state)
 
     def load_model_state_from_checkpoint(self):
         """

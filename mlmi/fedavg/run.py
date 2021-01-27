@@ -286,7 +286,7 @@ def create_femnist_experiment_context(name: str, local_epochs: int, batch_size: 
     train_args_dict = {
         'max_epochs': local_epochs,
         'min_epochs': local_epochs,
-        'gradient_clip_val': 10.0
+        'gradient_clip_val': 50.0
     }
     if no_progress_bar:
         train_args_dict['progress_bar_refresh_rate'] = 0
