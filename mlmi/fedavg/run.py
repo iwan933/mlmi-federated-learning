@@ -15,7 +15,7 @@ from mlmi.fedavg.data import scratch_data
 from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.participant import BaseTrainingParticipant
 from mlmi.structs import ClusterArgs, FederatedDatasetData
-from mlmi.clustering import ModelFlattenWeightsPartitioner
+from mlmi.clustering import ModelFlattenWeightsPartitioner, AlternativePartitioner, GradientClusterPartitioner
 from mlmi.log import getLogger
 from mlmi.fedavg.femnist import load_femnist_dataset, load_mnist_dataset
 from mlmi.fedavg.model import CNNMnist, CNNMnistLightning, FedAvgClient, FedAvgServer, CNNLightning
@@ -204,7 +204,6 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
 
     server, clients = run_fedavg(context, num_rounds_init, save_states=True, dataset=dataset,
                                  restore_state=restore_fedavg)
-
     logger.debug('starting local training before clustering.')
     overwrite_participants_models(server.model.state_dict(), clients)
     run_train_round(clients, context.train_args)
@@ -221,7 +220,8 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
     else:
         # Clustering of participants by model updates
         partitioner = context.cluster_args.partitioner_class(*context.cluster_args.args, **context.cluster_args.kwargs)
-        cluster_clients_dic = partitioner.cluster(clients)
+        cluster_clients_dic = partitioner.cluster(clients, server.model.state_dict())
+        #cluster_clients_dic = partitioner.cluster(clients)
         _cluster_clients_dic = dict()
         for cluster_id, participants in cluster_clients_dic.items():
             _cluster_clients_dic[cluster_id] = [c._name for c in participants]
@@ -433,7 +433,7 @@ if __name__ == '__main__':
                                             dataset=fed_dataset, num_rounds_init=cluster_args.num_rounds_init,
                                             num_rounds_cluster=cluster_args.num_rounds_cluster)
         elif args.hierarchical:
-            cluster_args = ClusterArgs(ModelFlattenWeightsPartitioner, linkage_mech="ward", criterion="distance",
+            cluster_args = ClusterArgs(AlternativePartitioner, linkage_mech="ward", criterion="distance",
                                        dis_metric="euclidean", max_value_criterion=10.0, plot_dendrogram=False,
                                        num_rounds_init=1, num_rounds_cluster=1)
 
