@@ -11,6 +11,7 @@ from torch.distributions import Categorical
 
 from mlmi.fedavg.data import scratch_data
 from mlmi.fedavg.structs import FedAvgExperimentContext
+from mlmi.participant import BaseTrainingParticipant
 from mlmi.structs import ClusterArgs, FederatedDatasetData
 from mlmi.clustering import ModelFlattenWeightsPartitioner
 from mlmi.log import getLogger
@@ -101,7 +102,8 @@ def initialize_clients(context: 'FedAvgExperimentContext', dataset: 'FederatedDa
     return clients
 
 
-def log_data_distribution(dataset: FederatedDatasetData, experiment_logger: LightningLoggerBase):
+def log_data_distribution_by_dataset(name: str, dataset: FederatedDatasetData, experiment_logger: LightningLoggerBase,
+                                     global_step=0):
     num_partitions = len(dataset.train_data_local_dict.items())
     num_train_samples = []
     num_different_labels = []
@@ -125,13 +127,46 @@ def log_data_distribution(dataset: FederatedDatasetData, experiment_logger: Ligh
 
         if (i + 1) % 50 == 0:
             logger.debug('... extracted {}/{} partitions'.format(i + 1, num_partitions))
+    experiment_logger.experiment.add_histogram(f'distribution/{name}/sample_num', Tensor(num_train_samples),
+                                               global_step=global_step)
+    experiment_logger.experiment.add_histogram(f'distribution/{name}/labels_num', Tensor(num_different_labels),
+                                               global_step=global_step)
+    experiment_logger.experiment.add_histogram(f'distribution/{name}/entropy', Tensor(entropy_per_partition),
+                                               global_step=global_step)
 
-    experiment_logger.experiment.add_histogram('distribution/sample_num', Tensor(num_train_samples),
-                                               global_step=0)
-    experiment_logger.experiment.add_histogram('distribution/labels_num', Tensor(num_different_labels),
-                                               global_step=0)
-    experiment_logger.experiment.add_histogram('distribution/entropy', Tensor(entropy_per_partition),
-                                               global_step=0)
+
+def log_data_distribution_by_participants(name: str, training_participants: List['BaseTrainingParticipant'],
+                                          experiment_logger: LightningLoggerBase, global_step=0):
+    num_partitions = len(training_participants)
+    num_train_samples = []
+    num_different_labels = []
+    entropy_per_partition = []
+
+    logger.debug('... extracting dataset distributions')
+    for i, participant in enumerate(training_participants):
+        dataloader = participant.train_data_loader
+        local_labels = None
+        num_all_samples = 0
+        for x, y in dataloader:
+            num_all_samples += x.shape[0]
+            if local_labels is None:
+                local_labels = y
+            else:
+                local_labels = torch.cat((local_labels, y), dim=0)
+        unique_labels, counts = torch.unique(local_labels, return_counts=True)
+        entropy = Categorical(probs=counts / counts.sum()).entropy()
+        num_different_labels.append(len(unique_labels))
+        num_train_samples.append(num_all_samples)
+        entropy_per_partition.append(entropy)
+
+        if (i + 1) % 50 == 0:
+            logger.debug('... extracted {}/{} partitions'.format(i + 1, num_partitions))
+    experiment_logger.experiment.add_histogram(f'distribution/{name}/sample_num', Tensor(num_train_samples),
+                                               global_step=global_step)
+    experiment_logger.experiment.add_histogram(f'distribution/{name}/labels_num', Tensor(num_different_labels),
+                                               global_step=global_step)
+    experiment_logger.experiment.add_histogram(f'distribution/{name}/entropy', Tensor(entropy_per_partition),
+                                               global_step=global_step)
 
 
 def run_fedavg(context: FedAvgExperimentContext, num_rounds: int, save_states: bool, dataset: 'FederatedDatasetData',
@@ -227,6 +262,10 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
     global_losses, global_acc = evaluate_cluster_models(cluster_server_dic, cluster_clients_dic)
     log_loss_and_acc('post_clustering', global_losses, global_acc, context.experiment_logger, num_rounds_init + 1)
     log_goal_test_acc('post_clustering', global_acc, context.experiment_logger, num_rounds_init + 1)
+
+    for cluster_id, cluster_clients in cluster_clients_dic.items():
+        log_data_distribution_by_participants(f'cluster{cluster_id}cf{context.client_fraction}',
+                                              cluster_clients, context.experiment_logger, global_step=num_rounds_init)
 
     # Train in clusters
     for i in range(num_rounds_cluster):
@@ -369,12 +408,13 @@ if __name__ == '__main__':
         if args.log_data_distribution:
             logger.info('... found log distribution flag, only logging data distribution information')
             experiment_logger = create_tensorboard_logger('datadistribution', fed_dataset.name, version=0)
-            log_data_distribution(fed_dataset, experiment_logger)
+            log_data_distribution_by_dataset('fedavg', fed_dataset, experiment_logger)
             return
 
         if args.briggs:
             total_rounds = 50
             # execution of larger client fractions takes very long, skipping these for now 0.2, 0.5, 1.0]:
+            fedavg_distribution_logged = False
             for fraction in [0.1, 0.2, 0.5]:
                 configuration = {
                     'client_fraction': fraction,
@@ -385,6 +425,9 @@ if __name__ == '__main__':
                                                             dataset_name=fed_dataset.name,
                                                             no_progress_bar=args.no_progress_bar,
                                                             gradient_clip_val=args.gradient_clip_val)
+                if not fedavg_distribution_logged:
+                    log_data_distribution_by_dataset('fedavg', fed_dataset, context.experiment_logger)
+                    fedavg_distribution_logged = True
                 run_fedavg(context, num_rounds=total_rounds, dataset=fed_dataset, save_states=True, restore_state=True)
                 for fedavg_rounds in [1, 3, 5, 10]:
                     round_configuration = {
