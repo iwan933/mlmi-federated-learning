@@ -6,3 +6,7 @@ class ClientError(Exception):
 
 class ExecutionError(Exception):
     pass
+
+
+class GradientExplodingError(Exception):
+    pass

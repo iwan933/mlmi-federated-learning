@@ -9,6 +9,7 @@ from pytorch_lightning.metrics import Accuracy
 
 from fedml_api.model.cv.cnn import CNN_OriginalFedAvg
 
+from mlmi.exceptions import GradientExplodingError
 from mlmi.log import getLogger
 from mlmi.participant import BaseParticipantModel, BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
 
@@ -45,9 +46,9 @@ class FedAvgServer(BaseAggregatorParticipant):
 
     def aggregate(self, participants: List[BaseParticipant], num_train_samples: List[int] = None, *args, **kwargs):
         assert num_train_samples is not None, 'Place pass num_train_samples to the aggregation function.'
-        assert len(num_train_samples) == len(participants), 'Please provide the keyword argument num_train_samples, ' \
-                                                            'containing the number of training samples for each ' \
-                                                            'participant'
+        assert len(num_train_samples) == len(participants), 'Please provide the keyword argument a valid number of' \
+                                                            f'num_train_samples, got {len(num_train_samples)},' \
+                                                            f'expected {len(participants)}'
         num_total_samples = sum(num_train_samples)
 
         aggregated_model_state = None
@@ -76,6 +77,8 @@ class CNNLightning(BaseParticipantModel, pl.LightningModule):
         # TODO: this should actually be calculated on a validation set (missing cross entropy implementation)
         self.log('train/acc/{}'.format(self.participant_name), self.accuracy(preds, y).item())
         self.log('train/loss/{}'.format(self.participant_name), loss.item())
+        if torch.isnan(loss) or torch.isinf(loss):
+            raise GradientExplodingError('Loss is nan or inf, it seems gradient exploded.')
         return loss
 
     def test_step(self, test_batch, batch_idx):

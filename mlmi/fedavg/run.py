@@ -47,7 +47,7 @@ def add_args(parser: argparse.ArgumentParser):
     parser.add_argument('--scratch-data', dest='scratch_data', action='store_const',
                         const=True, default=False)
     parser.add_argument('--max-last', type=int, dest='max_last', default=-1)
-    parser.add_argument('--gradient-clip-val', type=float, dest='gradient_clip_val', default=5.0)
+    parser.add_argument('--gradient-clip-val', type=float, dest='gradient_clip_val', default=0.0)
     parser.add_argument('--briggs', dest='briggs', action='store_const',
                         const=True, default=False)
     parser.add_argument('--mnist', dest='mnist', action='store_const',
@@ -207,7 +207,9 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
 
     logger.debug('starting local training before clustering.')
     overwrite_participants_models(server.model.state_dict(), clients)
-    run_train_round(clients, context.train_args)
+    trained_participants = run_train_round(clients, context.train_args)
+    if len(trained_participants) != len(clients):
+        raise ValueError('not all clients successfully participated in the clustering round')
 
     cluster_ids, cluster_clients = None, None
     if restore_clustering:
@@ -288,14 +290,13 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
 
 def create_femnist_experiment_context(name: str, local_epochs: int, batch_size: int, lr: float, client_fraction: float,
                                       dataset_name: str, fixed_logger_version=None, no_progress_bar=False,
-                                      cluster_args: Optional[ClusterArgs] = None, gradient_clip_val=30.0):
+                                      cluster_args: Optional[ClusterArgs] = None):
     logger.debug('creating experiment context ...')
     optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
     train_args_dict = {
         'max_epochs': local_epochs,
-        'min_epochs': local_epochs,
-        'gradient_clip_val': gradient_clip_val
+        'min_epochs': local_epochs
     }
     if no_progress_bar:
         train_args_dict['progress_bar_refresh_rate'] = 0
@@ -314,15 +315,13 @@ def create_femnist_experiment_context(name: str, local_epochs: int, batch_size: 
 
 def create_mnist_experiment_context(name: str, local_epochs: int, batch_size: int, lr: float, client_fraction: float,
                                     dataset_name: str, num_classes: int, fixed_logger_version=None,
-                                    no_progress_bar=False,
-                                    cluster_args: Optional[ClusterArgs] = None):
+                                    no_progress_bar=False, cluster_args: Optional[ClusterArgs] = None):
     logger.debug('creating experiment context ...')
     optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     model_args = ModelArgs(CNNMnistLightning, num_classes=num_classes, optimizer_args=optimizer_args)
     train_args_dict = {
         'max_epochs': local_epochs,
-        'min_epochs': local_epochs,
-        'gradient_clip_val': 10.0
+        'min_epochs': local_epochs
     }
     if no_progress_bar:
         train_args_dict['progress_bar_refresh_rate'] = 0
@@ -408,11 +407,10 @@ if __name__ == '__main__':
                     'client_fraction': fraction,
                 }
                 experiment_name = 'briggs' if not args.scratch_data else 'briggs_scratch'
-                context = create_femnist_experiment_context(name=experiment_name, local_epochs=3, lr=0.1,
+                context = create_femnist_experiment_context(name=experiment_name, local_epochs=3, lr=1.0,
                                                             batch_size=fed_dataset.batch_size, **configuration,
                                                             dataset_name=fed_dataset.name,
-                                                            no_progress_bar=args.no_progress_bar,
-                                                            gradient_clip_val=args.gradient_clip_val)
+                                                            no_progress_bar=args.no_progress_bar)
                 run_fedavg(context, num_rounds=total_rounds, dataset=fed_dataset, save_states=True, restore_state=True)
                 for fedavg_rounds in [1, 3, 5, 10]:
                     round_configuration = {
@@ -426,8 +424,7 @@ if __name__ == '__main__':
                                                                 batch_size=fed_dataset.batch_size, **configuration,
                                                                 dataset_name=fed_dataset.name,
                                                                 cluster_args=cluster_args,
-                                                                no_progress_bar=args.no_progress_bar,
-                                                                gradient_clip_val=args.gradient_clip_val)
+                                                                no_progress_bar=args.no_progress_bar)
                     context.cluster_args = cluster_args
                     run_fedavg_hierarchical(context, restore_clustering=False, restore_fedavg=True,
                                             dataset=fed_dataset, num_rounds_init=cluster_args.num_rounds_init,
@@ -440,8 +437,7 @@ if __name__ == '__main__':
             context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.1, local_epochs=3,
                                                         lr=0.1, batch_size=fed_dataset.batch_size,
                                                         dataset_name=fed_dataset.name,
-                                                        cluster_args=cluster_args, no_progress_bar=args.no_progress_bar,
-                                                        gradient_clip_val=args.gradient_clip_val)
+                                                        cluster_args=cluster_args, no_progress_bar=args.no_progress_bar)
             context.cluster_args = cluster_args
             run_fedavg_hierarchical(context, restore_clustering=False, restore_fedavg=True, dataset=fed_dataset,
                                     num_rounds_init=cluster_args.num_rounds_init,
