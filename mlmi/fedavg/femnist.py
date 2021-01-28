@@ -120,8 +120,8 @@ def load_femnist_dataset(data_dir, num_clients=367, batch_size=10, only_digits=F
             emnist_train._h5_file[HDF5ClientData._EXAMPLES_GROUP][client_id].items()))
         femnist_train = FEMNISTDataset(h5data_train['label'], h5data_train['pixels'])
         h5data_test = collections.OrderedDict((name, ds[()]) for name, ds in sorted(
-            emnist_train._h5_file[HDF5ClientData._EXAMPLES_GROUP][client_id].items()))
-        femnist_test = FEMNISTDataset(h5data_train['label'], h5data_train['pixels'])
+            emnist_test._h5_file[HDF5ClientData._EXAMPLES_GROUP][client_id].items()))
+        femnist_test = FEMNISTDataset(h5data_test['label'], h5data_test['pixels'])
         dl_train = data.DataLoader(femnist_train, batch_size=batch_size)
         dl_test = data.DataLoader(femnist_test, batch_size=batch_size)
         train_data_local_dict[client_id] = dl_train
