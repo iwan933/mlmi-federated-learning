@@ -1,13 +1,15 @@
 import argparse
 import math
+import numpy as np
 from typing import Dict, List, Optional
 
 from sklearn.model_selection import ParameterGrid
 
 import torch
 from pytorch_lightning.loggers import LightningLoggerBase
-from torch import Tensor, optim
+from torch import IntTensor, Tensor, optim
 from torch.distributions import Categorical
+from torch.utils.data import DataLoader
 
 from mlmi.fedavg.data import scratch_data
 from mlmi.fedavg.structs import FedAvgExperimentContext
@@ -104,47 +106,24 @@ def initialize_clients(context: 'FedAvgExperimentContext', dataset: 'FederatedDa
 
 def log_data_distribution_by_dataset(name: str, dataset: FederatedDatasetData, experiment_logger: LightningLoggerBase,
                                      global_step=0):
-    num_partitions = len(dataset.train_data_local_dict.items())
-    num_train_samples = []
-    num_different_labels = []
-    entropy_per_partition = []
-
-    logger.debug('... extracting dataset distributions')
-    for i, (c, dataloader) in enumerate(dataset.train_data_local_dict.items()):
-        local_labels = None
-        num_all_samples = 0
-        for x, y in dataloader:
-            num_all_samples += x.shape[0]
-            if local_labels is None:
-                local_labels = y
-            else:
-                local_labels = torch.cat((local_labels, y), dim=0)
-        unique_labels, counts = torch.unique(local_labels, return_counts=True)
-        entropy = Categorical(probs=counts / counts.sum()).entropy()
-        num_different_labels.append(len(unique_labels))
-        num_train_samples.append(num_all_samples)
-        entropy_per_partition.append(entropy)
-
-        if (i + 1) % 50 == 0:
-            logger.debug('... extracted {}/{} partitions'.format(i + 1, num_partitions))
-    experiment_logger.experiment.add_histogram(f'distribution/{name}/sample_num', Tensor(num_train_samples),
-                                               global_step=global_step)
-    experiment_logger.experiment.add_histogram(f'distribution/{name}/labels_num', Tensor(num_different_labels),
-                                               global_step=global_step)
-    experiment_logger.experiment.add_histogram(f'distribution/{name}/entropy', Tensor(entropy_per_partition),
-                                               global_step=global_step)
+    dataloaders = [d for d in dataset.train_data_local_dict.values()]
+    log_data_distribution_by_dataloaders(name, dataset.class_num, dataloaders, experiment_logger, global_step)
 
 
-def log_data_distribution_by_participants(name: str, training_participants: List['BaseTrainingParticipant'],
+def log_data_distribution_by_participants(name: str, num_classes: int, training_participants: List['BaseTrainingParticipant'],
                                           experiment_logger: LightningLoggerBase, global_step=0):
-    num_partitions = len(training_participants)
-    num_train_samples = []
-    num_different_labels = []
-    entropy_per_partition = []
+    dataloaders = [p.train_data_loader for p in training_participants]
+    log_data_distribution_by_dataloaders(name, num_classes, dataloaders, experiment_logger, global_step)
+
+
+def log_data_distribution_by_dataloaders(name: str, num_classes: int, dataloaders: List[DataLoader],
+                                         experiment_logger: LightningLoggerBase, global_step=0):
+    num_partitions = len(dataloaders)
+    num_train_samples = np.array([], dtype=np.int)
+    label_distribution = np.zeros((num_classes,))
 
     logger.debug('... extracting dataset distributions')
-    for i, participant in enumerate(training_participants):
-        dataloader = participant.train_data_loader
+    for i, dataloader in enumerate(dataloaders):
         local_labels = None
         num_all_samples = 0
         for x, y in dataloader:
@@ -154,25 +133,34 @@ def log_data_distribution_by_participants(name: str, training_participants: List
             else:
                 local_labels = torch.cat((local_labels, y), dim=0)
         unique_labels, counts = torch.unique(local_labels, return_counts=True)
-        entropy = Categorical(probs=counts / counts.sum()).entropy()
-        num_different_labels.append(len(unique_labels))
-        num_train_samples.append(num_all_samples)
-        entropy_per_partition.append(entropy)
-
+        for u, c in zip(unique_labels, counts):
+            label_distribution[u] += c
+        num_train_samples = np.append(num_train_samples, num_all_samples)
         if (i + 1) % 50 == 0:
             logger.debug('... extracted {}/{} partitions'.format(i + 1, num_partitions))
-    experiment_logger.experiment.add_histogram(f'distribution/{name}/sample_num', Tensor(num_train_samples),
-                                               global_step=global_step)
-    experiment_logger.experiment.add_histogram(f'distribution/{name}/labels_num', Tensor(num_different_labels),
-                                               global_step=global_step)
-    experiment_logger.experiment.add_histogram(f'distribution/{name}/entropy', Tensor(entropy_per_partition),
-                                               global_step=global_step)
+
+    unique_num_samples, counts = torch.unique(IntTensor(num_train_samples), return_counts=True)
+    num_train_samples = np.zeros((torch.max(unique_num_samples) + 1,))
+    for u, c in zip(unique_num_samples, counts):
+        num_train_samples[u] = c
+    chunks = int(len(num_train_samples) / 10)
+    num_10step_split = [np.sum(num_train_samples[s * 10:(s + 1) * 10]) for s in range(chunks)]
+    if int(len(num_train_samples) / 10) < len(num_train_samples) / 10:
+        num_10step_split.append(np.sum(num_train_samples[chunks*10:]))
+
+    for i, v in enumerate(label_distribution):
+        experiment_logger.experiment.add_scalar(f'distribution/label/{name}', v, global_step=i)
+
+    for i, v in enumerate(num_10step_split):
+        experiment_logger.experiment.add_scalar(f'distribution/sample/{name}', v, global_step=i)
 
 
 def run_fedavg(context: FedAvgExperimentContext, num_rounds: int, save_states: bool, dataset: 'FederatedDatasetData',
                initial_model_state: Optional[Dict[str, Tensor]] = None, clients: Optional[List['FedAvgClient']] = None,
                server: Optional['FedAvgServer'] = None, start_round=0, restore_state=False):
     assert (server is None and clients is None) or (server is not None and clients is not None)
+
+    log_data_distribution_by_dataset('fedavg', dataset, context.experiment_logger)
 
     if clients is None or server is None:
         logger.info('initializing server ...')
@@ -264,7 +252,7 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
     log_goal_test_acc('post_clustering', global_acc, context.experiment_logger, num_rounds_init + 1)
 
     for cluster_id, cluster_clients in cluster_clients_dic.items():
-        log_data_distribution_by_participants(f'cluster{cluster_id}cf{context.client_fraction}',
+        log_data_distribution_by_participants(f'cluster{cluster_id}cf{context.client_fraction}', dataset.class_num,
                                               cluster_clients, context.experiment_logger, global_step=num_rounds_init)
 
     # Train in clusters
@@ -425,9 +413,6 @@ if __name__ == '__main__':
                                                             dataset_name=fed_dataset.name,
                                                             no_progress_bar=args.no_progress_bar,
                                                             gradient_clip_val=args.gradient_clip_val)
-                if not fedavg_distribution_logged:
-                    log_data_distribution_by_dataset('fedavg', fed_dataset, context.experiment_logger)
-                    fedavg_distribution_logged = True
                 run_fedavg(context, num_rounds=total_rounds, dataset=fed_dataset, save_states=True, restore_state=True)
                 for fedavg_rounds in [1, 3, 5, 10]:
                     round_configuration = {
@@ -456,7 +441,7 @@ if __name__ == '__main__':
                                                         lr=0.1, batch_size=fed_dataset.batch_size,
                                                         dataset_name=fed_dataset.name,
                                                         cluster_args=cluster_args, no_progress_bar=args.no_progress_bar,
-                                                        gradient_clip_val=19)
+                                                        gradient_clip_val=args.gradient_clip_val)
             context.cluster_args = cluster_args
             run_fedavg_hierarchical(context, restore_clustering=False, restore_fedavg=True, dataset=fed_dataset,
                                     num_rounds_init=cluster_args.num_rounds_init,
