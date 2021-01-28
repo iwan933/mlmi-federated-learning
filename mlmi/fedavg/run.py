@@ -401,9 +401,9 @@ if __name__ == '__main__':
 
         if args.briggs:
             total_rounds = 50
-            # execution of larger client fractions takes very long, skipping these for now 0.2, 0.5, 1.0]:
+            # execution of larger client fractions takes very long, skipping these for now 0.5, 1.0]:
             fedavg_distribution_logged = False
-            for fraction in [0.1, 0.2, 0.5]:
+            for fraction in [0.1]:
                 configuration = {
                     'client_fraction': fraction,
                 }
