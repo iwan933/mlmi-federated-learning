@@ -407,7 +407,7 @@ if __name__ == '__main__':
                     'client_fraction': fraction,
                 }
                 experiment_name = 'briggs' if not args.scratch_data else 'briggs_scratch'
-                context = create_femnist_experiment_context(name=experiment_name, local_epochs=3, lr=1.0,
+                context = create_femnist_experiment_context(name=experiment_name, local_epochs=3, lr=0.1,
                                                             batch_size=fed_dataset.batch_size, **configuration,
                                                             dataset_name=fed_dataset.name,
                                                             no_progress_bar=args.no_progress_bar)
@@ -468,7 +468,7 @@ if __name__ == '__main__':
             try:
                 context = create_mnist_experiment_context(name='fedavg', client_fraction=0.1,
                                                           local_epochs=5, num_classes=10,
-                                                          lr=0.03, batch_size=fed_dataset.batch_size,
+                                                          lr=0.1, batch_size=fed_dataset.batch_size,
                                                           dataset_name='mnist_momentum0.5',
                                                           no_progress_bar=args.no_progress_bar)
                 logger.info(f'running FedAvg with the following configuration: {context}')

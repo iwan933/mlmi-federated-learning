@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from tensorflow import Tensor
 from torch.utils import data
 from torch.utils.data.dataset import T_co
 from torchvision.datasets import MNIST, vision
@@ -10,6 +11,8 @@ from mlmi.structs import FederatedDatasetData
 
 import numpy as np
 from torchvision import datasets, transforms
+
+from mlmi.utils import create_tensorboard_logger
 
 
 class DatasetSplit(data.Dataset):
@@ -100,8 +103,10 @@ class FEMNISTDataset(data.Dataset):
 
 
 def load_femnist_dataset(data_dir, num_clients=367, batch_size=10, only_digits=False):
+    import torch
     import os, collections
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    import tensorflow as tf
     import tensorflow_federated as tff
     from tensorflow_federated.python.simulation import HDF5ClientData
     import multiprocessing
@@ -118,10 +123,12 @@ def load_femnist_dataset(data_dir, num_clients=367, batch_size=10, only_digits=F
     for client_id in selected_client_ids:
         h5data_train = collections.OrderedDict((name, ds[()]) for name, ds in sorted(
             emnist_train._h5_file[HDF5ClientData._EXAMPLES_GROUP][client_id].items()))
-        femnist_train = FEMNISTDataset(h5data_train['label'], h5data_train['pixels'])
+        train_channel_data = torch.unsqueeze(torch.from_numpy(h5data_train['pixels']), 1)
+        femnist_train = FEMNISTDataset(torch.from_numpy(h5data_train['label']), train_channel_data)
         h5data_test = collections.OrderedDict((name, ds[()]) for name, ds in sorted(
             emnist_test._h5_file[HDF5ClientData._EXAMPLES_GROUP][client_id].items()))
-        femnist_test = FEMNISTDataset(h5data_test['label'], h5data_test['pixels'])
+        test_channel_data = torch.unsqueeze(torch.from_numpy(h5data_test['pixels']), 1)
+        femnist_test = FEMNISTDataset(torch.from_numpy(h5data_test['label']), test_channel_data)
         dl_train = data.DataLoader(femnist_train, batch_size=batch_size)
         dl_test = data.DataLoader(femnist_test, batch_size=batch_size)
         train_data_local_dict[client_id] = dl_train
