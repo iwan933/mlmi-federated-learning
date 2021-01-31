@@ -52,8 +52,8 @@ def add_args(parser: argparse.ArgumentParser):
                         const=True, default=False)
     parser.add_argument('--mnist', dest='mnist', action='store_const',
                         const=True, default=False)
-    parser.add_argument('--no-progress-bar', dest='no_progress_bar', action='store_const',
-                        const=True, default=False)
+    parser.add_argument('--show-progress-bar', dest='no_progress_bar', action='store_const',
+                        const=False, default=True)
 
 
 def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, experiment_logger: LightningLoggerBase,
