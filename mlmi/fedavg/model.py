@@ -60,7 +60,6 @@ class FedAvgServer(BaseAggregatorParticipant):
             aggregated_model_state = add_weighted_model(aggregated_model_state,
                                                         load_participant_model_state(participant),
                                                         num_samples, num_total_samples)
-
         self.model.load_state_dict(aggregated_model_state)
 
 
@@ -75,13 +74,12 @@ class CNN_OriginalFedAvg(torch.nn.Module):
         self.flatten = nn.Flatten()
         self.linear_1 = nn.Linear(3136, 512)
         self.linear_2 = nn.Linear(512, 10 if only_digits else 62)
-        self.relu = nn.ReLU()
 
     def forward(self, x):
         x = self.conv2d_1(x)
-        x = self.max_pooling(x)
-        x = F.relu(self.conv2d_2(x))
-        x = self.max_pooling(x)
+        x = F.relu(self.max_pooling(x))
+        x = self.conv2d_2(x)
+        x = F.relu(self.max_pooling(x))
         x = self.flatten(x)
         x = F.relu(self.linear_1(x))
         x = self.linear_2(x)
@@ -94,7 +92,7 @@ class CNNLightning(BaseParticipantModel, pl.LightningModule):
         model = CNN_OriginalFedAvg(only_digits=only_digits)
         super().__init__(*args, model=model, **kwargs)
         self.model = model
-        self.model.apply(init_weights)
+        # self.model.apply(init_weights)
         self.accuracy = Accuracy()
 
     def training_step(self, train_batch, batch_idx):
