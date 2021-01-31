@@ -18,12 +18,14 @@ class TrainArgs(object):
     def _create_config_string(self, **kwargs):
         epochs = kwargs.get('max_epochs', None)
         steps = kwargs.get('max_steps', None)
-        gradient_clipping_value = kwargs.get('gradient_clip_val', 0.0)
-        config_str = f'gc{gradient_clipping_value}'
+        gradient_clipping_value = kwargs.get('gradient_clip_val', None)
+        config_str = ''
         if epochs is not None:
             config_str += f'e{epochs}'
         elif steps is not None:
             config_str += f's{steps}'
+        if gradient_clipping_value is not None:
+            config_str += f'gc{gradient_clipping_value}'
         return config_str
 
     def __str__(self):
@@ -91,10 +93,12 @@ class OptimizerArgs(object):
         self._config_string = self._create_config_string(**kwargs)
 
     def _create_config_string(self, **kwargs):
-        self.lr = kwargs.get('lr', None)
-        self.momentum = kwargs.get('momentum', None)
-        self.optimizer = re.sub(r'[a-z.<>\' ]', '', str(self.optimizer_class))
-        unique_str = f'opt{self.optimizer}mom{self.momentum}'
+        lr = kwargs.get('lr', None)
+        momentum = kwargs.get('momentum', None)
+        optimizer = re.sub(r'[a-z.<>\' ]', '', str(self.optimizer_class))
+        unique_str = f'opt{optimizer}'
+        if momentum is not None:
+            unique_str += f'mom{momentum}'
         return unique_str
 
     def __str__(self):
