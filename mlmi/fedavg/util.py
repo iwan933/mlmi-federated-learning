@@ -36,8 +36,8 @@ def run_train_round(participants: List['BaseTrainingParticipant'], training_args
             logger.debug(f'invoking training on participant {participant._name}')
             participant.train(training_args)
             successful_participants.append(participant)
-            if success_threshold <= len(successful_participants):
-                return successful_participants
+            if success_threshold != -1 and success_threshold <= len(successful_participants):
+                break
         except GradientExplodingError as gradient_exception:
             logger.error(f'participant {participant._name} failed due to exploding gradients', gradient_exception)
         except Exception as e:
@@ -45,6 +45,7 @@ def run_train_round(participants: List['BaseTrainingParticipant'], training_args
 
     if success_threshold != -1 and len(successful_participants) < success_threshold:
         raise ExecutionError('Failed to execute training round, not enough clients participated successfully')
+    return successful_participants
 
 
 def run_fedavg_round(aggregator: 'BaseAggregatorParticipant', participants: List['BaseTrainingParticipant'],
