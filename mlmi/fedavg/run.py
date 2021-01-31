@@ -54,6 +54,7 @@ def add_args(parser: argparse.ArgumentParser):
                         const=True, default=False)
     parser.add_argument('--show-progress-bar', dest='no_progress_bar', action='store_const',
                         const=False, default=True)
+    parser.add_argument('--seed', dest='seed', type=int, default=123123123)
 
 
 def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, experiment_logger: LightningLoggerBase,
@@ -363,12 +364,11 @@ def lr_gen(bases: List[float], powers: List[int]):
 
 if __name__ == '__main__':
     def run():
-        # fix for experiment reproducability
-        fix_random_seeds(123123123)
-
         parser = argparse.ArgumentParser()
         add_args(parser)
         args = parser.parse_args()
+
+        fix_random_seeds(args.seed)
 
         logger.debug('loading experiment data ...')
         data_dir = REPO_ROOT / 'data'
