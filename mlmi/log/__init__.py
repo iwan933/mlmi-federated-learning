@@ -19,7 +19,7 @@ config = {
     },
     'loggers': {
         '': {
-            'level': 'DEBUG',
+            'level': 'INFO',
             'handlers': ['console']
         },
         'mlmi': {
