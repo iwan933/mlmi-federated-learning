@@ -12,6 +12,7 @@ from torch.distributions import Categorical
 from torch.utils.data import DataLoader
 
 from mlmi.fedavg.data import scratch_data
+from mlmi.fedavg.plot import plot_client_label_heatmap
 from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.participant import BaseTrainingParticipant
 from mlmi.structs import ClusterArgs, FederatedDatasetData
@@ -55,6 +56,8 @@ def add_args(parser: argparse.ArgumentParser):
     parser.add_argument('--show-progress-bar', dest='no_progress_bar', action='store_const',
                         const=False, default=True)
     parser.add_argument('--seed', dest='seed', type=int, default=123123123)
+    parser.add_argument('--plot-client-labels', dest='plot_client_labels', action='store_const', default=False,
+                        const=True)
 
 
 def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, experiment_logger: LightningLoggerBase,
@@ -396,6 +399,10 @@ if __name__ == '__main__':
             logger.info('... found log distribution flag, only logging data distribution information')
             experiment_logger = create_tensorboard_logger('datadistribution', fed_dataset.name, version=0)
             log_data_distribution_by_dataset('fedavg', fed_dataset, experiment_logger)
+            return
+
+        if args.plot_client_labels:
+            plot_client_label_heatmap(fed_dataset)
             return
 
         if args.briggs:
