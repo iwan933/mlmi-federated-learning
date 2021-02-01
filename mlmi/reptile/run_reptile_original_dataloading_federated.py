@@ -5,12 +5,11 @@ import random
 
 import torch
 from pytorch_lightning.loggers import LightningLoggerBase
-from torch import optim
 
 from mlmi.reptile.args import argument_parser
 from mlmi.log import getLogger
 from mlmi.reptile.omniglot import load_omniglot_datasets
-from mlmi.struct import ExperimentContext, ModelArgs, TrainArgs, OptimizerArgs
+from mlmi.structs import ModelArgs, TrainArgs, OptimizerArgs
 from mlmi.settings import REPO_ROOT
 from mlmi.utils import create_tensorboard_logger, evaluate_local_models
 
@@ -52,7 +51,7 @@ def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, exp
     experiment_logger.experiment.add_scalar('test-test/acc/{}/mean'.format(model_name), torch.mean(acc), global_step=global_step)
 
 
-def run_reptile(context: ExperimentContext, initial_model_state=None):
+def run_reptile(context: str, initial_model_state=None):
 
     args = argument_parser().parse_args()
     RANDOM = random.Random(args.seed)
@@ -60,7 +59,7 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
     experiment_logger = create_tensorboard_logger(
         'reptile',
         (
-            f"{context.name};seed{args.seed};"
+            f"{context};seed{args.seed};"
             f"train-clients{args.train_clients};"
             f"{args.classes}-way{args.shots}-shot;"
             f"mlr{str(args.meta_step).replace('.', '')}"
@@ -178,7 +177,6 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
 
 if __name__ == '__main__':
     def run():
-        context = ExperimentContext(name='reptile_original_dataloading_federated')
-        run_reptile(context=context)
+        run_reptile(context='reptile_original_dataloading_federated')
 
     run()

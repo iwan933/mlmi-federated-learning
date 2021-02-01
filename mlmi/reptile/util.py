@@ -54,9 +54,7 @@ def reptile_train_step(aggregator: ReptileServer,
     """
     logger.debug('distribute the initial model to the clients.')
     initial_model_state = copy.deepcopy(aggregator.model.state_dict())
-    overwrite_participants_models(
-        initial_model_state, participants, verbose=False
-    )
+    overwrite_participants_models(initial_model_state, participants)
 
     logger.debug('starting training round.')
     run_train_round(participants, inner_training_args)

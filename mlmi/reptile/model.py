@@ -64,20 +64,6 @@ class ReptileClient(BaseTrainingParticipant):
             **_kwargs
         )
 
-    def train(self, training_args: TrainArgs, *args, **kwargs):
-        """
-        Implement the training routine.
-        :param training_args:
-        :param args:
-        :param kwargs:
-        :return:
-        """
-        trainer = self.create_trainer(**training_args.kwargs)
-        train_dataloader = self.train_data_loader
-        trainer.fit(self.model, train_dataloader, train_dataloader)
-        self.save_model_state()
-        del trainer
-
     def overwrite_model_state(self, model_state: Dict[str, Tensor]):
         """
         Loads the model state into the current model instance
@@ -166,11 +152,12 @@ class OmniglotLightning(BaseParticipantModel, pl.LightningModule):
     """
     A model for Omniglot classification - PyTorch implementation.
     """
-    def __init__(self, optimizer_args: OptimizerArgs, num_classes:int, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.model = OmniglotModel(num_classes=num_classes)
-        self.optimizer_args = optimizer_args
-        self.accuracy = Accuracy()
+    def __init__(self, num_classes: int, *args, **kwargs):
+        super().__init__(
+            model=OmniglotModel(num_classes=num_classes),
+            *args,
+            **kwargs
+        )
 
     def configure_optimizers(self):
         o = self.optimizer_args

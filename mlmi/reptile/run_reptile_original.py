@@ -27,7 +27,6 @@ from pytorch_lightning.loggers import TensorBoardLogger
 
 from mlmi.settings import REPO_ROOT
 from mlmi.settings import RUN_DIR
-from mlmi.struct import ExperimentContext
 from mlmi.reptile.reptile_original.args import (
     argument_parser, model_kwargs, train_kwargs, evaluate_kwargs
 )
@@ -40,7 +39,7 @@ from mlmi.reptile.reptile_original.train import train
 
 DATA_DIR = REPO_ROOT / 'data' / 'omniglot'
 
-def main(context: ExperimentContext):
+def main(context: str):
     """
     Load data and train a model on it.
     """
@@ -48,7 +47,7 @@ def main(context: ExperimentContext):
     random.seed(args.seed)
 
     experiment_path = RUN_DIR / 'reptile' / (
-        f"{context.name};{args.classes}-way{args.shots}-shot;"
+        f"{context};{args.classes}-way{args.shots}-shot;"
         f"mlr{str(args.meta_step).replace('.', '')}"
         f"ilr{str(args.learning_rate).replace('.', '')}"
         f"is{args.inner_iters}"
@@ -82,5 +81,4 @@ def main(context: ExperimentContext):
 
 if __name__ == '__main__':
 
-    context = ExperimentContext(name='reptile_original')
-    main(context=context)
+    main(context='reptile_original')

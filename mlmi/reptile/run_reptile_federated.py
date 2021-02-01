@@ -12,7 +12,7 @@ from mlmi.log import getLogger
 from mlmi.reptile.omniglot import load_omniglot_datasets
 from mlmi.reptile.model import ReptileClient, ReptileServer, OmniglotLightning
 from mlmi.reptile.util import reptile_train_step
-from mlmi.struct import ExperimentContext, ModelArgs, TrainArgs, OptimizerArgs
+from mlmi.reptile.structs import ReptileTrainingArgs
 from mlmi.settings import REPO_ROOT
 from mlmi.utils import create_tensorboard_logger, evaluate_local_models
 
@@ -46,106 +46,13 @@ def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, exp
     experiment_logger.experiment.add_histogram('test-test/acc/{}'.format(model_name), acc, global_step=global_step)
     experiment_logger.experiment.add_scalar('test-test/acc/{}/mean'.format(model_name), torch.mean(acc), global_step=global_step)
 
-class ReptileTrainingArgs:
-    """
-    Container for meta-learning parameters
-    :param model: Class of base model
-    :param inner_optimizer: Optimizer on task level
-    :param inner_learning_rate: Learning rate for task level optimizer
-    :param num_inner_steps: Number of training steps on task level
-    :param num_inner_steps_eval: Number of training steps for training on test
-        set
-    :param log_every_n_steps:
-    :param inner_batch_size: Batch size for training on task level. A value of -1
-        means batch size is equal to local training set size (full batch
-        training)
-    :param meta_batch_size: Batch size of tasks for single meta-training step.
-        A value of -1 means meta batch size is equal to total number of training
-        tasks (full batch meta training)
-    :param meta_learning_rate_initial: Learning rate for meta training (initial
-        value). Learning rate decreases linearly with training progress to reach
-        meta_learning_rate_final at end of training.
-    :param meta_learning_rate_final: Final value for learning rate for meta
-        training. If None, this will be equal to meta_learning_rate_initial and
-        learning rate will remain constant over training.
-    :param num_meta_steps: Number of total meta training steps
-    :return:
-    """
-    def __init__(self,
-                 model_class,
-                 inner_optimizer,
-                 inner_learning_rate=0.03,
-                 num_inner_steps=1,
-                 num_inner_steps_eval=50,
-                 log_every_n_steps=3,
-                 meta_learning_rate_initial=0.03,
-                 meta_learning_rate_final=None,
-                 num_classes_per_client=5):
-        self.model_class = model_class
-        self.inner_optimizer = inner_optimizer
-        self.inner_learning_rate = inner_learning_rate
-        self.num_inner_steps = num_inner_steps
-        self.num_inner_steps_eval = num_inner_steps_eval
-        self.log_every_n_steps = log_every_n_steps
-        self.meta_learning_rate_initial = meta_learning_rate_initial
-        self.meta_learning_rate_final = meta_learning_rate_final
-        if self.meta_learning_rate_final is None:
-            self.meta_learning_rate_final = self.meta_learning_rate_initial
-        self.num_classes_per_client = num_classes_per_client
 
-    def get_inner_model_args(self):
-        inner_optimizer_args = OptimizerArgs(
-            optimizer_class=self.inner_optimizer,
-            lr=self.inner_learning_rate,
-            betas=(0, 0.999)
-        )
-        return ModelArgs(
-            self.model_class,
-            inner_optimizer_args,
-            num_classes=self.num_classes_per_client
-        )
-
-    def get_meta_model_args(self):
-        dummy_optimizer_args = OptimizerArgs(
-            optimizer_class=optim.SGD
-        )
-        return ModelArgs(
-            self.model_class,
-            dummy_optimizer_args,
-            num_classes=self.num_classes_per_client
-        )
-
-    def get_inner_training_args(self, eval=False):
-        """
-        Return TrainArgs for inner training (training on task level)
-        """
-        inner_training_args = TrainArgs(
-            min_steps=self.num_inner_steps if not eval else self.num_inner_steps_eval,
-            max_steps=self.num_inner_steps if not eval else self.num_inner_steps_eval,
-            log_every_n_steps=self.log_every_n_steps,
-            weights_summary=None,  # Do not show model summary
-            progress_bar_refresh_rate=0  # Do not show training progress bar
-        )
-        if torch.cuda.is_available():
-            inner_training_args.kwargs['gpus'] = 1
-        return inner_training_args
-
-    def get_meta_training_args(self, frac_done: float):
-        """
-        Return TrainArgs for meta training
-        :param frac_done: Fraction of meta training steps already done
-        """
-        return TrainArgs(
-            meta_learning_rate=frac_done * self.meta_learning_rate_final + \
-                                 (1 - frac_done) * self.meta_learning_rate_initial
-        )
-
-
-def run_reptile(context: ExperimentContext, initial_model_state=None):
+def run_reptile(context: str, initial_model_state=None):
 
     args = argument_parser().parse_args()
     RANDOM = random.Random(args.seed)
 
+    # TODO: Possibly implement logic using ReptileExperimentContext
     reptile_args = ReptileTrainingArgs(
         model_class=OmniglotLightning,
         inner_optimizer=optim.Adam,
@@ -160,7 +67,7 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
     experiment_logger = create_tensorboard_logger(
         'reptile',
         (
-            f"{context.name};seed{args.seed};"
+            f"{context};seed{args.seed};"
             f"train-clients{args.train_clients};"
             f"{args.classes}-way{args.shots}-shot;"
             f"mlr{str(args.meta_step).replace('.', '')}"
@@ -218,7 +125,7 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
     server = ReptileServer(
         participant_name='initial_server',
         model_args=reptile_args.get_meta_model_args(),
-        context=context,
+        context=context,  # TODO: Change to ReptileExperimentContext
         initial_model_state=initial_model_state
     )
 
@@ -257,8 +164,6 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
                 evaluation_mode=True
             )
             result = evaluate_local_models(participants=client)
-            # log_loss_and_acc('global_model', result.get('test/loss'), result.get('test/acc'),
-            #                 experiment_logger, global_step=i+1)
             experiment_logger.experiment.add_scalar(
                 'train-test/acc/{}/mean'.format('global_model'),
                 torch.mean(result.get('test/acc')),
@@ -275,8 +180,6 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
                 evaluation_mode=True
             )
             result = evaluate_local_models(participants=client)
-            # log_loss_and_acc('global_model', result.get('test/loss'), result.get('test/acc'),
-            #                 experiment_logger, global_step=i+1)
             experiment_logger.experiment.add_scalar(
                 'test-test/acc/{}/mean'.format('global_model'),
                 torch.mean(result.get('test/acc')),
@@ -306,7 +209,6 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
 
 if __name__ == '__main__':
     def run():
-        context = ExperimentContext(name='reptile_federated')
-        run_reptile(context=context)
+        run_reptile(context='reptile_federated')
 
     run()
