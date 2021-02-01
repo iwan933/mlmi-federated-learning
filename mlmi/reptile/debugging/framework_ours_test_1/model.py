@@ -1,29 +1,27 @@
 from typing import Dict, List
 from collections import OrderedDict
 import copy
+from itertools import cycle
 
 import torch
 from torch import Tensor
-from torch import nn
 from torch.nn import functional as F
+from torch.utils import data
 import pytorch_lightning as pl
 from pytorch_lightning.metrics import Accuracy
 
 from mlmi.log import getLogger
 from mlmi.participant import BaseParticipantModel, BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
-from mlmi.reptile.structs import ReptileExperimentContext
-from mlmi.structs import TrainArgs, ModelArgs, OptimizerArgs
+from mlmi.struct import TrainArgs, ModelArgs, ExperimentContext, OptimizerArgs
 
 
 logger = getLogger(__name__)
-
 
 def weight_model(model: Dict[str, Tensor], num_samples: int, num_total_samples: int) -> Dict[str, Tensor]:
     weighted_model_state = OrderedDict()
     for key, w in model.items():
         weighted_model_state[key] = (num_samples / num_total_samples) * w
     return weighted_model_state
-
 
 def sum_model_states(model_state_list: List[Dict[str, Tensor]]) -> Dict[str, Tensor]:
     result_state = copy.deepcopy(model_state_list[0])
@@ -32,9 +30,8 @@ def sum_model_states(model_state_list: List[Dict[str, Tensor]]) -> Dict[str, Ten
             result_state[key] += w
     return result_state
 
-
-def subtract_model_states(minuend: Dict[str, Tensor],
-                          subtrahend: Dict[str, Tensor]) -> Dict[str, Tensor]:
+def subtract_model_states(minuend: OrderedDict,
+                          subtrahend: OrderedDict) -> OrderedDict:
     """
     Returns difference of two model_states: minuend - subtrahend
     """
@@ -43,47 +40,41 @@ def subtract_model_states(minuend: Dict[str, Tensor],
         result_state[key] -= w
     return result_state
 
+class ReptileClient:#(BaseTrainingParticipant):
 
-class ReptileClient(BaseTrainingParticipant):
-
-    def create_trainer(self, enable_logging=True, **kwargs) -> pl.Trainer:
-        """
-        Creates a new trainer instance for each training round.
-        :param kwargs: additional keyword arguments to send to the trainer for configuration
-        :return: a pytorch lightning trainer instance
-        """
-        _kwargs = kwargs.copy()
-        # Disable logging and do not save checkpoints (not enough disc space for
-        # thousands of model states)
-        #if enable_logging:
-        #    _kwargs['logger'] = self.logger
-        return pl.Trainer(
-            checkpoint_callback=False,
-            logger=False,
-            limit_val_batches=0.0,
-            **_kwargs
-        )
-
-    def train(self, training_args: TrainArgs, *args, **kwargs):
-        """
-        Implement the training routine.
-        :param training_args:
-        :param args:
-        :param kwargs:
-        :return:
-        """
-        trainer = self.create_trainer(**training_args.kwargs)
-        train_dataloader = self.train_data_loader
-        trainer.fit(self.model, train_dataloader, train_dataloader)
-        self.save_model_state()
-        del trainer
+    def __init__(self,
+                 train_dataloader: data.DataLoader, num_train_samples: int,
+                 test_dataloader: data.DataLoader, num_test_samples: int,
+                 **kwargs):
+        self._train_dataloader = train_dataloader
+        self._test_dataloader = test_dataloader
+        self._num_train_samples = num_train_samples
+        self._num_test_samples = num_test_samples
+        self.model_state = None
 
     def overwrite_model_state(self, model_state: Dict[str, Tensor]):
         """
         Loads the model state into the current model instance
         :param model_state: The model state to load
         """
-        self.model.load_state_dict(copy.deepcopy(model_state))
+        self.model_state = copy.deepcopy(model_state)
+
+    def train(self,
+              model,
+              optimizer,
+              criterion,
+              training_args):
+        inner_iterations = training_args.kwargs['max_steps']
+        #old_vars = copy.deepcopy(self.model_state)
+        model.load_state_dict(self.model_state)
+        for i, (inputs, labels) in zip(range(inner_iterations), cycle(self._train_dataloader)):
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+        self.model_state = copy.deepcopy(model.state_dict())
+        #model.load_state_dict(old_vars)
 
     def save_model_state(self):
         """
@@ -95,34 +86,39 @@ class ReptileClient(BaseTrainingParticipant):
         # torch.save(self._model.state_dict(), self.get_checkpoint_path())
 
 
-class ReptileServer(BaseAggregatorParticipant):
+class ReptileServer:#(BaseAggregatorParticipant):
     def __init__(self,
+                 model_state,
                  participant_name: str,
                  model_args,
-                 context: ReptileExperimentContext,
+                 context: ExperimentContext,
                  initial_model_state: OrderedDict = None):
-        super().__init__(participant_name, model_args, context)
+        #super().__init__(participant_name, model_args, context)
         # Initialize model parameters
-        if initial_model_state is not None:
-            self.model.load_state_dict(initial_model_state)
+        #if initial_model_state is not None:
+        #    self.model.load_state_dict(initial_model_state)
+
+        self.model_state = model_state
 
     @property
     def model_args(self):
         return self._model_args
 
     def aggregate(self,
-                  participants: List[ReptileClient],
+                  participants: List[BaseParticipant],
                   meta_learning_rate: float,
                   weighted: bool = True):
-        # Average participants' model states for meta_gradient of server
-        initial_model_state = copy.deepcopy(self.model.state_dict())
+
+        # Collect participants' model states and calculate model differences to
+        # initial model (= model deltas)
+        initial_model_state = copy.deepcopy(self.model_state)
         if weighted:
             # meta_gradient = weighted (by number of samples) average of
             # participants' model updates
             num_train_samples_total = sum([p._num_train_samples for p in participants])
             new_states = [
                 weight_model(
-                    model=p.model.state_dict(),
+                    model=p.model_state,
                     num_samples=p._num_train_samples,
                     num_total_samples=num_train_samples_total
                 ) for p in participants
@@ -131,7 +127,7 @@ class ReptileServer(BaseAggregatorParticipant):
             # meta_gradient = simple average of participants' model updates
             new_states = [
                 weight_model(
-                    model=p.model.state_dict(),
+                    model=p.model_state,
                     num_samples=1,
                     num_total_samples=len(participants)
                 ) for p in participants
@@ -152,14 +148,14 @@ class ReptileServer(BaseAggregatorParticipant):
         """
         # TODO (optional): Extend this function with other optimizer options
         #                  than vanilla GD
-        new_model_state = copy.deepcopy(self.model.state_dict())
+        new_model_state = copy.deepcopy(self.model_state)
         for key, w in new_model_state.items():
             if key.endswith('running_mean') or key.endswith('running_var') \
                 or key.endswith('num_batches_tracked'):
                 # Do not update non-trainable batch norm parameters
                 continue
             new_model_state[key] = w + learning_rate * gradient[key]
-        self.model.load_state_dict(new_model_state)
+        self.model_state = new_model_state
 
 
 class OmniglotLightning(BaseParticipantModel, pl.LightningModule):

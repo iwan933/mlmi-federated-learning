@@ -1,6 +1,5 @@
 from typing import List, Dict
-
-import torch
+import copy
 
 from mlmi.reptile.model import (
     ReptileClient, ReptileServer
@@ -14,7 +13,9 @@ from mlmi.participant import BaseTrainingParticipant
 
 logger = getLogger(__name__)
 
-def run_train_round(participants: List[BaseTrainingParticipant], training_args: TrainArgs, success_threshold=-1):
+def run_train_round(participants: List[BaseTrainingParticipant],
+                    training_args: TrainArgs,
+                    success_threshold: int = -1):
     """
     Routine to run a single round of training on the clients and return the results additional args are passed to the
     clients training routines.
@@ -52,7 +53,7 @@ def reptile_train_step(aggregator: ReptileServer,
     :return:
     """
     logger.debug('distribute the initial model to the clients.')
-    initial_model_state = aggregator.model.state_dict()
+    initial_model_state = copy.deepcopy(aggregator.model.state_dict())
     overwrite_participants_models(
         initial_model_state, participants, verbose=False
     )
@@ -64,7 +65,10 @@ def reptile_train_step(aggregator: ReptileServer,
     if not evaluation_mode:
         assert meta_training_args is not None, ('Argument meta_training_args '
             'must not be None when not in evaluation_mode')
-        logger.debug('starting aggregation.')
+        logger.debug(
+            (f"Starting aggregation: num_participants={len(participants)}, "
+             f"meta_learning_rate={meta_training_args.kwargs['meta_learning_rate']}")
+        )
         aggregator.aggregate(
             participants=participants,
             meta_learning_rate=meta_training_args.kwargs['meta_learning_rate']
