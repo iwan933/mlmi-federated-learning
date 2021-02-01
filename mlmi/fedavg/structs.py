@@ -42,5 +42,6 @@ class FedAvgExperimentContext(object):
         String identifying experiment. Used for model loading and saving.
         :return:
         """
-        id = f'{self.dataset_name}_bs{self.batch_size}lr{self.lr:.2E}cf{self.client_fraction:.2f}e{self.local_epochs}'
+        id = f'{self.dataset_name}_bs{self.batch_size}lr{self.lr:.2E}cf{self.client_fraction:.2f}{self.train_args}' \
+             f'_{self.optimizer_args}'
         return id

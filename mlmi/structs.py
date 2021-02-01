@@ -2,6 +2,7 @@ from typing import Optional, Type, Dict
 from torch import optim
 from torch.utils import data
 import pytorch_lightning as pl
+import re
 
 
 class TrainArgs(object):
@@ -12,6 +13,23 @@ class TrainArgs(object):
     def __init__(self, *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
+        self._config_string = self._create_config_string(**kwargs)
+
+    def _create_config_string(self, **kwargs):
+        epochs = kwargs.get('max_epochs', None)
+        steps = kwargs.get('max_steps', None)
+        gradient_clipping_value = kwargs.get('gradient_clip_val', None)
+        config_str = ''
+        if epochs is not None:
+            config_str += f'e{epochs}'
+        elif steps is not None:
+            config_str += f's{steps}'
+        if gradient_clipping_value is not None:
+            config_str += f'gc{gradient_clipping_value}'
+        return config_str
+
+    def __str__(self):
+        return self._config_string
 
 
 class ClusterArgs(object):
@@ -72,6 +90,19 @@ class OptimizerArgs(object):
         self.optimizer_class = optimizer_class
         self.optimizer_args = args
         self.optimizer_kwargs = kwargs
+        self._config_string = self._create_config_string(**kwargs)
+
+    def _create_config_string(self, **kwargs):
+        lr = kwargs.get('lr', None)
+        momentum = kwargs.get('momentum', None)
+        optimizer = re.sub(r'[a-z.<>\' ]', '', str(self.optimizer_class))
+        unique_str = f'opt{optimizer}'
+        if momentum is not None:
+            unique_str += f'mom{momentum}'
+        return unique_str
+
+    def __str__(self):
+        return self._config_string
 
     def __call__(self, model_parameters, *args, **kwargs):
         return self.optimizer_class(model_parameters, *self.optimizer_args, **self.optimizer_kwargs)
@@ -91,9 +122,7 @@ class ModelArgs(object):
 
 
 class FederatedDatasetData(object):
-    """
-    Dataset type resulting from FedML dataset loader
-    """
+
     def __init__(self, client_num, train_data_global: data.DataLoader,
                  test_data_global: data.DataLoader, data_local_num_dict: Dict[int, int],
                  data_local_train_num_dict: Dict[int, int], data_local_test_num_dict: Dict[int, int],

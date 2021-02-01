@@ -77,3 +77,5 @@ wandb==0.10.11
 watchdog==0.10.4
 Werkzeug==1.0.1
 wrapt==1.12.1
+
+argparse==1.4.0

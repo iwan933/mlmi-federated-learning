@@ -168,10 +168,7 @@ class BaseTrainingParticipant(BaseParticipant):
         trainer = self.create_trainer(enable_logging=False, **training_args.kwargs)
         train_dataloader = self.train_data_loader
         trainer.fit(self.model, train_dataloader, train_dataloader)
-        self._model = self.model.cpu()
-        optimizer: optim.Optimizer = self.model.optimizers()
-        self.model.optimizer_state = optimizer_state_dict_to_cpu(optimizer.state_dict())
-        optimizer.load_state_dict(self.model.optimizer_state)
+        del self.model.trainer
 
     def test(self, model: Optional[torch.nn.Module] = None, use_local_model: bool = False):
         """

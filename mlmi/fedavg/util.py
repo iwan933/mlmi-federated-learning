@@ -9,18 +9,19 @@ from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.participant import (
     BaseTrainingParticipant, BaseAggregatorParticipant,
 )
-from mlmi.exceptions import ExecutionError
+from mlmi.exceptions import ExecutionError, GradientExplodingError
 
 from mlmi.log import getLogger
-from mlmi.selectors import sample_randomly_by_fraction
+from mlmi.sampling import sample_randomly_by_fraction
 from mlmi.settings import REPO_ROOT
 from mlmi.structs import TrainArgs
-from mlmi.utils import overwrite_participants_models, overwrite_participants_optimizers
+from mlmi.utils import evaluate_global_model, overwrite_participants_models, overwrite_participants_optimizers
 
 logger = getLogger(__name__)
 
 
-def run_train_round(participants: List[BaseTrainingParticipant], training_args: TrainArgs, success_threshold=-1):
+def run_train_round(participants: List['BaseTrainingParticipant'], training_args: TrainArgs, success_threshold=-1)\
+        -> List['BaseTrainingParticipant']:
     """
     Routine to run a single round of training on the clients and return the results additional args are passed to the
     clients training routines.
@@ -29,20 +30,25 @@ def run_train_round(participants: List[BaseTrainingParticipant], training_args: 
     :param success_threshold: threshold for how many clients should at least participate in the round
     :return:
     """
-    successful_participants = 0
+    successful_participants = []
     for participant in participants:
         try:
-            logger.debug('invoking training on participant {0}'.format(participant._name))
+            logger.debug(f'invoking training on participant {participant._name}')
             participant.train(training_args)
-            successful_participants += 1
+            successful_participants.append(participant)
+            if success_threshold != -1 and success_threshold <= len(successful_participants):
+                break
+        except GradientExplodingError as gradient_exception:
+            logger.error(f'participant {participant._name} failed due to exploding gradients', gradient_exception)
         except Exception as e:
-            logger.error('training on participant {0} failed'.format(participant._name), e)
+            logger.error(f'training on participant {participant._name} failed', e)
 
-    if success_threshold != -1 and successful_participants < success_threshold:
+    if success_threshold != -1 and len(successful_participants) < success_threshold:
         raise ExecutionError('Failed to execute training round, not enough clients participated successfully')
+    return successful_participants
 
 
-def run_fedavg_round(aggregator: BaseAggregatorParticipant, participants: List[BaseTrainingParticipant],
+def run_fedavg_round(aggregator: 'BaseAggregatorParticipant', participants: List['BaseTrainingParticipant'],
                      training_args: TrainArgs, client_fraction: float = 1.0):
     """
     Routine to run a training round with the given clients based on the server model and then aggregate the results
@@ -55,13 +61,14 @@ def run_fedavg_round(aggregator: BaseAggregatorParticipant, participants: List[B
     initial_model_state = aggregator.model.state_dict()
     overwrite_participants_models(initial_model_state, participants)
 
+    success_threshold = max(len(participants) * client_fraction, 1) if client_fraction < 1.0 else -1
     participant_fraction = sample_randomly_by_fraction(participants, client_fraction)
     logger.debug(f'starting training round with {len(participant_fraction)}/{len(participants)}.')
-    run_train_round(participant_fraction, training_args)
+    trained_participants = run_train_round(participant_fraction, training_args, success_threshold=success_threshold)
 
     logger.debug('starting aggregation.')
-    num_train_samples = [p.num_train_samples for p in participant_fraction]
-    aggregator.aggregate(participant_fraction, num_train_samples=num_train_samples)
+    num_train_samples = [p.num_train_samples for p in trained_participants]
+    aggregator.aggregate(trained_participants, num_train_samples=num_train_samples)
 
     logger.debug('distribute the aggregated global model to clients')
     resulting_model_state = aggregator.model.state_dict()
@@ -155,3 +162,28 @@ def save_fedavg_state(experiment_context: 'FedAvgExperimentContext', fl_round: i
     path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{experiment_context}r{fl_round}.mdl'
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model_state, path)
+
+
+def evaluate_cluster_models(cluster_server_dic: Dict[str, 'BaseAggregatorParticipant'],
+                            cluster_clients_dic: Dict[str, List['BaseTrainingParticipant']])\
+        -> Tuple[Tensor, Tensor]:
+    global_losses = None
+    global_acc = None
+    for cluster_id, cluster_clients in cluster_clients_dic.items():
+        cluster_server = cluster_server_dic[cluster_id]
+        result = evaluate_global_model(global_model_participant=cluster_server, participants=cluster_clients)
+        if global_losses is None:
+            global_losses = result.get('test/loss')
+            global_acc = result.get('test/acc')
+        else:
+            if result.get('test/loss').dim() == 0:
+                loss_test = torch.tensor([result.get('test/loss')])
+                global_losses = torch.cat((global_losses, loss_test), dim=0)
+            else:
+                global_losses = torch.cat((global_losses, result.get('test/loss')), dim=0)
+            if result.get('test/acc').dim() == 0:
+                acc_test = torch.tensor([result.get('test/acc')])
+                global_acc = torch.cat((global_acc, acc_test), dim=0)
+            else:
+                global_acc = torch.cat((global_acc, result.get('test/acc')), dim=0)
+    return global_losses, global_acc

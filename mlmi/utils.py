@@ -28,7 +28,7 @@ def create_tensorboard_logger(experiment_name: str, experiment_specification: Op
     return TensorBoardLogger(experiment_path.absolute(), version=version)
 
 
-def overwrite_participants_models(model_state: Dict[str, Tensor], participants, verbose=True):
+def overwrite_participants_models(model_state: Dict[str, Tensor], participants):
     """
     Overwrites the participants models with a initial state
     :param model_state: state to save on the client side
@@ -38,8 +38,6 @@ def overwrite_participants_models(model_state: Dict[str, Tensor], participants, 
     """
     for participant in participants:
         try:
-            if verbose:
-                logger.debug('sending model to participant {0}'.format(participant._name))
             participant.overwrite_model_state(model_state)
         except Exception as e:
             logger.error('sending model to participant {0} failed'.format(participant._name), e)
@@ -54,7 +52,6 @@ def overwrite_participants_optimizers(optimizer_state: Dict[str, Tensor], partic
     """
     for participant in participants:
         try:
-            logger.debug('sending model to participant {0}'.format(participant._name))
             participant.overwrite_optimizer_state(optimizer_state)
         except Exception as e:
             logger.error('sendign model to participant {0} failed'.format(participant._name), e)

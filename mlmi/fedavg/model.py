@@ -1,20 +1,24 @@
 from typing import Dict, List, Optional
 
 import torch
-from torch import Tensor, optim, nn
+from torch import Tensor, nn
 from torch.nn import functional as F
 
 import pytorch_lightning as pl
 from pytorch_lightning.metrics import Accuracy
 
-from fedml_api.model.cv.cnn import CNN_OriginalFedAvg
-
+from mlmi.exceptions import GradientExplodingError
 from mlmi.log import getLogger
 from mlmi.participant import BaseParticipantModel, BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
-from mlmi.structs import OptimizerArgs
 
 
 logger = getLogger(__name__)
+
+
+def init_weights(m):
+    if type(m) == nn.Linear or type(m) == nn.Conv2d:
+        torch.nn.init.xavier_uniform_(m.weight)
+        m.bias.data.fill_(0.01)
 
 
 def add_weighted_model(previous: Optional[Dict[str, Tensor]], next: Dict[str, Tensor], num_samples: int,
@@ -46,9 +50,9 @@ class FedAvgServer(BaseAggregatorParticipant):
 
     def aggregate(self, participants: List[BaseParticipant], num_train_samples: List[int] = None, *args, **kwargs):
         assert num_train_samples is not None, 'Place pass num_train_samples to the aggregation function.'
-        assert len(num_train_samples) == len(participants), 'Please provide the keyword argument num_train_samples, ' \
-                                                            'containing the number of training samples for each ' \
-                                                            'participant'
+        assert len(num_train_samples) == len(participants), 'Please provide the keyword argument a valid number of' \
+                                                            f'num_train_samples, got {len(num_train_samples)},' \
+                                                            f'expected {len(participants)}'
         num_total_samples = sum(num_train_samples)
 
         aggregated_model_state = None
@@ -56,8 +60,30 @@ class FedAvgServer(BaseAggregatorParticipant):
             aggregated_model_state = add_weighted_model(aggregated_model_state,
                                                         load_participant_model_state(participant),
                                                         num_samples, num_total_samples)
-
         self.model.load_state_dict(aggregated_model_state)
+
+
+class CNN_OriginalFedAvg(torch.nn.Module):
+
+    def __init__(self, only_digits=True):
+        super(CNN_OriginalFedAvg, self).__init__()
+        self.only_digits = only_digits
+        self.conv2d_1 = torch.nn.Conv2d(1, 32, kernel_size=5, padding=2)
+        self.max_pooling = nn.MaxPool2d(2, stride=2)
+        self.conv2d_2 = torch.nn.Conv2d(32, 64, kernel_size=5, padding=2)
+        self.flatten = nn.Flatten()
+        self.linear_1 = nn.Linear(3136, 512)
+        self.linear_2 = nn.Linear(512, 10 if only_digits else 62)
+
+    def forward(self, x):
+        x = self.conv2d_1(x)
+        x = F.relu(self.max_pooling(x))
+        x = self.conv2d_2(x)
+        x = F.relu(self.max_pooling(x))
+        x = self.flatten(x)
+        x = F.relu(self.linear_1(x))
+        x = self.linear_2(x)
+        return x
 
 
 class CNNLightning(BaseParticipantModel, pl.LightningModule):
@@ -66,6 +92,7 @@ class CNNLightning(BaseParticipantModel, pl.LightningModule):
         model = CNN_OriginalFedAvg(only_digits=only_digits)
         super().__init__(*args, model=model, **kwargs)
         self.model = model
+        # self.model.apply(init_weights)
         self.accuracy = Accuracy()
 
     def training_step(self, train_batch, batch_idx):
@@ -77,6 +104,8 @@ class CNNLightning(BaseParticipantModel, pl.LightningModule):
         # TODO: this should actually be calculated on a validation set (missing cross entropy implementation)
         self.log('train/acc/{}'.format(self.participant_name), self.accuracy(preds, y).item())
         self.log('train/loss/{}'.format(self.participant_name), loss.item())
+        if torch.isnan(loss) or torch.isinf(loss):
+            raise GradientExplodingError('Loss is nan or inf, it seems gradient exploded.')
         return loss
 
     def test_step(self, test_batch, batch_idx):
@@ -102,7 +131,7 @@ class CNNMnist(nn.Module):
     def forward(self, x):
         x = F.relu(F.max_pool2d(self.conv1(x), 2))
         x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-        x = x.view(-1, x.shape[1]*x.shape[2]*x.shape[3])
+        x = torch.flatten(x)
         x = F.relu(self.fc1(x))
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)
