@@ -435,7 +435,7 @@ if __name__ == '__main__':
         elif args.hierarchical:
             cluster_args = ClusterArgs(AlternativePartitioner, linkage_mech="ward", criterion="distance",
                                        dis_metric="euclidean", max_value_criterion=10.0, plot_dendrogram=False,
-                                       num_rounds_init=1, num_rounds_cluster=1)
+                                       num_rounds_init=3, num_rounds_cluster=1)
 
             context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.1, local_epochs=3,
                                                         lr=0.1, batch_size=fed_dataset.batch_size,

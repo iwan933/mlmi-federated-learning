@@ -188,17 +188,17 @@ class AlternativePartitioner(BaseClusterPartitioner):
 
         tic = time.perf_counter()
         global_parameter = flatten_model_parameter(server, keys).numpy()
-        euclidean_dist = np.array([((model_parameter[participant_id]-global_parameter)**2).sum(axis=0) for participant_id in range(len(participants))])
-        euclidean_dist = np.reshape(euclidean_dist, (len(euclidean_dist), 1))
-        cluster_ids = hac.fclusterdata(euclidean_dist, self.max_value_criterion, self.criterion,
-                                       method=self.linkage_mech, metric=self.dis_metric)
+        euclidean_dist = np.array([((model_parameter[participant_id]-global_parameter)**2).sum(axis=0)
+                                   for participant_id in range(len(participants))])
 
-        num_cluster = max(cluster_ids)
+        cluster_ids = hac.fclusterdata(np.reshape(euclidean_dist, (len(euclidean_dist), 1)), self.max_value_criterion,
+                                       self.criterion, method=self.linkage_mech, metric=self.dis_metric)
         toc = time.perf_counter()
         print(f'Computation time:{toc-tic}')
 
         # Allocate participants to clusters
         i = 0
+        num_cluster = max(cluster_ids)
         for id in range(1, num_cluster + 1):
             clusters_hac_dic[str(id)] = []
         for participant in participants:
@@ -207,7 +207,7 @@ class AlternativePartitioner(BaseClusterPartitioner):
             i += 1
 
         for cluster_id in range(num_cluster):
-            logging.info(f'cluster {cluster_id} has {np.count_nonzero(cluster_ids == cluster_id)} clients')
+            logging.info(f'cluster {cluster_id+1} has {np.count_nonzero(cluster_ids == cluster_id+1)} clients')
             if np.count_nonzero(cluster_ids == cluster_id) == 1:
                 logging.info('cluster {} has only one client!'.format(cluster_id))
         logging.info('Used linkage method: ' + str(self.linkage_mech))

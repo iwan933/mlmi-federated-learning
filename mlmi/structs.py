@@ -44,7 +44,8 @@ class ClusterArgs(object):
         self._config_string = self._create_config_string(**kwargs)
 
     def _create_config_string(self, **kwargs):
-        unique_str = ''
+        partitioner = str(self.partitioner_class).replace('<class \'mlmi.clustering.', '')
+        unique_str = partitioner.replace('\'>', '_')
         linkage_mech = kwargs.get('linkage_mech', None)
         criterion = kwargs.get('criterion', None)
         dis_metric = kwargs.get('dis_metric', None)
