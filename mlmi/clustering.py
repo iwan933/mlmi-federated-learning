@@ -21,13 +21,13 @@ def flatten_model_parameter(state_dict: Dict[str, Tensor], sorted_keys: List[str
 
 class BaseClusterPartitioner(object):
 
-    def cluster(self, participants: List['BaseParticipant']) -> Dict[str, List['BaseParticipant']]:
+    def cluster(self, participants: List['BaseParticipant'], server: BaseParticipant) -> Dict[str, List['BaseParticipant']]:
         raise NotImplementedError()
 
 
 class RandomClusterPartitioner(BaseClusterPartitioner):
 
-    def cluster(self, participants: List['BaseParticipant']) -> Dict[str, List['BaseParticipant']]:
+    def cluster(self, participants: List['BaseParticipant'], server: BaseParticipant) -> Dict[str, List['BaseParticipant']]:
         num_cluster = 10
         result_dic = {}
         for id in range(1, num_cluster+1):
@@ -70,7 +70,7 @@ class GradientClusterPartitioner(BaseClusterPartitioner):
             sum_weights_participant += float(weights_layer.sum())
         return sum_weights_participant
 
-    def cluster(self, participants: List['BaseParticipant']) -> Dict[str, List['BaseParticipant']]:
+    def cluster(self, participants: List['BaseParticipant'], server: BaseParticipant) -> Dict[str, List['BaseParticipant']]:
         logging.info('Start clustering')
         clusters_hac_dic = {}
 
@@ -125,7 +125,7 @@ class ModelFlattenWeightsPartitioner(BaseClusterPartitioner):
         self.max_value_criterion = max_value_criterion
         self.plot_dendrogram = plot_dendrogram
 
-    def cluster(self, participants: List['BaseParticipant']) -> Dict[str, List['BaseParticipant']]:
+    def cluster(self, participants: List['BaseParticipant'], server: BaseParticipant) -> Dict[str, List['BaseParticipant']]:
         logging.info('start clustering...')
         clusters_hac_dic = {}
 
@@ -179,6 +179,7 @@ class AlternativePartitioner(BaseClusterPartitioner):
     def cluster(self, participants: List['BaseParticipant'], server) -> Dict[str, List['BaseParticipant']]:
         logging.info('start clustering...')
         clusters_hac_dic = {}
+        server = server.model.state_dict()
 
         model_states: List[Dict[str, Tensor]] = [p.model.state_dict() for p in participants]
         keys = list(model_states[0].keys())

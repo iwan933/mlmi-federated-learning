@@ -220,8 +220,7 @@ def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: i
     else:
         # Clustering of participants by model updates
         partitioner = context.cluster_args.partitioner_class(*context.cluster_args.args, **context.cluster_args.kwargs)
-        cluster_clients_dic = partitioner.cluster(clients, server.model.state_dict())
-        #cluster_clients_dic = partitioner.cluster(clients)
+        cluster_clients_dic = partitioner.cluster(clients, server)
         _cluster_clients_dic = dict()
         for cluster_id, participants in cluster_clients_dic.items():
             _cluster_clients_dic[cluster_id] = [c._name for c in participants]
@@ -384,7 +383,7 @@ if __name__ == '__main__':
             fed_dataset = load_mnist_dataset(str(data_dir.absolute()), num_clients=100, batch_size=10)
         else:
             # default to femnist dataset
-            fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=367, batch_size=10)
+            fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=20, batch_size=10)
 
         if args.scratch_data:
             client_fraction_to_scratch = 0.75
@@ -433,11 +432,11 @@ if __name__ == '__main__':
                                             dataset=fed_dataset, num_rounds_init=cluster_args.num_rounds_init,
                                             num_rounds_cluster=cluster_args.num_rounds_cluster)
         elif args.hierarchical:
-            cluster_args = ClusterArgs(AlternativePartitioner, linkage_mech="ward", criterion="distance",
+            cluster_args = ClusterArgs(ModelFlattenWeightsPartitioner, linkage_mech="ward", criterion="distance",
                                        dis_metric="euclidean", max_value_criterion=10.0, plot_dendrogram=False,
-                                       num_rounds_init=3, num_rounds_cluster=1)
+                                       num_rounds_init=1, num_rounds_cluster=1)
 
-            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.1, local_epochs=3,
+            context = create_femnist_experiment_context(name='fedavg_hierarchical', client_fraction=0.1, local_epochs=1,
                                                         lr=0.1, batch_size=fed_dataset.batch_size,
                                                         dataset_name=fed_dataset.name,
                                                         cluster_args=cluster_args, no_progress_bar=args.no_progress_bar,
