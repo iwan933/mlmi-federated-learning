@@ -71,8 +71,14 @@ def main(context: ExperimentContext):
 
         print('Evaluating...')
         eval_kwargs = evaluate_kwargs(args)
-        print('Train accuracy: ' + str(evaluate(sess, model, train_set, **eval_kwargs)))
-        print('Test accuracy: ' + str(evaluate(sess, model, test_set, **eval_kwargs)))
+        for label, dataset in zip(['Train', 'Test'], [train_set, test_set]):
+            accuracy = evaluate(sess, model, dataset, **eval_kwargs)
+            experiment_logger.experiment.add_scalar(
+                f'final_{label}_acc',
+                accuracy,
+                global_step=0
+            )
+            print(f'{label} accuracy: {accuracy}')
 
 if __name__ == '__main__':
 

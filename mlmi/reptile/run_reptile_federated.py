@@ -296,6 +296,11 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
         result = evaluate_local_models(participants=eval_sample)
         log_loss_and_acc('global_model', result.get('test/loss'), result.get('test/acc'),
                          experiment_logger, global_step=args.meta_iters)
+        experiment_logger.experiment.add_scalar(
+            f'final_{label}_acc',
+            torch.mean(result.get('test/acc')),
+            global_step=0
+        )
         print(f"{label} accuracy: {torch.mean(result.get('test/acc'))}")
 
 

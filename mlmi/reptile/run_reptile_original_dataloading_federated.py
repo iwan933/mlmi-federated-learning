@@ -169,6 +169,11 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
                 eval_inner_iters=args.eval_iters,
                 transductive=True
             )
+            experiment_logger.experiment.add_scalar(
+                f'final_{label}_acc',
+                accuracy,
+                global_step=0
+            )
             print(f"{label} accuracy: {accuracy}")
 
 if __name__ == '__main__':
