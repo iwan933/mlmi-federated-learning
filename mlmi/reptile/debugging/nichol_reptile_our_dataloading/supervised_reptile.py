@@ -3,39 +3,15 @@ Supervised Reptile learning and evaluation on arbitrary
 datasets.
 """
 
-import numpy as np
 import tensorflow.compat.v1 as tf
 from itertools import cycle
 
-from mlmi.reptile.dataloading_ours_model_nichol.variables_2 import (interpolate_vars, average_vars,
-                                                                    VariableState)
-
-from functools import partial
-
-DEFAULT_OPTIMIZER = partial(tf.train.AdamOptimizer, beta1=0)
-
-# pylint: disable=R0903
-class OmniglotModel:
-    """
-    A model for Omniglot classification.
-    """
-    def __init__(self, num_classes, optimizer=DEFAULT_OPTIMIZER, **optim_kwargs):
-        self.input_ph = tf.placeholder(tf.float32, shape=(None, 28, 28))
-        out = tf.reshape(self.input_ph, (-1, 28, 28, 1))
-        for _ in range(4):
-            out = tf.layers.conv2d(out, 64, 3, strides=2, padding='same')
-            out = tf.layers.batch_normalization(out, training=True)
-            out = tf.nn.relu(out)
-        out = tf.reshape(out, (-1, int(np.prod(out.get_shape()[1:]))))
-        self.logits = tf.layers.dense(out, num_classes)
-        self.label_ph = tf.placeholder(tf.int32, shape=(None,))
-        self.loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.label_ph,
-                                                                   logits=self.logits)
-        self.predictions = tf.argmax(self.logits, axis=-1)
-        self.minimize_op = optimizer(**optim_kwargs).minimize(self.loss)
+from mlmi.reptile.reptile_original.variables import (
+    interpolate_vars, average_vars, VariableState
+)
 
 
-class Reptile:
+class ReptileForDataloaders:
     """
     A meta-learning session.
 
@@ -79,21 +55,32 @@ class Reptile:
           meta_step_size: interpolation coefficient.
           meta_batch_size: how many inner-loops to run.
         """
-        #print('saving old vars')
+        # Change from original code: Save and reset _full_state to reset not
+        # only model state but also optimizer state. The original implementation
+        # transmits optimizer parameters between tasks which leads to improved
+        # performance but is not applicable to the federated learning setting.
+        full_old_vars = self._full_state.export_variables()
         old_vars = self._model_state.export_variables()
         new_vars = []
-        #print('starting training')
+        # Change from original code: Use provided training data_loader for data
+        # retrieval rather than generating sampling training data on the spot in
+        # the original.
         for key, data_loader in meta_batch.items():
-            #print(f"Training on client {key}")
             for i, batch in zip(range(inner_iters), cycle(data_loader)):
                 inputs = []
                 for t in batch[0]:
                     inputs.append(t.numpy())
                 inputs = tuple(inputs)
                 labels = tuple(batch[1].numpy())
-                self.session.run(minimize_op, feed_dict={input_ph: inputs, label_ph: labels})
+                self.session.run(
+                    minimize_op, feed_dict={input_ph: inputs, label_ph: labels}
+                )
             new_vars.append(self._model_state.export_variables())
-            self._model_state.import_variables(old_vars)
+            ####
+            # Change from original code: load full state and not only model state
+            self._full_state.import_variables(full_old_vars)
+            # self._model_state.import_variables(old_vars) <- This was the original code
+            ####
         new_vars = average_vars(new_vars)
 
         self._model_state.import_variables(interpolate_vars(old_vars, new_vars, meta_step_size))
@@ -135,6 +122,8 @@ class Reptile:
 
         old_vars = self._full_state.export_variables()
 
+        # Change from original code: Use specified training and test data_loaders
+        # for data retrieval rather than generating data on the spot in the original
         for i, batch in zip(range(inner_iters), cycle(train_data_loader)):
             inputs = []
             for t in batch[0]:

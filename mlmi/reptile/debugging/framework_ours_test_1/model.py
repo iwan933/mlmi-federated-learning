@@ -1,20 +1,18 @@
 from typing import Dict, List
 from collections import OrderedDict
 import copy
+from itertools import cycle
 
 import torch
 from torch import Tensor
 from torch.nn import functional as F
+from torch.utils import data
 import pytorch_lightning as pl
 from pytorch_lightning.metrics import Accuracy
-
-import tensorflow.compat.v1 as tf
 
 from mlmi.log import getLogger
 from mlmi.participant import BaseParticipantModel, BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
 from mlmi.struct import TrainArgs, ModelArgs, ExperimentContext, OptimizerArgs
-
-import mlmi.reptile.framework_ours_model_nichol.variables as variables
 
 
 logger = getLogger(__name__)
@@ -42,12 +40,41 @@ def subtract_model_states(minuend: OrderedDict,
         result_state[key] -= w
     return result_state
 
-class ReptileClient(BaseTrainingParticipant):
+class ReptileClient:#(BaseTrainingParticipant):
 
-    def __init__(self, client_id: str, *args, **kwargs):
-        self._name = client_id
-        with tf.variable_scope(self._name):
-            super().__init__(client_id=client_id, *args, **kwargs)
+    def __init__(self,
+                 train_dataloader: data.DataLoader, num_train_samples: int,
+                 test_dataloader: data.DataLoader, num_test_samples: int,
+                 **kwargs):
+        self._train_dataloader = train_dataloader
+        self._test_dataloader = test_dataloader
+        self._num_train_samples = num_train_samples
+        self._num_test_samples = num_test_samples
+        self.model_state = None
+
+    def overwrite_model_state(self, model_state: Dict[str, Tensor]):
+        """
+        Loads the model state into the current model instance
+        :param model_state: The model state to load
+        """
+        self.model_state = copy.deepcopy(model_state)
+
+    def train(self,
+              model,
+              optimizer,
+              criterion,
+              training_args):
+        inner_iterations = training_args.kwargs['max_steps']
+        #old_vars = copy.deepcopy(self.model_state)
+        model.load_state_dict(self.model_state)
+        for i, (inputs, labels) in zip(range(inner_iterations), cycle(self._train_dataloader)):
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+        self.model_state = copy.deepcopy(model.state_dict())
+        #model.load_state_dict(old_vars)
 
     def save_model_state(self):
         """
@@ -58,28 +85,20 @@ class ReptileClient(BaseTrainingParticipant):
         # Do not save model state (not enough disc space for thousands of model states)
         # torch.save(self._model.state_dict(), self.get_checkpoint_path())
 
-    def overwrite_model_state(self, model_state):
-        pass
 
-    def get_model_state(self):
-        pass
-
-    def train(self):
-        pass
-
-
-
-
-class ReptileServer(BaseAggregatorParticipant):
+class ReptileServer:#(BaseAggregatorParticipant):
     def __init__(self,
+                 model_state,
                  participant_name: str,
                  model_args,
                  context: ExperimentContext,
                  initial_model_state: OrderedDict = None):
-        super().__init__(participant_name, model_args, context)
+        #super().__init__(participant_name, model_args, context)
         # Initialize model parameters
-        if initial_model_state is not None:
-            self.model.load_state_dict(initial_model_state)
+        #if initial_model_state is not None:
+        #    self.model.load_state_dict(initial_model_state)
+
+        self.model_state = model_state
 
     @property
     def model_args(self):
@@ -92,38 +111,31 @@ class ReptileServer(BaseAggregatorParticipant):
 
         # Collect participants' model states and calculate model differences to
         # initial model (= model deltas)
-        initial_model_state = self.model.state_dict()
-        participant_model_deltas = []
-        for participant in participants:
-            participant_model_deltas.append(
-                subtract_model_states(
-                    participant.model.state_dict(), initial_model_state
-                )
-            )
+        initial_model_state = copy.deepcopy(self.model_state)
         if weighted:
             # meta_gradient = weighted (by number of samples) average of
             # participants' model updates
-            num_train_samples = []
-            for participant in participants:
-                num_train_samples.append(participant.num_train_samples)
-            weighted_model_delta_list = []
-            num_total_samples = sum(num_train_samples)
-            for num_samples, pmd in zip(num_train_samples, participant_model_deltas):
-                weighted_model_delta = weight_model(
-                    pmd, num_samples, num_total_samples
-                )
-                weighted_model_delta_list.append(weighted_model_delta)
-            meta_gradient = sum_model_states(weighted_model_delta_list)
-            self.total_train_sample_num = num_total_samples
+            num_train_samples_total = sum([p._num_train_samples for p in participants])
+            new_states = [
+                weight_model(
+                    model=p.model_state,
+                    num_samples=p._num_train_samples,
+                    num_total_samples=num_train_samples_total
+                ) for p in participants
+            ]
         else:
             # meta_gradient = simple average of participants' model updates
-            scaled_model_delta_list = []
-            for pmd in participant_model_deltas:
-                scaled_model_delta = weight_model(
-                    pmd, 1, len(participant_model_deltas)
-                )
-                scaled_model_delta_list.append(scaled_model_delta)
-            meta_gradient = sum_model_states(scaled_model_delta_list)
+            new_states = [
+                weight_model(
+                    model=p.model_state,
+                    num_samples=1,
+                    num_total_samples=len(participants)
+                ) for p in participants
+            ]
+        meta_gradient = subtract_model_states(
+            minuend=sum_model_states(new_states),
+            subtrahend=initial_model_state
+        )
 
         # Update model state with meta_gradient using simple gradient descent
         self.update_model_state(meta_gradient, meta_learning_rate)
@@ -136,14 +148,14 @@ class ReptileServer(BaseAggregatorParticipant):
         """
         # TODO (optional): Extend this function with other optimizer options
         #                  than vanilla GD
-        new_model_state = self.model.state_dict()
+        new_model_state = copy.deepcopy(self.model_state)
         for key, w in new_model_state.items():
             if key.endswith('running_mean') or key.endswith('running_var') \
                 or key.endswith('num_batches_tracked'):
                 # Do not update non-trainable batch norm parameters
                 continue
             new_model_state[key] = w + learning_rate * gradient[key]
-        self.model.load_state_dict(new_model_state)
+        self.model_state = new_model_state
 
 
 class OmniglotLightning(BaseParticipantModel, pl.LightningModule):

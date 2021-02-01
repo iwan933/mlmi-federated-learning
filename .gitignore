@@ -142,6 +142,7 @@ cache/
 run/
 data/*
 checkpoints/
+ckpt_o55/
 # Do not ignore omniglot dataset
 !data/omniglot
 
@@ -149,3 +150,6 @@ checkpoints/
 jupyter_notebooks/
 # exclude lightning_logs
 lightning_logs/
+
+# exclude reptile/debugging
+mlmi/reptile/debugging/

@@ -15,7 +15,8 @@ def load_omniglot_datasets(data_dir,
                            num_classes_per_client: int = 5,
                            num_shots_per_class: int = 1,
                            inner_batch_size: int = 5,
-                           tensorflow: bool = False)\
+                           tensorflow: bool = False,
+                           random_seed: int = None)\
         -> (FederatedDatasetData, FederatedDatasetData):
     """
     Load the Omniglot dataset.
@@ -30,7 +31,12 @@ def load_omniglot_datasets(data_dir,
     :return:
     """
 
-    omniglot_train, omniglot_test = split_dataset(read_dataset(data_dir, tensorflow))
+    random_instance = random.Random(x=random_seed)
+
+    omniglot_train, omniglot_test = split_dataset(
+        dataset=read_dataset(data_dir, tensorflow),
+        random_instance=random_instance
+    )
     omniglot_train = list(augment_dataset(omniglot_train, tensorflow))
     omniglot_test = list(omniglot_test)
 
@@ -42,11 +48,13 @@ def load_omniglot_datasets(data_dir,
     train_clients = _make_omniglot_dataset(
         dataset=omniglot_train,
         num_clients=num_clients_train,
+        random_instance=random_instance,
         **omniglot_args
     )
     test_clients = _make_omniglot_dataset(
         dataset=omniglot_test,
         num_clients=num_clients_test,
+        random_instance=random_instance,
         **omniglot_args
     )
 
@@ -57,7 +65,8 @@ def _make_omniglot_dataset(dataset,
                            num_clients: int,
                            num_classes_per_client: int = 5,
                            num_shots_per_class: int = 1,
-                           inner_batch_size: int = 5):
+                           inner_batch_size: int = 5,
+                           random_instance = None):
 
     federated_dataset_args = {
         'client_num': num_clients,
@@ -77,7 +86,8 @@ def _make_omniglot_dataset(dataset,
         client_data = list(_sample_mini_dataset(
             dataset=dataset,
             num_classes=num_classes_per_client,
-            num_shots=num_shots_per_class + 1
+            num_shots=num_shots_per_class + 1,
+            random_instance=random_instance
         ))
         train_data, test_data = _split_train_test(client_data)
         train_batch_size = test_batch_size = inner_batch_size
@@ -86,19 +96,21 @@ def _make_omniglot_dataset(dataset,
             test_batch_size = len(test_data)
 
         # Train data
+        random_instance.shuffle(train_data)
         federated_dataset_args['train_data_local_dict'][i] = DataLoader(
             dataset=train_data,
             batch_size=train_batch_size,
-            shuffle=True
+            shuffle=False
         )
         federated_dataset_args['data_local_train_num_dict'][i] = len(train_data)
         federated_dataset_args['train_data_num'] += len(train_data)
 
         # Test data
+        random_instance.shuffle(test_data)
         federated_dataset_args['test_data_local_dict'][i] = DataLoader(
             dataset=test_data,
             batch_size=test_batch_size,
-            shuffle=True
+            shuffle=False
         )
         federated_dataset_args['data_local_test_num_dict'][i] = len(test_data)
         federated_dataset_args['test_data_num'] += len(test_data)
@@ -111,17 +123,19 @@ def _make_omniglot_dataset(dataset,
 
 # The below code is taken from the supervised-reptile repository (code from the
 # Nichol 2018 paper)
-def _sample_mini_dataset(dataset, num_classes, num_shots):
+def _sample_mini_dataset(dataset, num_classes, num_shots, random_instance=None):
     """
     Sample a few shot task from a dataset.
 
     Returns:
       An iterable of (input, label) pairs.
     """
+    if random_instance is None:
+        random_instance = random.Random()
     shuffled = list(dataset)
-    random.shuffle(shuffled)
+    random_instance.shuffle(shuffled)
     for class_idx, class_obj in enumerate(shuffled[:num_classes]):
-        for sample in class_obj.sample(num_shots):
+        for sample in class_obj.sample(num_shots, random_instance):
             yield (sample, class_idx)
 
 def read_dataset(data_dir, tensorflow: bool):
@@ -146,7 +160,7 @@ def read_dataset(data_dir, tensorflow: bool):
                 continue
             yield Character(os.path.join(alphabet_dir, char_name), tensorflow, 0)
 
-def split_dataset(dataset, num_train=1200):
+def split_dataset(dataset, num_train=1200, random_instance=None):
     """
     Split the dataset into a training and test set.
 
@@ -156,8 +170,10 @@ def split_dataset(dataset, num_train=1200):
     Returns:
       A tuple (train, test) of Character sequences.
     """
+    if random_instance is None:
+        random_instance = random.Random()
     all_data = list(dataset)
-    random.shuffle(all_data)
+    random_instance.shuffle(all_data)
     return all_data[:num_train], all_data[num_train:]
 
 def augment_dataset(dataset, tensorflow: bool):
@@ -186,7 +202,7 @@ class Character:
         self.rotation = rotation
         self._cache = {}
 
-    def sample(self, num_images):
+    def sample(self, num_images, random_instance=None):
         """
         Sample images (as numpy arrays) from the class.
 
@@ -194,8 +210,10 @@ class Character:
           A sequence of 28x28 numpy arrays.
           Each pixel ranges from 0 to 1.
         """
+        if random_instance is None:
+            random_instance = random.Random()
         names = [f for f in os.listdir(self.dir_path) if f.endswith('.png')]
-        random.shuffle(names)
+        random_instance.shuffle(names)
         images = []
         for name in names[:num_images]:
             images.append(self._read_image(os.path.join(self.dir_path, name)))
@@ -238,6 +256,3 @@ def _split_train_test(samples, test_shots=1):
     if len(test_set) < len(labels) * test_shots:
         raise IndexError('not enough examples of each class for test set')
     return train_set, test_set
-
-def add_channel(dataset):
-    pass

@@ -3,43 +3,21 @@ Supervised Reptile learning and evaluation on arbitrary
 datasets.
 """
 
-import numpy as np
 import tensorflow.compat.v1 as tf
 from itertools import cycle
 
-from mlmi.reptile.dataloading_ours_model_nichol.variables_2 import (interpolate_vars, average_vars,
-                                                                    VariableState)
-
-from mlmi.struct import OptimizerArgs
-
-from functools import partial
+from mlmi.reptile.reptile_original.variables import (
+    interpolate_vars, average_vars, VariableState
+)
 
 
-# pylint: disable=R0903
-class OmniglotModel:
+class ReptileForFederatedData:
     """
-    A model for Omniglot classification.
-    """
-    def __init__(self, num_classes, participant_name, optimizer_args: OptimizerArgs):
-        self.input_ph = tf.placeholder(tf.float32, shape=(None, 28, 28))
-        out = tf.reshape(self.input_ph, (-1, 28, 28, 1))
-        for _ in range(4):
-            out = tf.layers.conv2d(out, 64, 3, strides=2, padding='same')
-            out = tf.layers.batch_normalization(out, training=True)
-            out = tf.nn.relu(out)
-        out = tf.reshape(out, (-1, int(np.prod(out.get_shape()[1:]))))
-        self.logits = tf.layers.dense(out, num_classes)
-        self.label_ph = tf.placeholder(tf.int32, shape=(None,))
-        self.loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.label_ph,
-                                                                   logits=self.logits)
-        self.predictions = tf.argmax(self.logits, axis=-1)
-        self.minimize_op = optimizer_args.optimizer_class(**optimizer_args.optimizer_kwargs).minimize(self.loss)
+    Note:
+      This class is an adapted version of the original Nichol Reptile class
+      (mlmi.reptile.reptile_original.reptile.Reptile) to our federated dataset
+      structure.
 
-        self.participant_name = participant_name
-
-
-class Reptile:
-    """
     A meta-learning session.
 
     Reptile can operate in two evaluation modes: normal
@@ -67,36 +45,42 @@ class Reptile:
         Perform a Reptile training step.
 
         Args:
-          dataset: a sequence of data classes, where each data
-            class has a sample(n) method.
+          meta_batch (dict of torch.utils.data.DataLoader): a set of data
+            loaders. Each data loader contains training data for one federated
+            learning client in the meta batch.
           input_ph: placeholder for a batch of samples.
           label_ph: placeholder for a batch of labels.
           minimize_op: TensorFlow Op to minimize a loss on the
             batch specified by input_ph and label_ph.
-          num_classes: number of data classes to sample.
-          num_shots: number of examples per data class.
-          inner_batch_size: batch size for every inner-loop
-            training iteration.
           inner_iters: number of inner-loop iterations.
-          replacement: sample with replacement.
           meta_step_size: interpolation coefficient.
-          meta_batch_size: how many inner-loops to run.
         """
-        #print('saving old vars')
+        # Change from original code: Save and reset _full_state to reset not
+        # only model state but also optimizer state. The original implementation
+        # transmits optimizer parameters between tasks which leads to improved
+        # performance but is not applicable to the federated learning setting.
+        full_old_vars = self._full_state.export_variables()
         old_vars = self._model_state.export_variables()
         new_vars = []
-        #print('starting training')
+        # Change from original code: Use provided training data_loader for data
+        # retrieval rather than sampling training data on the spot in the
+        # original.
         for key, data_loader in meta_batch.items():
-            #print(f"Training on client {key}")
             for i, batch in zip(range(inner_iters), cycle(data_loader)):
                 inputs = []
                 for t in batch[0]:
                     inputs.append(t.numpy())
                 inputs = tuple(inputs)
                 labels = tuple(batch[1].numpy())
-                self.session.run(minimize_op, feed_dict={input_ph: inputs, label_ph: labels})
+                self.session.run(
+                    minimize_op, feed_dict={input_ph: inputs, label_ph: labels}
+                )
             new_vars.append(self._model_state.export_variables())
-            self._model_state.import_variables(old_vars)
+            ####
+            # Change from original code: load full state and not only model state
+            self._full_state.import_variables(full_old_vars)
+            # self._model_state.import_variables(old_vars) <- This was the original code
+            ####
         new_vars = average_vars(new_vars)
 
         self._model_state.import_variables(interpolate_vars(old_vars, new_vars, meta_step_size))
@@ -113,23 +97,19 @@ class Reptile:
         """
         Run a single evaluation of the model.
 
-        Samples a few-shot learning task and measures
-        performance.
+        Measures model performance on a single client.
 
         Args:
-          dataset: a sequence of data classes, where each data
-            class has a sample(n) method.
+          train_data_loader (torch.utils.data.DataLoader): a data loader with
+            training data of a single client.
+          test_data_loader (torch.utils.data.DataLoader): a data loader with
+            test data of the same client.
           input_ph: placeholder for a batch of samples.
           label_ph: placeholder for a batch of labels.
           minimize_op: TensorFlow Op to minimize a loss on the
             batch specified by input_ph and label_ph.
           predictions: a Tensor of integer label predictions.
-          num_classes: number of data classes to sample.
-          num_shots: number of examples per data class.
-          inner_batch_size: batch size for every inner-loop
-            training iteration.
           inner_iters: number of inner-loop iterations.
-          replacement: sample with replacement.
 
         Returns:
           The number of correctly predicted samples.
@@ -138,6 +118,8 @@ class Reptile:
 
         old_vars = self._full_state.export_variables()
 
+        # Change from original code: Use specified training and test data_loaders
+        # for data retrieval rather than generating data on the spot in the original
         for i, batch in zip(range(inner_iters), cycle(train_data_loader)):
             inputs = []
             for t in batch[0]:

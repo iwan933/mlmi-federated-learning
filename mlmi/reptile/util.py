@@ -1,6 +1,5 @@
 from typing import List, Dict
-
-import torch
+import copy
 
 from mlmi.reptile.model import (
     ReptileClient, ReptileServer
@@ -14,7 +13,9 @@ from mlmi.participant import BaseTrainingParticipant
 
 logger = getLogger(__name__)
 
-def run_train_round(participants: List[BaseTrainingParticipant], training_args: TrainArgs, success_threshold=-1):
+def run_train_round(participants: List[BaseTrainingParticipant],
+                    training_args: TrainArgs,
+                    success_threshold: int = -1):
     """
     Routine to run a single round of training on the clients and return the results additional args are passed to the
     clients training routines.
@@ -52,7 +53,7 @@ def reptile_train_step(aggregator: ReptileServer,
     """
 
     logger.debug('distribute the initial model to the clients.')
-    initial_model_state = aggregator.model.state_dict()
+    initial_model_state = copy.deepcopy(aggregator.model.state_dict())
     overwrite_participants_models(
         initial_model_state, participants, verbose=False
     )

@@ -1,6 +1,6 @@
 import argparse
 import sys
-sys.path.insert(0, 'C:\\Users\\Richard\\Desktop\\Informatik\\Semester_5\\MLMI\\git\\mlmi-federated-learning')
+sys.path.insert(0, '/')
 import random
 
 import torch
@@ -14,8 +14,11 @@ from mlmi.struct import ExperimentContext, ModelArgs, TrainArgs, OptimizerArgs
 from mlmi.settings import REPO_ROOT
 from mlmi.utils import create_tensorboard_logger
 
-from mlmi.reptile.dataloading_ours_model_ours_2.supervised_reptile_3 import Reptile
+from mlmi.reptile.debugging.dataloading_ours_model_ours.supervised_reptile_3 import Reptile
 import tensorflow.compat.v1 as tf
+
+RANDOM_SEED = 77
+RANDOM = random.Random(RANDOM_SEED)
 
 logger = getLogger(__name__)
 
@@ -162,7 +165,8 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
         num_clients_test=num_clients_test,
         num_classes_per_client=num_classes_per_client,
         num_shots_per_class=num_shots_per_class,
-        inner_batch_size=reptile_args.inner_batch_size
+        inner_batch_size=reptile_args.inner_batch_size,
+        random_seed=RANDOM_SEED
     )
 
     # Prepare ModelArgs for task training
@@ -256,10 +260,10 @@ def run_reptile(context: ExperimentContext, initial_model_state=None):
 
         if i % eval_iters == 0:
             accuracies = []
-            k = random.randrange(len(omniglot_train_clients.train_data_local_dict))
+            k = RANDOM.randrange(len(omniglot_train_clients.train_data_local_dict))
             train_train = omniglot_train_clients.train_data_local_dict[k]
             train_test = omniglot_train_clients.test_data_local_dict[k]
-            k = random.randrange(len(omniglot_test_clients.train_data_local_dict))
+            k = RANDOM.randrange(len(omniglot_test_clients.train_data_local_dict))
             test_train = omniglot_test_clients.train_data_local_dict[k]
             test_test = omniglot_test_clients.test_data_local_dict[k]
 
