@@ -20,16 +20,22 @@ from mlmi.utils import evaluate_global_model, overwrite_participants_models, ove
 logger = getLogger(__name__)
 
 
-def run_train_round(participants: List['BaseTrainingParticipant'], training_args: TrainArgs, success_threshold=-1)\
-        -> List['BaseTrainingParticipant']:
+def run_fedavg_train_round(
+        initial_model_state: Dict[str, Tensor],
+        participants: List['BaseTrainingParticipant'],
+        training_args: TrainArgs,
+        success_threshold=-1
+) -> List['BaseTrainingParticipant']:
     """
     Routine to run a single round of training on the clients and return the results additional args are passed to the
     clients training routines.
+    :param initial_model_state: model state to communicate before training
     :param participants: participants to train in this round
     :param training_args: arguments passed for training
     :param success_threshold: threshold for how many clients should at least participate in the round
     :return:
     """
+    overwrite_participants_models(initial_model_state, participants)
     successful_participants = []
     for participant in participants:
         try:
@@ -49,9 +55,10 @@ def run_train_round(participants: List['BaseTrainingParticipant'], training_args
 
 
 def run_fedavg_round(aggregator: 'BaseAggregatorParticipant', participants: List['BaseTrainingParticipant'],
-                     training_args: TrainArgs, client_fraction: float = 1.0):
+                     training_args: TrainArgs, client_fraction=1.0):
     """
     Routine to run a training round with the given clients based on the server model and then aggregate the results
+    :param client_fraction: client fraction to train with
     :param aggregator: aggregator participant that will aggregate the resulting training models
     :param participants: training participants in this round
     :param training_args: training arguments for this round
@@ -59,12 +66,11 @@ def run_fedavg_round(aggregator: 'BaseAggregatorParticipant', participants: List
     """
     logger.debug('distribute the initial model to the clients.')
     initial_model_state = aggregator.model.state_dict()
-    overwrite_participants_models(initial_model_state, participants)
 
     success_threshold = max(len(participants) * client_fraction, 1) if client_fraction < 1.0 else -1
     participant_fraction = sample_randomly_by_fraction(participants, client_fraction)
     logger.debug(f'starting training round with {len(participant_fraction)}/{len(participants)}.')
-    trained_participants = run_train_round(participant_fraction, training_args, success_threshold=success_threshold)
+    trained_participants = run_fedavg_train_round(initial_model_state, participant_fraction, training_args, success_threshold=success_threshold)
 
     logger.debug('starting aggregation.')
     num_train_samples = [p.num_train_samples for p in trained_participants]

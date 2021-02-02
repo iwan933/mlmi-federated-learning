@@ -81,6 +81,9 @@ class ClusterArgs(object):
     def __str__(self):
         return self._config_string
 
+    def __call__(self):
+        return self.partitioner_class(*self.args, **self.kwargs)
+
 
 class OptimizerArgs(object):
     """
