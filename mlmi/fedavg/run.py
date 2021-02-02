@@ -1,7 +1,7 @@
 import argparse
 import math
 import numpy as np
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from sklearn.model_selection import ParameterGrid
 
@@ -23,7 +23,7 @@ from mlmi.fedavg.model import CNNMnist, CNNMnistLightning, FedAvgClient, FedAvgS
 from mlmi.fedavg.util import evaluate_cluster_models, load_fedavg_hierarchical_cluster_configuration, \
     load_fedavg_hierarchical_cluster_model_state, load_fedavg_state, run_fedavg_round, \
     save_fedavg_hierarchical_cluster_configuration, save_fedavg_hierarchical_cluster_model_state, save_fedavg_state, \
-    run_train_round
+    run_fedavg_train_round
 from mlmi.structs import ModelArgs, TrainArgs, OptimizerArgs
 from mlmi.settings import REPO_ROOT
 from mlmi.utils import create_tensorboard_logger, evaluate_global_model, fix_random_seeds, evaluate_local_models, \
@@ -60,39 +60,6 @@ def add_args(parser: argparse.ArgumentParser):
                         const=True)
 
 
-def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, experiment_logger: LightningLoggerBase,
-                     global_step: int):
-    """
-    Logs the loss and accuracy in an histogram as well as scalar
-    :param model_name: name for logging
-    :param loss: loss tensor
-    :param acc: acc tensor
-    :param experiment_logger: lightning logger
-    :param global_step: global step
-    :return:
-    """
-    experiment_logger.experiment.add_histogram(f'{model_name}/acc/test', acc, global_step=global_step)
-    experiment_logger.experiment.add_scalar(f'{model_name}/acc/test/mean', torch.mean(acc),
-                                            global_step=global_step)
-    if loss.dim() == 0:
-        loss = torch.tensor([loss])
-    for x in loss:
-        if torch.isnan(x) or torch.isinf(x):
-            return
-    experiment_logger.experiment.add_histogram(f'{model_name}/loss/test/', loss, global_step=global_step)
-    experiment_logger.experiment.add_scalar(f'{model_name}/loss/test/mean', torch.mean(loss),
-                                            global_step=global_step)
-
-
-def log_goal_test_acc(model_name: str, acc: torch.Tensor,
-                      experiment_logger: LightningLoggerBase, global_step: int):
-    if acc.dim() == 0:
-        acc = torch.tensor([acc])
-    over80 = acc[acc >= 0.80]
-    percentage = over80.shape[0] / acc.shape[0]
-    experiment_logger.experiment.add_scalar(f'{model_name}/80/test', percentage, global_step=global_step)
-
-
 def initialize_clients(context: 'FedAvgExperimentContext', dataset: 'FederatedDatasetData',
                        initial_model_state: Dict[str, Tensor]):
     clients = []
@@ -114,7 +81,8 @@ def log_data_distribution_by_dataset(name: str, dataset: FederatedDatasetData, e
     log_data_distribution_by_dataloaders(name, dataset.class_num, dataloaders, experiment_logger, global_step)
 
 
-def log_data_distribution_by_participants(name: str, num_classes: int, training_participants: List['BaseTrainingParticipant'],
+def log_data_distribution_by_participants(name: str, num_classes: int,
+                                          training_participants: List['BaseTrainingParticipant'],
                                           experiment_logger: LightningLoggerBase, global_step=0):
     dataloaders = [p.train_data_loader for p in training_participants]
     log_data_distribution_by_dataloaders(name, num_classes, dataloaders, experiment_logger, global_step)
@@ -150,7 +118,7 @@ def log_data_distribution_by_dataloaders(name: str, num_classes: int, dataloader
     chunks = int(len(num_train_samples) / 10)
     num_10step_split = [np.sum(num_train_samples[s * 10:(s + 1) * 10]) for s in range(chunks)]
     if int(len(num_train_samples) / 10) < len(num_train_samples) / 10:
-        num_10step_split.append(np.sum(num_train_samples[chunks*10:]))
+        num_10step_split.append(np.sum(num_train_samples[chunks * 10:]))
 
     for i, v in enumerate(label_distribution):
         experiment_logger.experiment.add_scalar(f'distribution/label/{name}', v, global_step=i)
@@ -159,12 +127,19 @@ def log_data_distribution_by_dataloaders(name: str, num_classes: int, dataloader
         experiment_logger.experiment.add_scalar(f'distribution/sample/{name}', v, global_step=i)
 
 
-def run_fedavg(context: FedAvgExperimentContext, num_rounds: int, save_states: bool, dataset: 'FederatedDatasetData',
-               initial_model_state: Optional[Dict[str, Tensor]] = None, clients: Optional[List['FedAvgClient']] = None,
-               server: Optional['FedAvgServer'] = None, start_round=0, restore_state=False):
+def run_fedavg(
+        context: FedAvgExperimentContext,
+        num_rounds: int,
+        save_states: bool,
+        dataset: 'FederatedDatasetData',
+        initial_model_state: Optional[Dict[str, Tensor]] = None,
+        clients: Optional[List['FedAvgClient']] = None,
+        server: Optional['FedAvgServer'] = None,
+        start_round=0,
+        restore_state=False,
+        after_round_evaluation: Optional[List[Callable]] = None
+):
     assert (server is None and clients is None) or (server is not None and clients is not None)
-
-    log_data_distribution_by_dataset('fedavg', dataset, context.experiment_logger)
 
     if clients is None or server is None:
         logger.info('initializing server ...')
@@ -183,7 +158,7 @@ def run_fedavg(context: FedAvgExperimentContext, num_rounds: int, save_states: b
 
     for i in range(start_round, num_rounds):
         logger.info(f'starting training round {i + 1} ...')
-        round_model_state = load_fedavg_state(context, i)
+        round_model_state = load_fedavg_state(context, i + 1)
         if restore_state and round_model_state is not None:
             logger.info(f'skipping training and loading model from disk ...')
             server.overwrite_model_state(round_model_state)
@@ -192,104 +167,15 @@ def run_fedavg(context: FedAvgExperimentContext, num_rounds: int, save_states: b
         # test over all clients
         result = evaluate_global_model(global_model_participant=server, participants=clients)
         loss, acc = result.get('test/loss'), result.get('test/acc')
-        log_loss_and_acc('fedavg', loss, acc, context.experiment_logger, i)
-        log_goal_test_acc('fedavg', acc, context.experiment_logger, i)
+        if after_round_evaluation is not None:
+            for c in after_round_evaluation:
+                c(loss, acc, i)
         logger.info(
             f'... finished training round (mean loss: {torch.mean(loss):.2f}, mean acc: {torch.mean(acc):.2f})')
         # log and save
         if save_states:
-            save_fedavg_state(context, i, server.model.state_dict())
+            save_fedavg_state(context, i + 1, server.model.state_dict())
     return server, clients
-
-
-def run_fedavg_hierarchical(context: FedAvgExperimentContext, num_rounds_init: int, num_rounds_cluster: int,
-                            dataset: 'FederatedDatasetData', restore_clustering=False, restore_fedavg=False):
-    assert context.cluster_args is not None, 'Please set cluster args to run hierarchical experiment'
-
-    server, clients = run_fedavg(context, num_rounds_init, save_states=True, dataset=dataset,
-                                 restore_state=restore_fedavg)
-
-    logger.debug('starting local training before clustering.')
-    overwrite_participants_models(server.model.state_dict(), clients)
-    trained_participants = run_train_round(clients, context.train_args)
-    if len(trained_participants) != len(clients):
-        raise ValueError('not all clients successfully participated in the clustering round')
-
-    cluster_ids, cluster_clients = None, None
-    if restore_clustering:
-        # load configuration
-        cluster_ids, cluster_clients = load_fedavg_hierarchical_cluster_configuration(context)
-
-    if cluster_ids is not None and cluster_clients is not None:
-        cluster_clients_dic = dict()
-        for cluster_id, _clients in cluster_clients.items():
-            cluster_clients_dic[cluster_id] = [c for c in clients if c._name in _clients]
-    else:
-        # Clustering of participants by model updates
-        partitioner = context.cluster_args.partitioner_class(*context.cluster_args.args, **context.cluster_args.kwargs)
-        cluster_clients_dic = partitioner.cluster(clients)
-        _cluster_clients_dic = dict()
-        for cluster_id, participants in cluster_clients_dic.items():
-            _cluster_clients_dic[cluster_id] = [c._name for c in participants]
-        save_fedavg_hierarchical_cluster_configuration(context, list(cluster_clients_dic.keys()), _cluster_clients_dic)
-
-    # Initialize cluster models
-    cluster_server_dic = {}
-    for cluster_id, participants in cluster_clients_dic.items():
-        cluster_server = FedAvgServer('cluster_server' + cluster_id, context.model_args, context)
-        num_train_samples = [p.num_train_samples for p in participants]
-
-        loaded_state = load_fedavg_hierarchical_cluster_model_state(context, num_rounds_init, cluster_id, -1)
-        if restore_clustering and loaded_state is not None:
-            cluster_server.overwrite_model_state(loaded_state)
-            logger.info(f'skipping training cluster {cluster_id}, loaded state from disk ...')
-        else:
-            cluster_server.aggregate(participants, num_train_samples=num_train_samples)
-        save_fedavg_hierarchical_cluster_model_state(context, num_rounds_init, cluster_id, -1,
-                                                     cluster_server.model.state_dict())
-        cluster_server_dic[cluster_id] = cluster_server
-
-    eval_result = evaluate_global_model(global_model_participant=server, participants=clients)
-    loss, acc = eval_result.get('test/loss'), eval_result.get('test/acc')
-    log_loss_and_acc('post_clustering', loss, acc, context.experiment_logger, num_rounds_init)
-    log_goal_test_acc('post_clustering', acc, context.experiment_logger, num_rounds_init)
-    global_losses, global_acc = evaluate_cluster_models(cluster_server_dic, cluster_clients_dic)
-    log_loss_and_acc('post_clustering', global_losses, global_acc, context.experiment_logger, num_rounds_init + 1)
-    log_goal_test_acc('post_clustering', global_acc, context.experiment_logger, num_rounds_init + 1)
-
-    for cluster_id, cluster_clients in cluster_clients_dic.items():
-        log_data_distribution_by_participants(f'cluster{cluster_id}cf{context.client_fraction}', dataset.class_num,
-                                              cluster_clients, context.experiment_logger, global_step=num_rounds_init)
-
-    # Train in clusters
-    for i in range(num_rounds_cluster):
-        for cluster_id in cluster_clients_dic.keys():
-            # train
-            cluster_server = cluster_server_dic[cluster_id]
-            cluster_clients = cluster_clients_dic[cluster_id]
-            loaded_state = load_fedavg_hierarchical_cluster_model_state(context, num_rounds_init, cluster_id, i)
-            if restore_clustering and loaded_state is not None:
-                cluster_server.overwrite_model_state(loaded_state)
-                logger.info(f'skipping training cluster {cluster_id}, loaded state from disk ...')
-            else:
-                logger.info(f'starting training cluster {cluster_id} in round {i + 1}')
-                run_fedavg_round(cluster_server, cluster_clients, context.train_args,
-                                 client_fraction=context.client_fraction)
-            # test
-            result = evaluate_global_model(global_model_participant=cluster_server, participants=cluster_clients)
-            loss, acc = result.get('test/loss'), result.get('test/acc')
-            # log
-            log_loss_and_acc(f'cluster{cluster_id}', loss, acc, context.experiment_logger, num_rounds_init + i)
-            log_goal_test_acc(f'cluster{cluster_id}', acc, context.experiment_logger, num_rounds_init + i)
-            # save
-            save_fedavg_hierarchical_cluster_model_state(context, num_rounds_init, cluster_id, i,
-                                                         cluster_server.model.state_dict())
-            logger.info(f'finished training cluster {cluster_id}')
-        logger.info('testing clustering round results')
-        global_losses, global_acc = evaluate_cluster_models(cluster_server_dic, cluster_clients_dic)
-        log_loss_and_acc('final hierarchical', global_losses, global_acc, context.experiment_logger,
-                         num_rounds_init + i)
-        log_goal_test_acc('final hierarchical', global_acc, context.experiment_logger, num_rounds_init + i)
 
 
 def create_femnist_experiment_context(name: str, local_epochs: int, batch_size: int, lr: float, client_fraction: float,
