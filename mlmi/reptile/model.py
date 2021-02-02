@@ -158,6 +158,7 @@ class OmniglotLightning(BaseParticipantModel, pl.LightningModule):
             *args,
             **kwargs
         )
+        self.accuracy = Accuracy()
 
     def configure_optimizers(self):
         o = self.optimizer_args
