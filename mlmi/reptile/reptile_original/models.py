@@ -7,7 +7,7 @@ from functools import partial
 import numpy as np
 import tensorflow.compat.v1 as tf
 
-DEFAULT_OPTIMIZER = partial(tf.train.AdamOptimizer, beta1=0)
+DEFAULT_OPTIMIZER = tf.train.GradientDescentOptimizer  # partial(tf.train.AdamOptimizer, beta1=0)
 
 # pylint: disable=R0903
 class OmniglotModel:

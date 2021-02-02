@@ -64,7 +64,7 @@ class Reptile:
         # only model state but also optimizer state. The original implementation
         # transmits optimizer parameters between tasks which leads to improved
         # performance but is not applicable to the federated learning setting.
-        full_old_vars = self._full_state.export_variables()
+           # full_old_vars = self._full_state.export_variables()
         ####
         old_vars = self._model_state.export_variables()
         new_vars = []
@@ -78,8 +78,8 @@ class Reptile:
             new_vars.append(self._model_state.export_variables())
             ####
             # Change from original code (see comment above)
-            self._full_state.import_variables(full_old_vars)
-            #self._model_state.import_variables(old_vars) <- This was the original code
+               # self._full_state.import_variables(full_old_vars)
+            self._model_state.import_variables(old_vars) #<- This was the original code
             ####
         new_vars = average_vars(new_vars)
         self._model_state.import_variables(interpolate_vars(old_vars, new_vars, meta_step_size))
