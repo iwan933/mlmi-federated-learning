@@ -7,7 +7,7 @@ class ReptileTrainingArgs:
     """
     Container for meta-learning parameters
     :param model: Class of base model
-    :param inner_optimizer: Optimizer on task level
+    :param sgd: Whether to use Adam (False) or SGD (True) on task level
     :param inner_learning_rate: Learning rate for task level optimizer
     :param num_inner_steps: Number of training steps on task level
     :param num_inner_steps_eval: Number of training steps for training on test
@@ -30,7 +30,7 @@ class ReptileTrainingArgs:
     """
     def __init__(self,
                  model_class,
-                 inner_optimizer,
+                 sgd,
                  inner_learning_rate=0.03,
                  num_inner_steps=1,
                  num_inner_steps_eval=50,
@@ -39,7 +39,7 @@ class ReptileTrainingArgs:
                  meta_learning_rate_final=None,
                  num_classes_per_client=5):
         self.model_class = model_class
-        self.inner_optimizer = inner_optimizer
+        self.sgd = sgd
         self.inner_learning_rate = inner_learning_rate
         self.num_inner_steps = num_inner_steps
         self.num_inner_steps_eval = num_inner_steps_eval
@@ -51,11 +51,17 @@ class ReptileTrainingArgs:
         self.num_classes_per_client = num_classes_per_client
 
     def get_inner_model_args(self):
-        inner_optimizer_args = OptimizerArgs(
-            optimizer_class=self.inner_optimizer,
-            lr=self.inner_learning_rate
-            #betas=(0, 0.999)
-        )
+        if self.sgd:
+            inner_optimizer_args = OptimizerArgs(
+                optimizer_class=torch.optim.SGD,
+                lr=self.inner_learning_rate
+            )
+        else:
+            inner_optimizer_args = OptimizerArgs(
+                optimizer_class=torch.optim.Adam,
+                lr=self.inner_learning_rate,
+                betas=(0, 0.999)
+            )
         return ModelArgs(
             model_class=self.model_class,
             optimizer_args=inner_optimizer_args,

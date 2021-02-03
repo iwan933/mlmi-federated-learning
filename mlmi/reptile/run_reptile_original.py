@@ -47,10 +47,13 @@ def main(context: str):
     random.seed(args.seed)
 
     experiment_path = RUN_DIR / 'reptile' / (
-        f"{context};{args.classes}-way{args.shots}-shot;"
-        f"mlr{str(args.meta_step).replace('.', '')}"
+        f"{context};seed{args.seed};"
+        f"{args.classes}-way{args.shots}-shot;"
+        f"ib{args.inner_batch}ii{args.inner_iters}"
         f"ilr{str(args.learning_rate).replace('.', '')}"
-        f"is{args.inner_iters}"
+        f"ms{str(args.meta_step).replace('.', '')}"
+        f"mb{args.meta_batch}ei{args.eval_iters}"
+        f"{'sgd' if args.sgd else 'adam'}"
     )
     experiment_logger = TensorBoardLogger(experiment_path.absolute())
 

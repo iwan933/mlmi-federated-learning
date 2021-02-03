@@ -28,4 +28,5 @@ def argument_parser():
     parser.add_argument('--eval-iters', help='eval inner iterations', default=50, type=int)
     parser.add_argument('--eval-samples', help='evaluation samples', default=100, type=int)
     parser.add_argument('--eval-interval', help='train steps per eval', default=10, type=int)
+    parser.add_argument('--sgd', help='use vanilla SGD instead of Adam', action='store_true')
     return parser
