@@ -53,8 +53,8 @@ class ReptileTrainingArgs:
     def get_inner_model_args(self):
         inner_optimizer_args = OptimizerArgs(
             optimizer_class=self.inner_optimizer,
-            lr=self.inner_learning_rate,
-            betas=(0, 0.999)
+            lr=self.inner_learning_rate
+            #betas=(0, 0.999)
         )
         return ModelArgs(
             model_class=self.model_class,
