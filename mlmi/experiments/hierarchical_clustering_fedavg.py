@@ -14,19 +14,20 @@ from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.fedavg.util import load_fedavg_state, run_fedavg_round, run_fedavg_train_round
 from mlmi.hierarchical.run import run_fedavg_hierarchical
 from mlmi.participant import BaseTrainingParticipant
+from mlmi.plot import generate_client_label_heatmap, generate_data_label_heatmap
 from mlmi.settings import REPO_ROOT
-from mlmi.structs import ClusterArgs, ModelArgs, OptimizerArgs, TrainArgs
+from mlmi.structs import ClusterArgs, FederatedDatasetData, ModelArgs, OptimizerArgs, TrainArgs
 from mlmi.utils import create_tensorboard_logger, fix_random_seeds, overwrite_participants_models
 
 ex = Experiment('hierachical_clustering')
 
 
-@ex.named_config
+@ex.config
 def briggs():
     seed = 123123123
     lr = 0.1
     name = 'briggs'
-    total_fedavg_rounds = 50
+    total_fedavg_rounds = 1
     cluster_initialization_rounds = [1, 3, 5, 10]
     client_fraction = [0.1]
     local_epochs = 3
@@ -56,10 +57,19 @@ def log_after_round_evaluation(
 
 
 def log_cluster_distribution(
-        cluster_clients_dic: Dict[str, List['BaseTrainingParticipant']]
+        experiment_logger,
+        cluster_clients_dic: Dict[str, List['BaseTrainingParticipant']],
+        num_classes
 ):
-    # TODO: log the heatmap
-    return
+    for cluster_id, clients in cluster_clients_dic.items():
+        image = generate_client_label_heatmap(f'cluster {cluster_id}', clients, num_classes)
+        experiment_logger.experiment.add_image(f'label distribution/cluster_{cluster_id}', image.numpy())
+
+
+def log_dataset_distribution(experiment_logger, tag: str, dataset: FederatedDatasetData):
+    dataloaders = list(dataset.train_data_local_dict.values())
+    image = generate_data_label_heatmap(tag, dataloaders, dataset.class_num)
+    experiment_logger.experiment.add_image('label distribution', image.numpy())
 
 
 @ex.automain
@@ -92,9 +102,7 @@ def run_hierarchical_clustering(
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
 
-    # TODO: log the heatmap
-    # log_data_distribution_by_dataset('fedavg', dataset, context.experiment_logger)
-
+    data_distribution_logged = False
     for cf in client_fraction:
         fedavg_context = FedAvgExperimentContext(name=name, client_fraction=cf, local_epochs=local_epochs,
                                                  lr=lr, batch_size=batch_size, optimizer_args=optimizer_args,
@@ -102,6 +110,9 @@ def run_hierarchical_clustering(
                                                  dataset_name=dataset)
         experiment_specification = f'{fedavg_context}'
         experiment_logger = create_tensorboard_logger(fedavg_context.name, experiment_specification)
+        if not data_distribution_logged:
+            log_dataset_distribution(experiment_logger, 'full dataset', fed_dataset)
+            data_distribution_logged = True
 
         log_after_round_evaluation_fns = [
             partial(log_after_round_evaluation, experiment_logger, 'fedavg'),
@@ -133,13 +144,6 @@ def run_hierarchical_clustering(
             create_aggregator_fn = partial(FedAvgServer, model_args=model_args, context=fedavg_context)
             federated_round_fn = partial(run_fedavg_round, training_args=train_args, client_fraction=cf)
 
-
-
-
-
-
-
-
             after_post_clustering_evaluation = [
                 partial(log_after_round_evaluation, experiment_logger, 'post_clustering')
             ]
@@ -151,7 +155,7 @@ def run_hierarchical_clustering(
                 partial(log_after_round_evaluation, experiment_logger, global_tag)
             ]
             after_clustering_fn = [
-                partial(log_cluster_distribution)
+                partial(log_cluster_distribution, experiment_logger, num_classes=fed_dataset.class_num)
             ]
             run_fedavg_hierarchical(server, clients, cluster_args,
                                     initial_train_fn,
@@ -161,4 +165,3 @@ def run_hierarchical_clustering(
                                     after_clustering_round_evaluation,
                                     after_federated_round_evaluation,
                                     after_clustering_fn)
-
