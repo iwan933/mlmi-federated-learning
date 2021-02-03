@@ -55,7 +55,7 @@ def add_args(parser: argparse.ArgumentParser):
     parser.add_argument('--plot-client-labels', dest='plot_client_labels', action='store_const', default=False,
                         const=True)
     parser.add_argument('--non-iid-scratch', dest='non_iid_scratch', action='store_const', default=False,
-                    const=True)
+                        const=True)
 
 
 def initialize_clients(context: 'FedAvgExperimentContext', dataset: 'FederatedDatasetData',

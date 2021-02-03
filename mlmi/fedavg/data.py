@@ -117,14 +117,19 @@ def scratch_non_idd_from_dataloader(dataloader: data.DataLoader, random_mnist_in
     label_tensor: Tensor = torch.cat(batch_label_list, 0)
 
     idx_del_list = []
-    for index in random_mnist_indices:
-        idx_del_list.append(torch.tensor([idx for idx, label in enumerate(label_tensor) if label == index]))
+    if int(label_tensor[9:].count_nonzero()) == 0:
+        # skip scratching for clients with no letter labels
+        pass
+    else:
+        # scratch random digit labels
+        for index in random_mnist_indices:
+            idx_del_list.append(torch.tensor([idx for idx, label in enumerate(label_tensor) if label == index]))
 
-    idx_del_tensor: Tensor = torch.cat(idx_del_list, 0)
-    for i in sorted(idx_del_tensor, reverse=True):
-        i = int(i)
-        data_tensor = torch.cat([data_tensor[0:i], data_tensor[i+1:]])
-        label_tensor = torch.cat([label_tensor[0:i], label_tensor[i+1:]])
+        idx_del_tensor: Tensor = torch.cat(idx_del_list, 0)
+        for i in sorted(idx_del_tensor, reverse=True):
+            i = int(i)
+            data_tensor = torch.cat([data_tensor[0:i], data_tensor[i+1:]])
+            label_tensor = torch.cat([label_tensor[0:i], label_tensor[i+1:]])
 
     dataset = data.TensorDataset(data_tensor, label_tensor)
     out_dataloader = data.DataLoader(dataset=dataset, batch_size=dataloader.batch_size, shuffle=True,
