@@ -19,9 +19,9 @@ from mlmi.utils import create_tensorboard_logger, evaluate_local_models
 
 logger = getLogger(__name__)
 
-def add_args(parser: argparse.ArgumentParser):
-    parser.add_argument('--hierarchical', dest='hierarchical', action='store_const',
-                        const=True, default=False)
+#def add_args(parser: argparse.ArgumentParser):
+#    parser.add_argument('--hierarchical', dest='hierarchical', action='store_const',
+#                        const=True, default=False)
 
 def cyclerange(start, stop, len):
     assert start < len and stop < len, "Error: start and stop must be < len"
