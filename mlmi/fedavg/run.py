@@ -10,7 +10,7 @@ from pytorch_lightning.loggers import LightningLoggerBase
 from torch import IntTensor, Tensor, optim
 from torch.utils.data import DataLoader
 
-from mlmi.fedavg.data import scratch_data
+from mlmi.fedavg.data import scratch_data, non_iid_scratch
 from mlmi.plot import generate_data_label_heatmap
 from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.participant import BaseTrainingParticipant
@@ -54,6 +54,8 @@ def add_args(parser: argparse.ArgumentParser):
     parser.add_argument('--seed', dest='seed', type=int, default=123123123)
     parser.add_argument('--plot-client-labels', dest='plot_client_labels', action='store_const', default=False,
                         const=True)
+    parser.add_argument('--scratch-non-iid', dest='scratch_non_iid', action='store_const', default=False,
+                    const=True)
 
 
 def initialize_clients(context: 'FedAvgExperimentContext', dataset: 'FederatedDatasetData',
@@ -269,6 +271,9 @@ if __name__ == '__main__':
         else:
             # default to femnist dataset
             fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=367, batch_size=10)
+
+        if args.scratch_non_iid:
+            non_iid_scratch(fed_dataset, num_mnist_label_zero=5)
 
         if args.scratch_data:
             client_fraction_to_scratch = 0.75
