@@ -11,7 +11,7 @@ from torch import IntTensor, Tensor, optim
 from torch.distributions import Categorical
 from torch.utils.data import DataLoader
 
-from mlmi.fedavg.data import scratch_data
+from mlmi.fedavg.data import scratch_data, non_iid_scratch
 from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.participant import BaseTrainingParticipant
 from mlmi.structs import ClusterArgs, FederatedDatasetData
@@ -54,7 +54,8 @@ def add_args(parser: argparse.ArgumentParser):
                         const=True, default=False)
     parser.add_argument('--no-progress-bar', dest='no_progress_bar', action='store_const',
                         const=True, default=False)
-
+    parser.add_argument('--non-iid-scratch', dest='non_iid_scratch', action='store_const',
+                        const=True, default=False)
 
 def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, experiment_logger: LightningLoggerBase,
                      global_step: int):
@@ -384,6 +385,9 @@ if __name__ == '__main__':
         else:
             # default to femnist dataset
             fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=20, batch_size=10)
+
+        if args.non_iid_scratch:
+            non_iid_scratch(fed_dataset, num_mnist_label_zero=5)
 
         if args.scratch_data:
             client_fraction_to_scratch = 0.75
