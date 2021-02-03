@@ -55,7 +55,7 @@ def run_reptile(context: str, initial_model_state=None):
     # TODO: Possibly implement logic using ReptileExperimentContext
     reptile_args = ReptileTrainingArgs(
         model_class=OmniglotLightning,
-        inner_optimizer=optim.Adam,
+        inner_optimizer=optim.SGD,
         inner_learning_rate=args.learning_rate,
         num_inner_steps=args.inner_iters,
         num_inner_steps_eval=args.eval_iters,
