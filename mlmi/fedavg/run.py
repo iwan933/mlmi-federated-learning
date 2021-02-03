@@ -54,7 +54,7 @@ def add_args(parser: argparse.ArgumentParser):
     parser.add_argument('--seed', dest='seed', type=int, default=123123123)
     parser.add_argument('--plot-client-labels', dest='plot_client_labels', action='store_const', default=False,
                         const=True)
-    parser.add_argument('--scratch-non-iid', dest='scratch_non_iid', action='store_const', default=False,
+    parser.add_argument('--non-iid-scratch', dest='non_iid_scratch', action='store_const', default=False,
                     const=True)
 
 
@@ -272,7 +272,7 @@ if __name__ == '__main__':
             # default to femnist dataset
             fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=367, batch_size=10)
 
-        if args.scratch_non_iid:
+        if args.non_iid_scratch:
             non_iid_scratch(fed_dataset, num_mnist_label_zero=5)
 
         if args.scratch_data:

@@ -96,17 +96,17 @@ def non_iid_scratch(fed_dataset: FederatedDatasetData, num_mnist_label_zero):
         random_mnist_indices = np.array([random.randint(0, 9) for i in range(num_mnist_label_zero)])
 
         train_dl = fed_dataset.train_data_local_dict[i]
-        scratched_mnist_data, train_num = scratch_non_idd(train_dl, random_mnist_indices)
+        scratched_mnist_data, train_num = scratch_non_idd_from_dataloader(train_dl, random_mnist_indices)
         fed_dataset.train_data_local_dict[i] = scratched_mnist_data
         fed_dataset.data_local_train_num_dict[i] = train_num
 
         test_dl = fed_dataset.test_data_local_dict[i]
-        scratched_test_dl, test_num = scratch_non_idd(test_dl, random_mnist_indices)
+        scratched_test_dl, test_num = scratch_non_idd_from_dataloader(test_dl, random_mnist_indices)
         fed_dataset.test_data_local_dict[i] = scratched_test_dl
         fed_dataset.data_local_test_num_dict[i] = test_num
 
 
-def scratch_non_idd(dataloader: data.DataLoader, random_mnist_indices):
+def scratch_non_idd_from_dataloader(dataloader: data.DataLoader, random_mnist_indices):
 
     batch_data_list = []
     batch_label_list = []
