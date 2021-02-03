@@ -193,7 +193,7 @@ class BaseAggregatorParticipant(BaseParticipant):
     def __init__(self, participant_name: str, model_args: ModelArgs, context):
         super().__init__(participant_name, model_args, context)
 
-    def aggregate(self, participants: List[BaseParticipant], *args, **kwargs):
+    def aggregate(self, participants: List['BaseTrainingParticipant'], *args, **kwargs):
         """
         Aggregate the models of other participants with their models.
         :param participants: Participants to apply the model changes from

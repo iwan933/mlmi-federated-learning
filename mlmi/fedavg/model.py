@@ -48,18 +48,14 @@ class FedAvgClient(BaseTrainingParticipant):
 
 class FedAvgServer(BaseAggregatorParticipant):
 
-    def aggregate(self, participants: List[BaseParticipant], num_train_samples: List[int] = None, *args, **kwargs):
-        assert num_train_samples is not None, 'Place pass num_train_samples to the aggregation function.'
-        assert len(num_train_samples) == len(participants), 'Please provide the keyword argument a valid number of' \
-                                                            f'num_train_samples, got {len(num_train_samples)},' \
-                                                            f'expected {len(participants)}'
-        num_total_samples = sum(num_train_samples)
+    def aggregate(self, participants: List['BaseTrainingParticipant'], *args, **kwargs):
+        num_total_samples = sum([p.num_train_samples for p in participants])
 
         aggregated_model_state = None
-        for num_samples, participant in zip(num_train_samples, participants):
+        for participant in participants:
             aggregated_model_state = add_weighted_model(aggregated_model_state,
                                                         load_participant_model_state(participant),
-                                                        num_samples, num_total_samples)
+                                                        participant.num_train_samples, num_total_samples)
         self.model.load_state_dict(aggregated_model_state)
 
 
@@ -125,13 +121,14 @@ class CNNMnist(nn.Module):
         self.conv1 = nn.Conv2d(input_channels, 10, kernel_size=5)
         self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
         self.conv2_drop = nn.Dropout2d()
+        self.flatten = nn.Flatten()
         self.fc1 = nn.Linear(320, 50)
         self.fc2 = nn.Linear(50, num_classes)
 
     def forward(self, x):
         x = F.relu(F.max_pool2d(self.conv1(x), 2))
         x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-        x = torch.flatten(x)
+        x = self.flatten(x)
         x = F.relu(self.fc1(x))
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)

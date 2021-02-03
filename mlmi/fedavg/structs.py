@@ -1,4 +1,4 @@
-from mlmi.structs import ClusterArgs, ModelArgs, OptimizerArgs, TrainArgs
+from mlmi.structs import ModelArgs, OptimizerArgs, TrainArgs
 
 
 class FedAvgExperimentContext(object):
@@ -18,16 +18,7 @@ class FedAvgExperimentContext(object):
         self.train_args = train_args
         self.model_args = model_args
         self.dataset_name = dataset_name
-        self._cluster_args = None
         self._experiment_logger = None
-
-    @property
-    def cluster_args(self) -> 'ClusterArgs':
-        return self._cluster_args
-
-    @cluster_args.setter
-    def cluster_args(self, value: 'ClusterArgs'):
-        self._cluster_args = value
 
     @property
     def experiment_logger(self):
