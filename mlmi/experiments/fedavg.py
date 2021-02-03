@@ -19,7 +19,7 @@ from mlmi.settings import REPO_ROOT
 from mlmi.structs import ClusterArgs, FederatedDatasetData, ModelArgs, OptimizerArgs, TrainArgs
 from mlmi.utils import create_tensorboard_logger, fix_random_seeds, overwrite_participants_models
 
-ex = Experiment('hierachical_clustering')
+ex = Experiment('fedavg')
 
 
 @ex.config
@@ -74,7 +74,7 @@ def log_dataset_distribution(experiment_logger, tag: str, dataset: FederatedData
 
 
 @ex.automain
-def run_hierarchical_clustering(
+def run_fedavg_experiment(
         seed,
         lr,
         name,
