@@ -5,7 +5,7 @@ from functools import partial
 
 from torch import Tensor, optim
 
-from mlmi.clustering import ModelFlattenWeightsPartitioner
+from mlmi.clustering import ModelFlattenWeightsPartitioner, AlternativePartitioner, RandomClusterPartitioner
 from mlmi.experiments.log import log_goal_test_acc, log_loss_and_acc
 from mlmi.fedavg.femnist import load_femnist_dataset
 from mlmi.fedavg.model import CNNLightning, CNNMnistLightning, FedAvgServer
@@ -67,6 +67,27 @@ def briggs():
     dis_metric = 'euclidean'
     max_value_criterion = 10.0
 
+@ex.named_config
+def briggs_alt_clustering():
+    seed = 123123123
+    lr = 0.1
+    name = 'briggs'
+    total_fedavg_rounds = 50
+    cluster_initialization_rounds = [1, 3, 5, 10]
+    client_fraction = [0.1]
+    local_epochs = 3
+    batch_size = 10
+    num_clients = 367
+    num_classes = 62
+    optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
+    train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
+    model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
+    dataset = 'femnist'
+    partitioner_class = AlternativePartitioner
+    linkage_mech = 'ward'
+    criterion = 'distance'
+    dis_metric = 'euclidean'
+    max_value_criterion = 10.0
 
 def log_after_round_evaluation(
         experiment_logger,

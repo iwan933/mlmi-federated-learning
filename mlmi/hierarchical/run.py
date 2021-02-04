@@ -32,7 +32,7 @@ def run_fedavg_hierarchical(
 
     # Clustering of participants by model updates
     partitioner = cluster_args()
-    cluster_clients_dic = partitioner.cluster(clients)
+    cluster_clients_dic = partitioner.cluster(clients, server)
     _cluster_clients_dic = dict()
     for cluster_id, participants in cluster_clients_dic.items():
         _cluster_clients_dic[cluster_id] = [c._name for c in participants]

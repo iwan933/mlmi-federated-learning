@@ -4,6 +4,7 @@ import logging
 
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 import torch
 from torch import Tensor
@@ -20,13 +21,13 @@ def flatten_model_parameter(state_dict: Dict[str, Tensor], sorted_keys: List[str
 
 class BaseClusterPartitioner(object):
 
-    def cluster(self, participants: List['BaseParticipant']) -> Dict[str, List['BaseParticipant']]:
+    def cluster(self, participants: List['BaseParticipant'], server: BaseParticipant) -> Dict[str, List['BaseParticipant']]:
         raise NotImplementedError()
 
 
 class RandomClusterPartitioner(BaseClusterPartitioner):
 
-    def cluster(self, participants: List['BaseParticipant']) -> Dict[str, List['BaseParticipant']]:
+    def cluster(self, participants: List['BaseParticipant'], server: BaseParticipant) -> Dict[str, List['BaseParticipant']]:
         num_cluster = 10
         result_dic = {}
         for id in range(1, num_cluster+1):
@@ -69,7 +70,7 @@ class GradientClusterPartitioner(BaseClusterPartitioner):
             sum_weights_participant += float(weights_layer.sum())
         return sum_weights_participant
 
-    def cluster(self, participants: List['BaseParticipant']) -> Dict[str, List['BaseParticipant']]:
+    def cluster(self, participants: List['BaseParticipant'], server: BaseParticipant) -> Dict[str, List['BaseParticipant']]:
         logging.info('Start clustering')
         clusters_hac_dic = {}
 
@@ -124,7 +125,7 @@ class ModelFlattenWeightsPartitioner(BaseClusterPartitioner):
         self.max_value_criterion = max_value_criterion
         self.plot_dendrogram = plot_dendrogram
 
-    def cluster(self, participants: List['BaseParticipant']) -> Dict[str, List['BaseParticipant']]:
+    def cluster(self, participants: List['BaseParticipant'], server: BaseParticipant) -> Dict[str, List['BaseParticipant']]:
         logging.info('start clustering...')
         clusters_hac_dic = {}
 
@@ -134,8 +135,13 @@ class ModelFlattenWeightsPartitioner(BaseClusterPartitioner):
         # to flatten models without bias use version below
         # keys = list(filter(lambda k: not k.endswith('bias'), model_states[0].keys()))
         model_parameter = np.array([flatten_model_parameter(m, keys).numpy() for m in model_states], dtype=float)
+
+        tic = time.perf_counter()
         cluster_ids = hac.fclusterdata(model_parameter, self.max_value_criterion, self.criterion,
                                        method=self.linkage_mech, metric=self.dis_metric)
+        toc = time.perf_counter()
+        print(f'Computation time:{toc-tic}')
+
         num_cluster = max(cluster_ids)
 
         # Allocate participants to clusters
@@ -159,3 +165,56 @@ class ModelFlattenWeightsPartitioner(BaseClusterPartitioner):
         logging.info('Finished clustering')
 
         return clusters_hac_dic
+
+
+class AlternativePartitioner(BaseClusterPartitioner):
+
+    def __init__(self, linkage_mech, criterion, dis_metric, max_value_criterion, plot_dendrogram):
+        self.linkage_mech = linkage_mech
+        self.criterion = criterion
+        self.dis_metric = dis_metric
+        self.max_value_criterion = max_value_criterion
+        self.plot_dendrogram = plot_dendrogram
+
+    def cluster(self, participants: List['BaseParticipant'], server) -> Dict[str, List['BaseParticipant']]:
+        logging.info('start clustering...')
+        clusters_hac_dic = {}
+        server = server.model.state_dict()
+
+        model_states: List[Dict[str, Tensor]] = [p.model.state_dict() for p in participants]
+        keys = list(model_states[0].keys())
+        # to flatten models without bias use version below
+        # keys = list(filter(lambda k: not k.endswith('bias'), model_states[0].keys()))
+        model_parameter = np.array([flatten_model_parameter(m, keys).numpy() for m in model_states], dtype=float)
+
+        tic = time.perf_counter()
+        global_parameter = flatten_model_parameter(server, keys).numpy()
+        euclidean_dist = np.array([((model_parameter[participant_id]-global_parameter)**2).sum(axis=0)
+                                   for participant_id in range(len(participants))])
+
+        cluster_ids = hac.fclusterdata(np.reshape(euclidean_dist, (len(euclidean_dist), 1)), self.max_value_criterion,
+                                       self.criterion, method=self.linkage_mech, metric=self.dis_metric)
+        toc = time.perf_counter()
+        print(f'Computation time:{toc-tic}')
+
+        # Allocate participants to clusters
+        i = 0
+        num_cluster = max(cluster_ids)
+        for id in range(1, num_cluster + 1):
+            clusters_hac_dic[str(id)] = []
+        for participant in participants:
+            participant.cluster_id = str(cluster_ids[i])
+            clusters_hac_dic[participant.cluster_id].append(participant)
+            i += 1
+
+        for cluster_id in range(num_cluster):
+            logging.info(f'cluster {cluster_id+1} has {np.count_nonzero(cluster_ids == cluster_id+1)} clients')
+            if np.count_nonzero(cluster_ids == cluster_id) == 1:
+                logging.info('cluster {} has only one client!'.format(cluster_id))
+        logging.info('Used linkage method: ' + str(self.linkage_mech))
+        logging.info('Used distance method: ' + str(self.dis_metric))
+        logging.info('Used criterion for clustering: ' + str(self.criterion))
+        logging.info('Found %i clusters', num_cluster)
+        logging.info('Finished clustering')
+        return clusters_hac_dic
+
