@@ -89,6 +89,50 @@ def scratch_data_from_dataloader(
     return out_dataloader, num_scratched_samples
 
 
+def scratch_labels(fed_dataset: FederatedDatasetData, num_limit_label: int):
+    """
+    Scratches data to increase non-i.i.d-ness by increasing the data variety.
+    :param fed_dataset: the dataset to scratch data from
+    :param client_fraction_to_scratch: the fraction of clients to pick that get their data scratched
+    :param fraction_to_scratch: the fraction of data per picked client to scratch
+    :return:
+    """
+    for i in fed_dataset.train_data_local_dict.keys():
+        train_dl = fed_dataset.train_data_local_dict[i]
+        scratched_train_dl, train_num = scratch_labels_from_dataloaders(train_dl, num_limit_label)
+        fed_dataset.train_data_local_dict[i] = scratched_train_dl
+        fed_dataset.data_local_train_num_dict[i] = train_num
+
+        test_dl = fed_dataset.test_data_local_dict[i]
+        scratched_train_dl, test_num = scratch_labels_from_dataloaders(test_dl, num_limit_label)
+        fed_dataset.test_data_local_dict[i] = scratched_train_dl
+        fed_dataset.data_local_test_num_dict[i] = test_num
+    return fed_dataset
+
+
+def scratch_labels_from_dataloaders(
+        dataloader: data.DataLoader, num_limit_label: int) -> Tuple[data.DataLoader, int]:
+    datapoints = None
+    labels = None
+    for x, y in dataloader:
+        if datapoints is None:
+            datapoints = x.numpy()
+            labels = y.numpy()
+            continue
+        datapoints = np.concatenate((datapoints, x.numpy()))
+        labels = np.concatenate((labels, y.numpy()))
+    unique_labels = np.unique(labels)
+    chosen_labels = np.random.choice(unique_labels, size=num_limit_label, replace=False)
+    indices = np.isin(labels, chosen_labels)
+
+    scratched_data_tensor: Tensor = torch.from_numpy(datapoints[indices])
+    scratched_label_tensor: Tensor = torch.from_numpy(labels[indices])
+
+    dataset = data.TensorDataset(scratched_data_tensor, scratched_label_tensor)
+    out_dataloader = data.DataLoader(dataset=dataset, batch_size=dataloader.batch_size, shuffle=True, drop_last=False)
+    return out_dataloader, len(scratched_label_tensor)
+
+
 def non_iid_scratch(fed_dataset: FederatedDatasetData, num_mnist_label_zero):
     random.seed(1)
     indices_client_id = np.array(list(fed_dataset.train_data_local_dict.keys()))
