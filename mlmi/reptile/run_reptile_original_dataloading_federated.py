@@ -62,9 +62,11 @@ def run_reptile(context: str, initial_model_state=None):
             f"{context};seed{args.seed};"
             f"train-clients{args.train_clients};"
             f"{args.classes}-way{args.shots}-shot;"
-            f"mlr{str(args.meta_step).replace('.', '')}"
+            f"ib{args.inner_batch}ii{args.inner_iters}"
             f"ilr{str(args.learning_rate).replace('.', '')}"
-            f"is{args.inner_iters}"
+            f"ms{str(args.meta_step).replace('.', '')}"
+            f"mb{args.meta_batch}ei{args.eval_iters}"
+            f"{'sgd' if args.sgd else 'adam'}"
         )
     )
 
@@ -82,11 +84,17 @@ def run_reptile(context: str, initial_model_state=None):
         random_seed=args.seed
     )
 
+    model_kwargs = {
+        'learning_rate': args.learning_rate
+    }
+    if args.sgd:
+        model_kwargs['optimizer'] = tf.train.GradientDescentOptimizer
+    model = OmniglotModel(
+        num_classes=args.classes,
+        **model_kwargs
+    )
+
     with tf.Session() as sess:
-        model = OmniglotModel(
-            num_classes=args.classes,
-            learning_rate=args.learning_rate
-        )
         reptile = ReptileForFederatedData(
             session=sess,
             transductive=True,
@@ -102,12 +110,14 @@ def run_reptile(context: str, initial_model_state=None):
             frac_done = i / args.meta_iters
             cur_meta_step_size = frac_done * args.meta_step_final + (1 - frac_done) * args.meta_step
 
+            crange = cyclerange(
+                start=i*args.meta_batch % len(omniglot_train_clients.train_data_local_dict),
+                stop=(i+1)*args.meta_batch % len(omniglot_train_clients.train_data_local_dict),
+                len=len(omniglot_train_clients.train_data_local_dict)
+            )
+            #print(f"Meta-step {i}: train clients {crange[0]}-{crange[-1]}")
             meta_batch = {
-                k: omniglot_train_clients.train_data_local_dict[k] for k in cyclerange(
-                    i*args.meta_batch % len(omniglot_train_clients.train_data_local_dict),
-                    (i+1)*args.meta_batch % len(omniglot_train_clients.train_data_local_dict),
-                    len(omniglot_train_clients.train_data_local_dict)
-                )
+                k: omniglot_train_clients.train_data_local_dict[k] for k in crange
             }
             reptile.train_step(
                 meta_batch=meta_batch,
@@ -177,6 +187,6 @@ def run_reptile(context: str, initial_model_state=None):
 
 if __name__ == '__main__':
     def run():
-        run_reptile(context='reptile_original_dataloading_federated')
+        run_reptile(context='reptile_orig_dl_fed')
 
     run()
