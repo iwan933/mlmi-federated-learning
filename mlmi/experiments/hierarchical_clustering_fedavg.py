@@ -72,8 +72,8 @@ def briggs_alt_clustering():
     seed = 123123123
     lr = 0.1
     name = 'briggs'
-    total_fedavg_rounds = 50
-    cluster_initialization_rounds = [1, 3, 5, 10]
+    total_fedavg_rounds = 2
+    cluster_initialization_rounds = [1, 3]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
@@ -87,7 +87,7 @@ def briggs_alt_clustering():
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = 10.0
+    max_value_criterion = 35.0
 
 def log_after_round_evaluation(
         experiment_logger,
