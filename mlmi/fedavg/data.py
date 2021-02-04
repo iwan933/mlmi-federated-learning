@@ -94,14 +94,18 @@ def scratch_letter_digit_dataloader(fed_dataset):
     num_clients = len(indices_client_id)
     num_letter_clients = math.ceil(0.45 * num_clients)
     num_digit_clients = math.ceil(0.45 * num_clients)
-    ids_letter_clients = np.array([random.randint(0, num_clients) for i in range(num_letter_clients)])
+
+    ids_letter_clients = []
+    while len(ids_letter_clients) < num_letter_clients:
+        idx = random.randint(0,num_clients)
+        if idx not in ids_letter_clients:
+            ids_letter_clients.append(idx)
+    ids_letter_clients = np.array([ids_letter_clients])
     remaining_ids = [idx for idx in range(0, num_clients) if not idx == ids_letter_clients.all()]
-    #ids_digit_clients = np.array([])
     ids_digit_clients = []
     while len(ids_digit_clients) < num_digit_clients:
         idx = random.choice(remaining_ids)
         if idx not in ids_digit_clients:
-            #ids_digit_clients = np.append(ids_digit_clients, idx)
             ids_digit_clients.append(idx)
 
     for idx, i in enumerate(indices_client_id):
@@ -135,7 +139,6 @@ def scratch_letter_digit(dataloader: data.DataLoader, label_del):
     label_tensor: Tensor = torch.cat(batch_label_list, 0)
 
     idx_del_tensor = torch.tensor([idx for idx, label in enumerate(label_tensor) if label in label_del])
-    #idx_del_tensor: Tensor = torch.cat(idx_del_list, 0)
     for i in sorted(idx_del_tensor, reverse=True):
         i = int(i)
         data_tensor = torch.cat([data_tensor[0:i], data_tensor[i + 1:]])
@@ -145,7 +148,6 @@ def scratch_letter_digit(dataloader: data.DataLoader, label_del):
     out_dataloader = data.DataLoader(dataset=dataset, batch_size=dataloader.batch_size, shuffle=True,
                                      drop_last=False)
     num_samples = data_tensor.shape[0]
-
     return out_dataloader, num_samples
 
 
