@@ -7,6 +7,7 @@ from torch import Tensor, optim
 
 from mlmi.clustering import ModelFlattenWeightsPartitioner
 from mlmi.experiments.log import log_goal_test_acc, log_loss_and_acc
+from mlmi.fedavg.data import non_iid_scratch, scratch_letter_digit_dataloader
 from mlmi.fedavg.femnist import load_femnist_dataset, load_mnist_dataset
 from mlmi.fedavg.model import CNNLightning, CNNMnistLightning, FedAvgServer
 from mlmi.fedavg.run import run_fedavg
@@ -27,16 +28,17 @@ def femnist():
     seed = 123123123
     lr = 0.1
     name = 'femnist'
-    total_fedavg_rounds = 50
+    total_fedavg_rounds = 1
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
-    num_clients = 367
+    num_clients = 50
     num_classes = 62
     optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
     dataset = 'femnist'
+    scratch = True
 
 
 @ex.named_config
@@ -87,6 +89,7 @@ def run_fedavg_experiment(
         train_args,
         model_args,
         dataset,
+        scratch,
 ):
     fix_random_seeds(seed)
 
@@ -98,6 +101,9 @@ def run_fedavg_experiment(
                                          num_clients=num_clients, batch_size=batch_size)
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
+
+    if scratch:
+        scratch_letter_digit_dataloader(fed_dataset)
 
     data_distribution_logged = False
     for cf in client_fraction:

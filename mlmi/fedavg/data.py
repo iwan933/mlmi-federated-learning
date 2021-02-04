@@ -89,25 +89,43 @@ def scratch_data_from_dataloader(
     return out_dataloader, num_scratched_samples
 
 
-def non_iid_scratch(fed_dataset: FederatedDatasetData, num_mnist_label_zero):
-    random.seed(1)
+def scratch_letter_digit_dataloader(fed_dataset):
     indices_client_id = np.array(list(fed_dataset.train_data_local_dict.keys()))
-    for i in indices_client_id:
-        random_mnist_indices = np.array([random.randint(0, 9) for i in range(num_mnist_label_zero)])
+    num_clients = len(indices_client_id)
+    num_letter_clients = math.ceil(0.45 * num_clients)
+    num_digit_clients = math.ceil(0.45 * num_clients)
+    ids_letter_clients = np.array([random.randint(0, num_clients) for i in range(num_letter_clients)])
+    remaining_ids = [idx for idx in range(0, num_clients) if not idx == ids_letter_clients.all()]
+    #ids_digit_clients = np.array([])
+    ids_digit_clients = []
+    while len(ids_digit_clients) < num_digit_clients:
+        idx = random.choice(remaining_ids)
+        if idx not in ids_digit_clients:
+            #ids_digit_clients = np.append(ids_digit_clients, idx)
+            ids_digit_clients.append(idx)
 
-        train_dl = fed_dataset.train_data_local_dict[i]
-        scratched_mnist_data, train_num = scratch_non_idd_from_dataloader(train_dl, random_mnist_indices)
-        fed_dataset.train_data_local_dict[i] = scratched_mnist_data
-        fed_dataset.data_local_train_num_dict[i] = train_num
+    for idx, i in enumerate(indices_client_id):
+        if idx in ids_letter_clients:
+            label_del = [i for i in range(0, 10)]
+            print('letter')
+        elif idx in ids_digit_clients:
+            label_del = [i for i in range(10, 62)]
+            print('digit')
+        else:
+            label_del = None
+            print('all')
+        if label_del is not None:
+            train_dl = fed_dataset.train_data_local_dict[i]
+            scratched_mnist_data, train_num = scratch_letter_digit(train_dl, label_del)
+            fed_dataset.train_data_local_dict[i] = scratched_mnist_data
+            fed_dataset.data_local_train_num_dict[i] = train_num
+            test_dl = fed_dataset.test_data_local_dict[i]
+            scratched_test_dl, test_num, = scratch_letter_digit(test_dl, label_del)
+            fed_dataset.test_data_local_dict[i] = scratched_test_dl
+            fed_dataset.data_local_test_num_dict[i] = test_num
 
-        test_dl = fed_dataset.test_data_local_dict[i]
-        scratched_test_dl, test_num = scratch_non_idd_from_dataloader(test_dl, random_mnist_indices)
-        fed_dataset.test_data_local_dict[i] = scratched_test_dl
-        fed_dataset.data_local_test_num_dict[i] = test_num
 
-
-def scratch_non_idd_from_dataloader(dataloader: data.DataLoader, random_mnist_indices):
-
+def scratch_letter_digit(dataloader: data.DataLoader, label_del):
     batch_data_list = []
     batch_label_list = []
     for x, y in dataloader:
@@ -115,6 +133,102 @@ def scratch_non_idd_from_dataloader(dataloader: data.DataLoader, random_mnist_in
         batch_label_list.append(y)
     data_tensor: Tensor = torch.cat(batch_data_list, 0)
     label_tensor: Tensor = torch.cat(batch_label_list, 0)
+
+    idx_del_tensor = torch.tensor([idx for idx, label in enumerate(label_tensor) if label in label_del])
+    #idx_del_tensor: Tensor = torch.cat(idx_del_list, 0)
+    for i in sorted(idx_del_tensor, reverse=True):
+        i = int(i)
+        data_tensor = torch.cat([data_tensor[0:i], data_tensor[i + 1:]])
+        label_tensor = torch.cat([label_tensor[0:i], label_tensor[i + 1:]])
+
+    dataset = data.TensorDataset(data_tensor, label_tensor)
+    out_dataloader = data.DataLoader(dataset=dataset, batch_size=dataloader.batch_size, shuffle=True,
+                                     drop_last=False)
+    num_samples = data_tensor.shape[0]
+
+    return out_dataloader, num_samples
+
+
+def non_iid_scratch(fed_dataset: FederatedDatasetData, num_mnist_label_zero):
+    random.seed(1)
+    indices_client_id = np.array(list(fed_dataset.train_data_local_dict.keys()))
+    num_clients = len(indices_client_id)
+    num_letter_clients = math.ceil(0.45 * num_clients)
+    num_digit_clients = math.ceil(0.45 * num_clients)
+    num_full_label_clients = num_clients - (num_digit_clients + num_letter_clients)
+
+    num_letter_labels_list = []
+    batch_label_list = []
+    batch_data_list = []
+    label_tensors = []
+    data_tensors = []
+    for i in indices_client_id:
+        for x, y in fed_dataset.train_data_local_dict[i]:
+            batch_label_list.append(y)
+            batch_data_list.append(x)
+        label_tensor: Tensor = torch.cat(batch_label_list, 0)
+        label_tensors.append(label_tensor)
+        data_tensor: Tensor = torch.cat(batch_data_list, 0)
+        data_tensors.append(data_tensor)
+        num_letter_labels = int(label_tensor[9:].count_nonzero())
+        num_letter_labels_list.append(num_letter_labels)
+
+    # sort_label = sorted(num_letter_labels_list, reverse=False)
+    # sort_label_reverse = sorted(num_letter_labels_list, reverse=True)
+    sort_label_index = np.argsort(num_letter_labels_list)
+
+    #for client_index in sort_label_index[::-1][:num_letter_labels]:
+
+    scratch(fed_dataset, sort_label_index[::-1], 'letter', num_letter_clients, label_tensors, data_tensors, indices_client_id)
+    scratch(fed_dataset, sort_label_index, 'digit', num_digit_clients, label_tensors, data_tensors, indices_client_id)
+
+
+def scratch(fed_dataset, sort_label_index, client_type, num_clients, label_tensors, data_tensors, indices_client_id):
+    for client_index in sort_label_index[:num_clients]:
+        label_tensor = label_tensors[client_index]
+        data_tensor = data_tensors[client_index]
+        """
+        idx_del_list_letter = []
+        idx_del_list_digit = []
+        for index in range(0, 10):
+            idx_del_list_letter.append(torch.tensor([idx for idx, label in enumerate(label_tensor) if label == index]))
+        for index in range(10, 62):
+            idx_del_list_digit.append(torch.tensor([idx for idx, label in enumerate(label_tensor) if label == index]))
+        """
+        idx_del_list = []
+        if client_type == 'letter':
+            for index in range(0, 10):
+                idx_del_list.append(torch.tensor([idx for idx, label in enumerate(label_tensor) if label == index]))
+        elif client_type == 'digit':
+            for index in range(10, 62):
+                idx_del_list.append(torch.tensor([idx for idx, label in enumerate(label_tensor) if label == index]))
+
+        idx_del_tensor: Tensor = torch.cat(idx_del_list, 0)
+        for i in sorted(idx_del_tensor, reverse=True):
+            i = int(i)
+            data_tensor = torch.cat([data_tensor[0:i], data_tensor[i + 1:]])
+            label_tensor = torch.cat([label_tensor[0:i], label_tensor[i + 1:]])
+
+        dataset = data.TensorDataset(data_tensor, label_tensor)
+        index_client_id = indices_client_id[client_index]
+        dataloader = fed_dataset.train_data_local_dict[index_client_id]
+        out_dataloader = data.DataLoader(dataset=dataset, batch_size=dataloader.batch_size, shuffle=True,
+                                         drop_last=False)
+        num_samples = data_tensor.shape[0]
+        fed_dataset.train_data_local_dict[index_client_id] = out_dataloader
+        fed_dataset.data_local_train_num_dict[index_client_id] = num_samples
+
+
+def scratch_non_idd_from_dataloader(dataloader: data.DataLoader, random_mnist_indices):
+    batch_data_list = []
+    batch_label_list = []
+    for x, y in dataloader:
+        batch_data_list.append(x)
+        batch_label_list.append(y)
+    data_tensor: Tensor = torch.cat(batch_data_list, 0)
+    label_tensor: Tensor = torch.cat(batch_label_list, 0)
+
+    num_letter_labels = int(label_tensor[9:].count_nonzero())
 
     idx_del_list = []
     skip_threshold = 4
@@ -130,14 +244,14 @@ def scratch_non_idd_from_dataloader(dataloader: data.DataLoader, random_mnist_in
         idx_del_tensor: Tensor = torch.cat(idx_del_list, 0)
         for i in sorted(idx_del_tensor, reverse=True):
             i = int(i)
-            data_tensor = torch.cat([data_tensor[0:i], data_tensor[i+1:]])
-            label_tensor = torch.cat([label_tensor[0:i], label_tensor[i+1:]])
+            data_tensor = torch.cat([data_tensor[0:i], data_tensor[i + 1:]])
+            label_tensor = torch.cat([label_tensor[0:i], label_tensor[i + 1:]])
 
         dataset = data.TensorDataset(data_tensor, label_tensor)
         out_dataloader = data.DataLoader(dataset=dataset, batch_size=dataloader.batch_size, shuffle=True,
-                                     drop_last=False)
+                                         drop_last=False)
         num_samples = data_tensor.shape[0]
-    return out_dataloader, num_samples
+    return out_dataloader, num_samples, num_letter_labels
 
 
 def sample_data_briggs(fed_dataset: FederatedDatasetData):
@@ -175,7 +289,3 @@ def scratch_data_briggs(dataloader: data.DataLoader, num_data_points: int):
     out_dataloader = data.DataLoader(dataset=dataset, batch_size=dataloader.batch_size, shuffle=True,
                                      drop_last=False)
     return out_dataloader
-
-
-
-
