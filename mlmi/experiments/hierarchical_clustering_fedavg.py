@@ -7,6 +7,7 @@ from torch import Tensor, optim
 
 from mlmi.clustering import ModelFlattenWeightsPartitioner, AlternativePartitioner, RandomClusterPartitioner
 from mlmi.experiments.log import log_goal_test_acc, log_loss_and_acc
+from mlmi.fedavg.data import scratch_labels
 from mlmi.fedavg.femnist import load_femnist_dataset
 from mlmi.fedavg.model import CNNLightning, CNNMnistLightning, FedAvgServer
 from mlmi.fedavg.run import run_fedavg
@@ -33,6 +34,8 @@ def default_configuration():
     local_epochs = 3
     batch_size = 10
     num_clients = 367
+    sample_threshold = -1
+    num_label_limit = -1
     num_classes = 62
     optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
@@ -52,10 +55,12 @@ def briggs():
     name = 'briggs'
     total_fedavg_rounds = 50
     cluster_initialization_rounds = [1, 3, 5, 10]
-    client_fraction = [0.1]
+    client_fraction = [0.1, 0.2, 0.5]
     local_epochs = 3
     batch_size = 10
     num_clients = 367
+    sample_threshold = 250  # we need clients with at least 250 samples to make sure all labels are present
+    num_label_limit = 15
     num_classes = 62
     optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
@@ -127,6 +132,8 @@ def run_hierarchical_clustering(
         local_epochs,
         batch_size,
         num_clients,
+        sample_threshold,
+        num_label_limit,
         optimizer_args,
         train_args,
         model_args,
@@ -142,7 +149,10 @@ def run_hierarchical_clustering(
 
     if dataset == 'femnist':
         fed_dataset = load_femnist_dataset(str((REPO_ROOT / 'data').absolute()),
-                                           num_clients=num_clients, batch_size=batch_size)
+                                           num_clients=num_clients, batch_size=batch_size,
+                                           sample_threshold=sample_threshold)
+        if num_label_limit != -1:
+            fed_dataset = scratch_labels(fed_dataset, num_label_limit)
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
 

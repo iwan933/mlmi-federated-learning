@@ -102,14 +102,13 @@ class FEMNISTDataset(data.Dataset):
         return self.pixels[index], self.labels[index]
 
 
-def load_femnist_dataset(data_dir, num_clients=367, batch_size=10, only_digits=False):
+def load_femnist_dataset(data_dir, num_clients=367, batch_size=10, only_digits=False, sample_threshold=-1):
     import torch
     import os, collections
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     import tensorflow as tf
     import tensorflow_federated as tff
     from tensorflow_federated.python.simulation import HDF5ClientData
-    import multiprocessing
 
     _datasets: Tuple[HDF5ClientData, HDF5ClientData] = tff.simulation.datasets.emnist.load_data(only_digits=only_digits,
                                                                                                 cache_dir=data_dir)
@@ -120,6 +119,18 @@ def load_femnist_dataset(data_dir, num_clients=367, batch_size=10, only_digits=F
     data_local_train_num_dict = dict()
     test_data_local_dict = dict()
     data_local_test_num_dict = dict()
+    if sample_threshold != -1:
+        clients_exceeding_threshold = []
+        for client_id in emnist_train.client_ids:
+            h5data_train = collections.OrderedDict((name, ds[()]) for name, ds in sorted(
+                emnist_train._h5_file[HDF5ClientData._EXAMPLES_GROUP][client_id].items()))
+            if sample_threshold < len(h5data_train['label']):
+                clients_exceeding_threshold.append(client_id)
+        if len(clients_exceeding_threshold) < num_clients:
+            raise ValueError(f'Only {len(clients_exceeding_threshold)} clients with more than {sample_threshold} '
+                             f'samples available. But asked for {num_clients}.')
+        selected_client_ids = np.random.choice(clients_exceeding_threshold, size=num_clients, replace=False)
+
     for client_id in selected_client_ids:
         h5data_train = collections.OrderedDict((name, ds[()]) for name, ds in sorted(
             emnist_train._h5_file[HDF5ClientData._EXAMPLES_GROUP][client_id].items()))
