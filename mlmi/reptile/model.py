@@ -20,7 +20,7 @@ logger = getLogger(__name__)
 
 def init_weights(m):
     if type(m) == nn.Linear or type(m) == nn.Conv2d:
-        torch.nn.init.xavier_uniform_(m.weight)
+        m.weight.data.fill_(0.05)
         m.bias.data.fill_(0.0)
 
 

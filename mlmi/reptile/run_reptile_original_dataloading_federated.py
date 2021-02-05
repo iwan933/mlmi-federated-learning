@@ -81,6 +81,7 @@ def convert_to_tensorflow_omniglot_model_state(model_dict):
     next_pos = pos + 256*5
     dense = flat_model[pos:next_pos].reshape((256, 5))
     output_list.append(dense)
+    pos = next_pos
     next_pos = pos + 5
     dense_out = flat_model[pos:next_pos].reshape((5,))
     output_list.append(dense_out)
