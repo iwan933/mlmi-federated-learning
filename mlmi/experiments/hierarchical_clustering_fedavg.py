@@ -187,7 +187,7 @@ def run_hierarchical_clustering(
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
 
-    if type(max_value_criterion) != list:
+    if not hasattr(max_value_criterion, '__iter__'):
         max_value_criterion = [max_value_criterion]
 
     data_distribution_logged = False
