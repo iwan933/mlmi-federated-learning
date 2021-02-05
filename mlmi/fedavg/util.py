@@ -67,10 +67,11 @@ def run_fedavg_round(aggregator: 'BaseAggregatorParticipant', participants: List
     logger.debug('distribute the initial model to the clients.')
     initial_model_state = aggregator.model.state_dict()
 
-    success_threshold = max(len(participants) * client_fraction, 1) if client_fraction < 1.0 else -1
+    success_threshold = max(int(len(participants) * client_fraction), 1) if client_fraction < 1.0 else -1
     participant_fraction = sample_randomly_by_fraction(participants, client_fraction)
     logger.debug(f'starting training round with {len(participant_fraction)}/{len(participants)}.')
-    trained_participants = run_fedavg_train_round(initial_model_state, participant_fraction, training_args, success_threshold=success_threshold)
+    trained_participants = run_fedavg_train_round(initial_model_state, participant_fraction, training_args,
+                                                  success_threshold=-1)
 
     logger.debug('starting aggregation.')
     num_train_samples = [p.num_train_samples for p in trained_participants]
