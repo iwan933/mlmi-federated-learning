@@ -52,7 +52,7 @@ def default_configuration():
 def hpsearch():
     seed = 123123123
     lr = 0.1
-    name = 'briggs'
+    name = 'hpsearch'
     total_fedavg_rounds = 20
     cluster_initialization_rounds = [1, 3, 5, 10]
     client_fraction = [0.1]
