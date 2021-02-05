@@ -49,6 +49,31 @@ def default_configuration():
 
 
 @ex.named_config
+def hpsearch():
+    seed = 123123123
+    lr = 0.1
+    name = 'briggs'
+    total_fedavg_rounds = 20
+    cluster_initialization_rounds = [1, 3, 5, 10]
+    client_fraction = [0.1]
+    local_epochs = 3
+    batch_size = 10
+    num_clients = 367
+    sample_threshold = 250  # we need clients with at least 250 samples to make sure all labels are present
+    num_label_limit = 15
+    num_classes = 62
+    optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
+    train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
+    model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
+    dataset = 'femnist'
+    partitioner_class = ModelFlattenWeightsPartitioner
+    linkage_mech = 'ward'
+    criterion = 'distance'
+    dis_metric = 'euclidean'
+    max_value_criterion = [3.5, 5.0, 7.5, 10.0]
+
+
+@ex.named_config
 def briggs():
     seed = 123123123
     lr = 0.1
@@ -121,6 +146,12 @@ def log_dataset_distribution(experiment_logger, tag: str, dataset: FederatedData
     experiment_logger.experiment.add_image('label distribution', image.numpy())
 
 
+def generate_configuration(init_rounds_list, max_value_criterion_list):
+    for ri in init_rounds_list:
+        for mv in max_value_criterion_list:
+            yield ri, mv
+
+
 @ex.automain
 def run_hierarchical_clustering(
         seed,
@@ -156,6 +187,9 @@ def run_hierarchical_clustering(
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
 
+    if type(max_value_criterion) != list:
+        max_value_criterion = [max_value_criterion]
+
     data_distribution_logged = False
     for cf in client_fraction:
         fedavg_context = FedAvgExperimentContext(name=name, client_fraction=cf, local_epochs=local_epochs,
@@ -176,7 +210,7 @@ def run_hierarchical_clustering(
                                      save_states=True, restore_state=True,
                                      after_round_evaluation=log_after_round_evaluation_fns)
 
-        for init_rounds in cluster_initialization_rounds:
+        for init_rounds, max_value in generate_configuration(cluster_initialization_rounds, max_value_criterion):
             # load the model state
             round_model_state = load_fedavg_state(fedavg_context, init_rounds)
             overwrite_participants_models(round_model_state, clients)
@@ -187,7 +221,7 @@ def run_hierarchical_clustering(
             }
             cluster_args = ClusterArgs(partitioner_class, linkage_mech=linkage_mech,
                                        criterion=criterion, dis_metric=dis_metric,
-                                       max_value_criterion=max_value_criterion,
+                                       max_value_criterion=max_value,
                                        plot_dendrogram=False, **round_configuration)
             # create new logger for cluster experiment
             experiment_specification = f'{fedavg_context}_{cluster_args}'
