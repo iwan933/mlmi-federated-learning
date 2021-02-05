@@ -18,6 +18,12 @@ from mlmi.structs import TrainArgs, ModelArgs, OptimizerArgs
 logger = getLogger(__name__)
 
 
+def init_weights(m):
+    if type(m) == nn.Linear or type(m) == nn.Conv2d:
+        torch.nn.init.xavier_uniform_(m.weight)
+        m.bias.data.fill_(0.0)
+
+
 def weight_model(model: Dict[str, Tensor], num_samples: int, num_total_samples: int) -> Dict[str, Tensor]:
     weighted_model_state = OrderedDict()
     for key, w in model.items():
@@ -158,6 +164,7 @@ class OmniglotLightning(BaseParticipantModel, pl.LightningModule):
             *args,
             **kwargs
         )
+        self.model.apply(init_weights)
         self.accuracy = Accuracy()
 
     def configure_optimizers(self):

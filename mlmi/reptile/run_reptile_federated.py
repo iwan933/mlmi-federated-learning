@@ -1,5 +1,8 @@
 import argparse
 import sys
+
+from mlmi.structs import FederatedDatasetData, ModelArgs
+
 sys.path.insert(0, 'C:\\Users\\Richard\\Desktop\\Informatik\\Semester_5\\MLMI\\git\\mlmi-federated-learning')
 import random
 
@@ -45,6 +48,23 @@ def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, exp
     experiment_logger.experiment.add_scalar('test-test/loss/{}/mean'.format(model_name), torch.mean(loss), global_step=global_step)
     experiment_logger.experiment.add_histogram('test-test/acc/{}'.format(model_name), acc, global_step=global_step)
     experiment_logger.experiment.add_scalar('test-test/acc/{}/mean'.format(model_name), torch.mean(acc), global_step=global_step)
+
+
+def initialize_clients(dataset: FederatedDatasetData, model_args: ModelArgs, context, experiment_logger):
+    clients = []
+    for c in dataset.train_data_local_dict.keys():
+        client = ReptileClient(
+            client_id=str(c),
+            model_args=model_args,
+            context=context,
+            train_dataloader=dataset.train_data_local_dict[c],
+            num_train_samples=dataset.data_local_train_num_dict[c],
+            test_dataloader=dataset.test_data_local_dict[c],
+            num_test_samples=dataset.data_local_test_num_dict[c],
+            lightning_logger=experiment_logger
+        )
+        clients.append(client)
+    return clients
 
 
 def run_reptile(context: str, initial_model_state=None):
@@ -93,35 +113,10 @@ def run_reptile(context: str, initial_model_state=None):
     # Set up clients
     # Since we are doing meta-learning, we need separate sets of training and
     # test clients
-    train_clients = []
-    for c in omniglot_train_clients.train_data_local_dict.keys():
-        client = ReptileClient(
-            client_id=str(c),
-            model_args=reptile_args.get_inner_model_args(),
-            context=context,
-            train_dataloader=omniglot_train_clients.train_data_local_dict[c],
-            num_train_samples=omniglot_train_clients.data_local_train_num_dict[c],
-            test_dataloader=omniglot_train_clients.test_data_local_dict[c],
-            num_test_samples=omniglot_train_clients.data_local_test_num_dict[c],
-            lightning_logger=experiment_logger
-        )
-        #checkpoint_callback = ModelCheckpoint(
-        #    filepath=str(client.get_checkpoint_path(suffix='cb').absolute()))
-        #client.set_trainer_callbacks([checkpoint_callback])
-        train_clients.append(client)
-    test_clients = []
-    for c in omniglot_test_clients.train_data_local_dict.keys():
-        client = ReptileClient(
-            client_id=str(c),
-            model_args=reptile_args.get_inner_model_args(),
-            context=context,
-            train_dataloader=omniglot_test_clients.train_data_local_dict[c],
-            num_train_samples=omniglot_test_clients.data_local_train_num_dict[c],
-            test_dataloader=omniglot_test_clients.test_data_local_dict[c],
-            num_test_samples=omniglot_test_clients.data_local_test_num_dict[c],
-            lightning_logger=experiment_logger
-        )
-        test_clients.append(client)
+    train_clients = initialize_clients(omniglot_train_clients, reptile_args.get_inner_model_args(), context,
+                                       experiment_logger)
+    test_clients = initialize_clients(omniglot_test_clients, reptile_args.get_inner_model_args(), context,
+                                      experiment_logger)
 
     # Set up server
     server = ReptileServer(

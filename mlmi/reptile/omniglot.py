@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import os
 import random
 
@@ -17,7 +17,7 @@ def load_omniglot_datasets(data_dir,
                            inner_batch_size: int = 5,
                            tensorflow: bool = False,
                            random_seed: int = None)\
-        -> (FederatedDatasetData, FederatedDatasetData):
+        -> Tuple[FederatedDatasetData, FederatedDatasetData]:
     """
     Load the Omniglot dataset.
     :param data_dir: data directory
