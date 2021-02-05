@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-from mlmi.structs import FederatedDatasetData, ModelArgs
+from mlmi.structs import FederatedDatasetData, ModelArgs, OptimizerArgs
 
 sys.path.insert(0, 'C:\\Users\\Richard\\Desktop\\Informatik\\Semester_5\\MLMI\\git\\mlmi-federated-learning')
 import random
@@ -17,10 +17,11 @@ from mlmi.reptile.model import ReptileClient, ReptileServer, OmniglotLightning
 from mlmi.reptile.util import reptile_train_step
 from mlmi.reptile.structs import ReptileTrainingArgs
 from mlmi.settings import REPO_ROOT
-from mlmi.utils import create_tensorboard_logger, evaluate_local_models
-
+from mlmi.utils import create_tensorboard_logger, evaluate_local_models, fix_random_seeds
 
 logger = getLogger(__name__)
+
+
 
 def add_args(parser: argparse.ArgumentParser):
     parser.add_argument('--hierarchical', dest='hierarchical', action='store_const',
@@ -68,9 +69,19 @@ def initialize_clients(dataset: FederatedDatasetData, model_args: ModelArgs, con
 
 
 def run_reptile(context: str, initial_model_state=None):
-
+    fix_random_seeds(123123)
     args = argument_parser().parse_args()
     RANDOM = random.Random(args.seed)
+
+    dummy_optimizer_args = OptimizerArgs(
+        optimizer_class=torch.optim.SGD
+    )
+    pytorch_model = OmniglotLightning(
+        participant_name='variable_generator',
+        optimizer_args=dummy_optimizer_args,
+        num_classes=args.classes
+    )
+    pytorch_model_state = pytorch_model.state_dict()
 
     # TODO: Possibly implement logic using ReptileExperimentContext
     reptile_args = ReptileTrainingArgs(
@@ -125,6 +136,7 @@ def run_reptile(context: str, initial_model_state=None):
         context=context,  # TODO: Change to ReptileExperimentContext
         initial_model_state=initial_model_state
     )
+    server.overwrite_model_state(pytorch_model_state)
 
     # Perform training
     for i in range(args.meta_iters):

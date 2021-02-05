@@ -7,6 +7,11 @@ from functools import partial
 import numpy as np
 import tensorflow.compat.v1 as tf
 
+tf.compat.v1.set_random_seed(
+    123123123
+)
+
+
 DEFAULT_OPTIMIZER = tf.train.GradientDescentOptimizer  # partial(tf.train.AdamOptimizer, beta1=0)
 
 # pylint: disable=R0903

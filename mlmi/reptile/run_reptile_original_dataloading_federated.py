@@ -1,5 +1,9 @@
 import argparse
 import sys
+
+from mlmi.clustering import flatten_model_parameter
+from mlmi.reptile.model import OmniglotLightning
+
 sys.path.insert(0, 'C:\\Users\\Richard\\Desktop\\Informatik\\Semester_5\\MLMI\\git\\mlmi-federated-learning')
 import random
 
@@ -11,7 +15,7 @@ from mlmi.log import getLogger
 from mlmi.reptile.omniglot import load_omniglot_datasets
 from mlmi.structs import ModelArgs, TrainArgs, OptimizerArgs
 from mlmi.settings import REPO_ROOT
-from mlmi.utils import create_tensorboard_logger, evaluate_local_models
+from mlmi.utils import create_tensorboard_logger, evaluate_local_models, fix_random_seeds
 
 from mlmi.reptile.reptile_original.models import OmniglotModel
 from mlmi.reptile.reptile_original.variables import weight_decay
@@ -22,6 +26,7 @@ from mlmi.reptile.omniglot import read_dataset, split_dataset, augment_dataset
 
 
 logger = getLogger(__name__)
+
 
 def add_args(parser: argparse.ArgumentParser):
     parser.add_argument('--hierarchical', dest='hierarchical', action='store_const',
@@ -51,8 +56,38 @@ def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, exp
     experiment_logger.experiment.add_scalar('test-test/acc/{}/mean'.format(model_name), torch.mean(acc), global_step=global_step)
 
 
-def run_reptile(context: str, initial_model_state=None):
+def convert_to_tensorflow_omniglot_model_state(model_dict):
+    flat_model = flatten_model_parameter(model_dict, list(model_dict.keys())).numpy()
+    pos = 0
+    output_list = []
+    channels = (1, 64, 64, 64)
+    for c, _ in zip(channels, range(4)):
+        next_pos = pos + 3*3*64*c
+        conv_w = flat_model[pos:next_pos].reshape((3, 3, c, 64))
+        output_list.append(conv_w)
+        pos = next_pos
+        next_pos = pos + 64
+        conv_b = flat_model[pos:next_pos].reshape((64,))
+        output_list.append(conv_b)
+        pos = next_pos
+        next_pos = pos + 64
+        bn_w = flat_model[pos:next_pos].reshape((64,))
+        output_list.append(bn_w)
+        pos = next_pos
+        next_pos = pos + 64
+        bn_b = flat_model[pos:next_pos].reshape((64,))
+        output_list.append(bn_b)
+        pos = next_pos
+    next_pos = pos + 256*5
+    dense = flat_model[pos:next_pos].reshape((256, 5))
+    output_list.append(dense)
+    next_pos = pos + 5
+    dense_out = flat_model[pos:next_pos].reshape((5,))
+    output_list.append(dense_out)
+    return output_list
 
+def run_reptile(context: str, initial_model_state=None):
+    fix_random_seeds(123123)
     args = argument_parser().parse_args()
     RANDOM = random.Random(args.seed)
 
@@ -84,6 +119,17 @@ def run_reptile(context: str, initial_model_state=None):
         random_seed=args.seed
     )
 
+    dummy_optimizer_args = OptimizerArgs(
+        optimizer_class=torch.optim.SGD
+    )
+    pytorch_model = OmniglotLightning(
+        participant_name='variable_generator',
+        optimizer_args=dummy_optimizer_args,
+        num_classes=args.classes
+    )
+    pytorch_model_state = pytorch_model.state_dict()
+    pytorch_as_tf_state = convert_to_tensorflow_omniglot_model_state(pytorch_model_state)
+
     model_kwargs = {
         'learning_rate': args.learning_rate
     }
@@ -105,6 +151,10 @@ def run_reptile(context: str, initial_model_state=None):
         merged = tf.summary.merge_all()
         tf.global_variables_initializer().run()
         sess.run(tf.global_variables_initializer())
+
+        tf.print(model)
+
+        reptile.load_external_variable_state(pytorch_as_tf_state)
 
         for i in range(args.meta_iters):
             frac_done = i / args.meta_iters

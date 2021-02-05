@@ -33,6 +33,9 @@ class ReptileForFederatedData:
         self._transductive = transductive
         self._pre_step_op = pre_step_op
 
+    def load_external_variable_state(self, variable_state):
+        self._model_state.import_variables(variable_state)
+
     # pylint: disable=R0913,R0914
     def train_step(self,
                    meta_batch,
@@ -81,9 +84,10 @@ class ReptileForFederatedData:
             self._full_state.import_variables(full_old_vars)
             # self._model_state.import_variables(old_vars) <- This was the original code
             ####
-        new_vars = average_vars(new_vars)
-
-        self._model_state.import_variables(interpolate_vars(old_vars, new_vars, meta_step_size))
+        temp_avg = average_vars(new_vars)
+        new_vars = temp_avg
+        update_vars = interpolate_vars(old_vars, new_vars, meta_step_size)
+        self._model_state.import_variables(update_vars)
 
 
     def evaluate(self,

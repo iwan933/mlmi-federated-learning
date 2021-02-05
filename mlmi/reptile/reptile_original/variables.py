@@ -9,7 +9,9 @@ def interpolate_vars(old_vars, new_vars, epsilon):
     """
     Interpolate between two sequences of variables.
     """
-    return add_vars(old_vars, scale_vars(subtract_vars(new_vars, old_vars), epsilon))
+    diff = subtract_vars(new_vars, old_vars)
+    scaled_diff = scale_vars(diff, epsilon)
+    return add_vars(old_vars, scaled_diff)
 
 def average_vars(var_seqs):
     """

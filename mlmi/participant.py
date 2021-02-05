@@ -167,7 +167,9 @@ class BaseTrainingParticipant(BaseParticipant):
         """
         trainer = self.create_trainer(enable_logging=False, **training_args.kwargs)
         train_dataloader = self.train_data_loader
+        state_dict = self.model.state_dict()
         trainer.fit(self.model, train_dataloader, train_dataloader)
+        state_dict2 = self.model.state_dict()
         del self.model.trainer
 
     def test(self, model: Optional[torch.nn.Module] = None, use_local_model: bool = False):

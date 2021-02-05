@@ -108,6 +108,7 @@ class ReptileServer(BaseAggregatorParticipant):
                   weighted: bool = True):
         # Average participants' model states for meta_gradient of server
         initial_model_state = copy.deepcopy(self.model.state_dict())
+        old_states = [p.model.state_dict() for p in participants]
         if weighted:
             # meta_gradient = weighted (by number of samples) average of
             # participants' model updates
@@ -128,8 +129,9 @@ class ReptileServer(BaseAggregatorParticipant):
                     num_total_samples=len(participants)
                 ) for p in participants
             ]
+        minuend = sum_model_states(new_states)
         meta_gradient = subtract_model_states(
-            minuend=sum_model_states(new_states),
+            minuend=minuend,
             subtrahend=initial_model_state
         )
 
