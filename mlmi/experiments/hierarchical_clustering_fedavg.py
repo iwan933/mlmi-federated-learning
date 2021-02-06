@@ -145,7 +145,7 @@ def run_hierarchical_clustering(
         num_clients,
         sample_threshold,
         num_label_limit,
-        optimizer_args,
+        #optimizer_args,
         train_args,
         model_args,
         dataset,
@@ -174,6 +174,8 @@ def run_hierarchical_clustering(
     data_distribution_logged = False
     for cf in client_fraction:
         for lr_i in lr:
+            optimizer_args = OptimizerArgs(optim.SGD, lr=lr_i)
+            model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
             fedavg_context = FedAvgExperimentContext(name=name, client_fraction=cf, local_epochs=local_epochs,
                                                      lr=lr_i, batch_size=batch_size, optimizer_args=optimizer_args,
                                                      model_args=model_args, train_args=train_args,
