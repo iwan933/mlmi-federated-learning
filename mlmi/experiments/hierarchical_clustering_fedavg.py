@@ -51,10 +51,10 @@ def default_configuration():
 @ex.named_config
 def hpsearch():
     seed = 123123123
-    lr = 0.1
+    lr = [0.11, 0.1, 0.09, 0.08, 0.07, 0.06]
     name = 'hpsearch'
-    total_fedavg_rounds = 20
-    cluster_initialization_rounds = [1, 3, 5, 10]
+    total_fedavg_rounds = 75
+    cluster_initialization_rounds = [5, 10, 15, 20]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
@@ -70,28 +70,28 @@ def hpsearch():
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = [3.5, 5.0, 7.5, 10.0]
+    max_value_criterion = [3.5, 3.75, 4.0, 5.0]
 
 
 @ex.named_config
 def briggs():
     seed = 123123123
     lr = 0.1
-    name = 'briggs'
-    total_fedavg_rounds = 50
-    cluster_initialization_rounds = [1, 3, 5, 10]
-    client_fraction = [0.1, 0.2, 0.5]
+    name = 'default_hierarchical_fedavg'
+    total_fedavg_rounds = 20
+    cluster_initialization_rounds = [1]
+    client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
     num_clients = 367
-    sample_threshold = 250  # we need clients with at least 250 samples to make sure all labels are present
-    num_label_limit = 15
+    sample_threshold = -1
+    num_label_limit = -1
     num_classes = 62
     optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
     dataset = 'femnist'
-    partitioner_class = ModelFlattenWeightsPartitioner
+    partitioner_class = AlternativePartitioner
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
@@ -101,19 +101,21 @@ def briggs():
 def briggs_alt_clustering():
     seed = 123123123
     lr = 0.1
-    name = 'briggs'
-    total_fedavg_rounds = 2
-    cluster_initialization_rounds = [1, 3]
+    name = 'briggs_alt1'
+    total_fedavg_rounds = 30
+    cluster_initialization_rounds = [1, 3, 5, 10]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
     num_clients = 367
+    sample_threshold = -1
+    num_label_limit = -1
     num_classes = 62
     optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
     dataset = 'femnist'
-    partitioner_class = AlternativePartitioner
+    partitioner_class = ModelFlattenWeightsPartitioner
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
@@ -189,6 +191,9 @@ def run_hierarchical_clustering(
 
     if not hasattr(max_value_criterion, '__iter__'):
         max_value_criterion = [max_value_criterion]
+
+    if not hasattr(lr, '__iter__'):
+        lr = [lr]
 
     data_distribution_logged = False
     for cf in client_fraction:

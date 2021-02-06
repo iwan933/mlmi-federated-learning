@@ -102,11 +102,12 @@ def scratch_labels(fed_dataset: FederatedDatasetData, num_limit_label: int):
         scratched_train_dl, train_num = scratch_labels_from_dataloaders(train_dl, num_limit_label)
         fed_dataset.train_data_local_dict[i] = scratched_train_dl
         fed_dataset.data_local_train_num_dict[i] = train_num
-
+        """
         test_dl = fed_dataset.test_data_local_dict[i]
         scratched_train_dl, test_num = scratch_labels_from_dataloaders(test_dl, num_limit_label)
         fed_dataset.test_data_local_dict[i] = scratched_train_dl
         fed_dataset.data_local_test_num_dict[i] = test_num
+        """
     return fed_dataset
 
 
@@ -122,8 +123,11 @@ def scratch_labels_from_dataloaders(
         datapoints = np.concatenate((datapoints, x.numpy()))
         labels = np.concatenate((labels, y.numpy()))
     unique_labels = np.unique(labels)
-    chosen_labels = np.random.choice(unique_labels, size=num_limit_label, replace=False)
-    indices = np.isin(labels, chosen_labels)
+    if len(unique_labels) < num_limit_label:
+        indices = np.isin(labels, unique_labels)
+    else:
+        chosen_labels = np.random.choice(unique_labels, size=num_limit_label, replace=False)
+        indices = np.isin(labels, chosen_labels)
 
     scratched_data_tensor: Tensor = torch.from_numpy(datapoints[indices])
     scratched_label_tensor: Tensor = torch.from_numpy(labels[indices])

@@ -7,6 +7,7 @@ from torch import Tensor, optim
 
 from mlmi.clustering import ModelFlattenWeightsPartitioner
 from mlmi.experiments.log import log_goal_test_acc, log_loss_and_acc
+from mlmi.fedavg.data import scratch_labels
 from mlmi.fedavg.femnist import load_femnist_dataset, load_mnist_dataset
 from mlmi.fedavg.model import CNNLightning, CNNMnistLightning, FedAvgServer
 from mlmi.fedavg.run import run_fedavg
@@ -26,12 +27,14 @@ ex = Experiment('fedavg')
 def femnist():
     seed = 123123123
     lr = 0.1
-    name = 'femnist'
-    total_fedavg_rounds = 50
+    name = 'hptest_lr'
+    total_fedavg_rounds = 20
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
     num_clients = 367
+    sample_threshold = 250
+    num_label_limit = 15
     num_classes = 62
     optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
@@ -83,6 +86,8 @@ def run_fedavg_experiment(
         local_epochs,
         batch_size,
         num_clients,
+        sample_threshold,
+        num_label_limit,
         optimizer_args,
         train_args,
         model_args,
@@ -92,12 +97,17 @@ def run_fedavg_experiment(
 
     if dataset == 'femnist':
         fed_dataset = load_femnist_dataset(str((REPO_ROOT / 'data').absolute()),
-                                           num_clients=num_clients, batch_size=batch_size)
+                                           num_clients=num_clients, batch_size=batch_size,
+                                           sample_threshold=sample_threshold)
+
+        if num_label_limit != -1:
+            fed_dataset = scratch_labels(fed_dataset, num_label_limit)
     elif dataset == 'mnist':
         fed_dataset = load_mnist_dataset(str((REPO_ROOT / 'data').absolute()),
                                          num_clients=num_clients, batch_size=batch_size)
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
+
 
     data_distribution_logged = False
     for cf in client_fraction:
@@ -116,4 +126,4 @@ def run_fedavg_experiment(
             partial(log_after_round_evaluation, experiment_logger, 'fedavg')
         ]
         run_fedavg(context=fedavg_context, num_rounds=total_fedavg_rounds, dataset=fed_dataset,
-                   save_states=True, restore_state=True, after_round_evaluation=log_after_round_evaluation_fns)
+                   save_states=True, restore_state=False, after_round_evaluation=log_after_round_evaluation_fns)
