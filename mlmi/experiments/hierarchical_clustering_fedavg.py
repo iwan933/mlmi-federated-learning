@@ -51,10 +51,10 @@ def default_configuration():
 @ex.named_config
 def hpsearch():
     seed = 123123123
-    lr = 0.1
+    lr = [0.08, 0.068, 0.05]
     name = 'hpsearch'
-    total_fedavg_rounds = 20
-    cluster_initialization_rounds = [1, 3, 5, 10]
+    total_fedavg_rounds = 75
+    cluster_initialization_rounds = [5, 10, 15, 20]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
@@ -70,7 +70,7 @@ def hpsearch():
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = [3.5, 5.0, 7.5, 10.0]
+    max_value_criterion = [3.5, 4.0, 5.0]
 
 
 @ex.named_config
@@ -97,27 +97,6 @@ def briggs():
     dis_metric = 'euclidean'
     max_value_criterion = 10.0
 
-@ex.named_config
-def briggs_alt_clustering():
-    seed = 123123123
-    lr = 0.1
-    name = 'briggs'
-    total_fedavg_rounds = 2
-    cluster_initialization_rounds = [1, 3]
-    client_fraction = [0.1]
-    local_epochs = 3
-    batch_size = 10
-    num_clients = 367
-    num_classes = 62
-    optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
-    train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
-    model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
-    dataset = 'femnist'
-    partitioner_class = AlternativePartitioner
-    linkage_mech = 'ward'
-    criterion = 'distance'
-    dis_metric = 'euclidean'
-    max_value_criterion = 35.0
 
 def log_after_round_evaluation(
         experiment_logger,
@@ -165,7 +144,7 @@ def run_hierarchical_clustering(
         num_clients,
         sample_threshold,
         num_label_limit,
-        optimizer_args,
+        #optimizer_args,
         train_args,
         model_args,
         dataset,
@@ -190,66 +169,70 @@ def run_hierarchical_clustering(
     if not hasattr(max_value_criterion, '__iter__'):
         max_value_criterion = [max_value_criterion]
 
+
     data_distribution_logged = False
     for cf in client_fraction:
-        fedavg_context = FedAvgExperimentContext(name=name, client_fraction=cf, local_epochs=local_epochs,
-                                                 lr=lr, batch_size=batch_size, optimizer_args=optimizer_args,
-                                                 model_args=model_args, train_args=train_args,
-                                                 dataset_name=dataset)
-        experiment_specification = f'{fedavg_context}'
-        experiment_logger = create_tensorboard_logger(fedavg_context.name, experiment_specification)
-        if not data_distribution_logged:
-            log_dataset_distribution(experiment_logger, 'full dataset', fed_dataset)
-            data_distribution_logged = True
-
-        log_after_round_evaluation_fns = [
-            partial(log_after_round_evaluation, experiment_logger, 'fedavg'),
-            partial(log_after_round_evaluation, experiment_logger, global_tag)
-        ]
-        server, clients = run_fedavg(context=fedavg_context, num_rounds=total_fedavg_rounds, dataset=fed_dataset,
-                                     save_states=True, restore_state=True,
-                                     after_round_evaluation=log_after_round_evaluation_fns)
-
-        for init_rounds, max_value in generate_configuration(cluster_initialization_rounds, max_value_criterion):
-            # load the model state
-            round_model_state = load_fedavg_state(fedavg_context, init_rounds)
-            overwrite_participants_models(round_model_state, clients)
-            # initialize the cluster configuration
-            round_configuration = {
-                'num_rounds_init': init_rounds,
-                'num_rounds_cluster': total_fedavg_rounds - init_rounds
-            }
-            cluster_args = ClusterArgs(partitioner_class, linkage_mech=linkage_mech,
-                                       criterion=criterion, dis_metric=dis_metric,
-                                       max_value_criterion=max_value,
-                                       plot_dendrogram=False, **round_configuration)
-            # create new logger for cluster experiment
-            experiment_specification = f'{fedavg_context}_{cluster_args}'
+        for lr_i in lr:
+            optimizer_args = OptimizerArgs(optim.SGD, lr=lr_i)
+            model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
+            fedavg_context = FedAvgExperimentContext(name=name, client_fraction=cf, local_epochs=local_epochs,
+                                                     lr=lr_i, batch_size=batch_size, optimizer_args=optimizer_args,
+                                                     model_args=model_args, train_args=train_args,
+                                                     dataset_name=dataset)
+            experiment_specification = f'{fedavg_context}'
             experiment_logger = create_tensorboard_logger(fedavg_context.name, experiment_specification)
-            fedavg_context.experiment_logger = experiment_logger
+            if not data_distribution_logged:
+                log_dataset_distribution(experiment_logger, 'full dataset', fed_dataset)
+                data_distribution_logged = True
 
-            initial_train_fn = partial(run_fedavg_train_round, round_model_state, training_args=train_args)
-            create_aggregator_fn = partial(FedAvgServer, model_args=model_args, context=fedavg_context)
-            federated_round_fn = partial(run_fedavg_round, training_args=train_args, client_fraction=cf)
-
-            after_post_clustering_evaluation = [
-                partial(log_after_round_evaluation, experiment_logger, 'post_clustering')
-            ]
-            after_clustering_round_evaluation = [
-                partial(log_after_round_evaluation, experiment_logger)
-            ]
-            after_federated_round_evaluation = [
-                partial(log_after_round_evaluation, experiment_logger, 'final hierarchical'),
+            log_after_round_evaluation_fns = [
+                partial(log_after_round_evaluation, experiment_logger, 'fedavg'),
                 partial(log_after_round_evaluation, experiment_logger, global_tag)
             ]
-            after_clustering_fn = [
-                partial(log_cluster_distribution, experiment_logger, num_classes=fed_dataset.class_num)
-            ]
-            run_fedavg_hierarchical(server, clients, cluster_args,
-                                    initial_train_fn,
-                                    federated_round_fn,
-                                    create_aggregator_fn,
-                                    after_post_clustering_evaluation,
-                                    after_clustering_round_evaluation,
-                                    after_federated_round_evaluation,
-                                    after_clustering_fn)
+            server, clients = run_fedavg(context=fedavg_context, num_rounds=total_fedavg_rounds, dataset=fed_dataset,
+                                         save_states=True, restore_state=True,
+                                         after_round_evaluation=log_after_round_evaluation_fns)
+
+            for init_rounds, max_value in generate_configuration(cluster_initialization_rounds, max_value_criterion):
+                # load the model state
+                round_model_state = load_fedavg_state(fedavg_context, init_rounds)
+                overwrite_participants_models(round_model_state, clients)
+                # initialize the cluster configuration
+                round_configuration = {
+                    'num_rounds_init': init_rounds,
+                    'num_rounds_cluster': total_fedavg_rounds - init_rounds
+                }
+                cluster_args = ClusterArgs(partitioner_class, linkage_mech=linkage_mech,
+                                           criterion=criterion, dis_metric=dis_metric,
+                                           max_value_criterion=max_value,
+                                           plot_dendrogram=False, **round_configuration)
+                # create new logger for cluster experiment
+                experiment_specification = f'{fedavg_context}_{cluster_args}'
+                experiment_logger = create_tensorboard_logger(fedavg_context.name, experiment_specification)
+                fedavg_context.experiment_logger = experiment_logger
+
+                initial_train_fn = partial(run_fedavg_train_round, round_model_state, training_args=train_args)
+                create_aggregator_fn = partial(FedAvgServer, model_args=model_args, context=fedavg_context)
+                federated_round_fn = partial(run_fedavg_round, training_args=train_args, client_fraction=cf)
+
+                after_post_clustering_evaluation = [
+                    partial(log_after_round_evaluation, experiment_logger, 'post_clustering')
+                ]
+                after_clustering_round_evaluation = [
+                    partial(log_after_round_evaluation, experiment_logger)
+                ]
+                after_federated_round_evaluation = [
+                    partial(log_after_round_evaluation, experiment_logger, 'final hierarchical'),
+                    partial(log_after_round_evaluation, experiment_logger, global_tag)
+                ]
+                after_clustering_fn = [
+                    partial(log_cluster_distribution, experiment_logger, num_classes=fed_dataset.class_num)
+                ]
+                run_fedavg_hierarchical(server, clients, cluster_args,
+                                        initial_train_fn,
+                                        federated_round_fn,
+                                        create_aggregator_fn,
+                                        after_post_clustering_evaluation,
+                                        after_clustering_round_evaluation,
+                                        after_federated_round_evaluation,
+                                        after_clustering_fn)
