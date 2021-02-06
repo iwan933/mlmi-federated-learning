@@ -181,6 +181,7 @@ class OmniglotLightning(BaseParticipantModel, pl.LightningModule):
             **kwargs
         )
         self.model.apply(init_weights)
+        self.criterion = nn.CrossEntropyLoss(reduction='sum')
         self.accuracy = Accuracy()
 
     def configure_optimizers(self):
@@ -191,7 +192,7 @@ class OmniglotLightning(BaseParticipantModel, pl.LightningModule):
         x, y = train_batch
         y = y.long()
         logits = self.model(x)
-        loss = F.cross_entropy(logits, y)
+        loss = self.criterion(logits, y)
         preds = torch.argmax(logits, dim=1)
         # TODO: this should actually be calculated on a validation set (missing cross entropy implementation)
         self.log('train/acc/{}'.format(self.participant_name), self.accuracy(preds, y))
@@ -202,7 +203,7 @@ class OmniglotLightning(BaseParticipantModel, pl.LightningModule):
         x, y = test_batch
         y = y.long()
         logits = self.model(x)
-        loss = F.cross_entropy(logits, y)
+        loss = self.criterion(logits, y)
         preds = torch.argmax(logits, dim=1)
         self.log('test/acc/{}'.format(self.participant_name), self.accuracy(preds, y))
         self.log('test/loss/{}'.format(self.participant_name), loss)

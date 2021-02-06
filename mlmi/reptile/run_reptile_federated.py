@@ -3,7 +3,6 @@ import sys
 
 from mlmi.structs import FederatedDatasetData, ModelArgs
 
-sys.path.insert(0, 'C:\\Users\\Richard\\Desktop\\Informatik\\Semester_5\\MLMI\\git\\mlmi-federated-learning')
 import random
 
 import torch
