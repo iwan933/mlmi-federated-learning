@@ -154,6 +154,22 @@ class ReptileServer(BaseAggregatorParticipant):
         self.model.load_state_dict(new_model_state)
 
 
+def apply_same_padding(x, kernel_size, stride):
+    if x.shape[2] % stride == 0:  # input image width % stride
+        pad = max(kernel_size - stride, 0)
+    else:
+        pad = max(kernel_size - (x.shape[2] % stride), 0)
+
+    if pad % 2 == 0:
+        pad_val = pad // 2
+        padding = (pad_val, pad_val, pad_val, pad_val)
+    else:
+        pad_val_start = pad // 2
+        pad_val_end = pad - pad_val_start
+        padding = (pad_val_start, pad_val_end, pad_val_start, pad_val_end)
+
+    return F.pad(x, padding, "constant", 0)
+
 class OmniglotLightning(BaseParticipantModel, pl.LightningModule):
     """
     A model for Omniglot classification - PyTorch implementation.
@@ -204,6 +220,9 @@ class OmniglotModel(torch.nn.Module):
     def __init__(self, num_classes: int):
         super().__init__()
 
+        self.kernel_size = 3
+        self.stride = 2
+
         # The below layers could be more conveniently generated as an array.
         # However, the class function state_dict() does not work then. For this
         # reason, we define all layers individually.
@@ -245,22 +264,27 @@ class OmniglotModel(torch.nn.Module):
         return torch.nn.ReLU()
 
     def forward(self, x):
+        x = apply_same_padding(x=x, kernel_size=self.kernel_size, stride=self.stride)
         x = self.conv2d_1(x)
         x = self.batchnorm_1(x)
         x = self.relu_1(x)
 
+        x = apply_same_padding(x=x, kernel_size=self.kernel_size, stride=self.stride)
         x = self.conv2d_2(x)
         x = self.batchnorm_2(x)
         x = self.relu_2(x)
 
+        x = apply_same_padding(x=x, kernel_size=self.kernel_size, stride=self.stride)
         x = self.conv2d_3(x)
         x = self.batchnorm_3(x)
         x = self.relu_3(x)
 
+        x = apply_same_padding(x=x, kernel_size=self.kernel_size, stride=self.stride)
         x = self.conv2d_4(x)
         x = self.batchnorm_4(x)
         x = self.relu_4(x)
 
+        x = x.permute(0, 2, 3, 1)
         x = self.flatten(x)
         x = self.logits(x)
         return x

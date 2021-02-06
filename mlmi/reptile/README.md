@@ -26,6 +26,7 @@ All experiments can be specified with the same command-line options:
 --eval-iters:       eval inner iterations (default 50)
 --eval-samples:     evaluation samples (default 100)
 --eval-interval:    train steps per eval (default 10)
+--sgd:              use gradient descent instead of Adam as inner optimizer
 ```
 In addition, `run_reptile_original_dataloading_federated.py` and `run_reptile_federated.py` take the following options:
 ```
