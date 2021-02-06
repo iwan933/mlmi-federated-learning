@@ -250,9 +250,9 @@ class OmniglotModel(torch.nn.Module):
         return torch.nn.Conv2d(
             in_channels=1 if first else 64,
             out_channels=64,
-            kernel_size=kernel_size,
-            stride=2,
-            padding=int((kernel_size - 1) / 2)  # Apply same padding
+            kernel_size=self.kernel_size,
+            stride=self.stride,
+            padding=0
         )
 
     def _make_batchnorm_layer(self):
