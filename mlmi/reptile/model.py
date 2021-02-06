@@ -246,7 +246,6 @@ class OmniglotModel(torch.nn.Module):
         self.logits = torch.nn.Linear(in_features=256, out_features=num_classes)
 
     def _make_conv2d_layer(self, first: bool = False):
-        kernel_size = 3
         return torch.nn.Conv2d(
             in_channels=1 if first else 64,
             out_channels=64,
