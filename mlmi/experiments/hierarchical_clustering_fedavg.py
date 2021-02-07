@@ -66,7 +66,7 @@ def hpsearch():
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
     dataset = 'femnist'
-    partitioner_class = ModelFlattenWeightsPartitioner
+    partitioner_class = AlternativePartitioner
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
