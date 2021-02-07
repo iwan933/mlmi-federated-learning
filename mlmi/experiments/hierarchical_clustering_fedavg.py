@@ -51,10 +51,10 @@ def default_configuration():
 @ex.named_config
 def hpsearch():
     seed = 123123123
-    lr = [0.08]
+    lr = [0.068]
     name = 'hpsearch'
     total_fedavg_rounds = 75
-    cluster_initialization_rounds = [15, 20]
+    cluster_initialization_rounds = [5, 10, 15, 20]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
