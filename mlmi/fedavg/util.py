@@ -183,12 +183,20 @@ def evaluate_cluster_models(cluster_server_dic: Dict[str, 'BaseAggregatorPartici
             global_losses = result.get('test/loss')
             global_acc = result.get('test/acc')
         else:
+            if global_losses.dim() == 0:
+                print(1)
+                global_losses = torch.tensor([global_losses])
+            if global_acc.dim() == 0:
+                print(2)
+                global_acc = torch.tensor([global_acc])
             if result.get('test/loss').dim() == 0:
+                print(3)
                 loss_test = torch.tensor([result.get('test/loss')])
                 global_losses = torch.cat((global_losses, loss_test), dim=0)
             else:
                 global_losses = torch.cat((global_losses, result.get('test/loss')), dim=0)
             if result.get('test/acc').dim() == 0:
+                print(4)
                 acc_test = torch.tensor([result.get('test/acc')])
                 global_acc = torch.cat((global_acc, acc_test), dim=0)
             else:
