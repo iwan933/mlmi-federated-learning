@@ -188,7 +188,7 @@ class AlternativePartitioner(BaseClusterPartitioner):
         model_parameter = np.array([flatten_model_parameter(m, keys).numpy() for m in model_states], dtype=float)
 
         tic = time.perf_counter()
-        global_parameter = flatten_model_parameter(server, keys).numpy()
+        global_parameter = flatten_model_parameter(server, keys).cpu().numpy()
         euclidean_dist = np.array([((model_parameter[participant_id]-global_parameter)**2).sum(axis=0)
                                    for participant_id in range(len(participants))])
 
