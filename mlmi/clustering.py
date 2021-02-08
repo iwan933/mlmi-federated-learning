@@ -179,7 +179,7 @@ class AlternativePartitioner(BaseClusterPartitioner):
     def cluster(self, participants: List['BaseParticipant'], server) -> Dict[str, List['BaseParticipant']]:
         logging.info('start clustering...')
         clusters_hac_dic = {}
-        server = server.model.state_dict()
+        server: Dict[str, Tensor] = server.model.state_dict()
 
         model_states: List[Dict[str, Tensor]] = [p.model.state_dict() for p in participants]
         keys = list(model_states[0].keys())
