@@ -54,7 +54,7 @@ def default_configuration():
 def hpsearch():
     seed = 123123123
     lr = [0.1]
-    name = 'briggs_altClust'
+    name = 'briggs_Clust'
     total_fedavg_rounds = 50
     cluster_initialization_rounds = [1, 3, 5, 10]
     client_fraction = [0.1]
@@ -68,7 +68,7 @@ def hpsearch():
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
     dataset = 'femnist'
-    partitioner_class = AlternativePartitioner
+    partitioner_class = ModelFlattenWeightsPartitioner
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
