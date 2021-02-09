@@ -46,19 +46,21 @@ def default_configuration():
     criterion = 'distance'
     dis_metric = 'euclidean'
     max_value_criterion = 10.0
+    reallocate_clients = False
+    threshold_min_client_cluster = 80
 
 
 @ex.named_config
 def hpsearch():
     seed = 123123123
     lr = [0.068]
-    name = 'hpsearch'
-    total_fedavg_rounds = 75
-    cluster_initialization_rounds = [5, 10, 15, 20]
+    name = 'hpsearch_altClust_80'
+    total_fedavg_rounds = 3
+    cluster_initialization_rounds = [1]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
-    num_clients = 367
+    num_clients = 100
     sample_threshold = 250  # we need clients with at least 250 samples to make sure all labels are present
     num_label_limit = 15
     num_classes = 62
@@ -70,8 +72,9 @@ def hpsearch():
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = [3.5, 4.0, 5.0]
-
+    max_value_criterion = [.5]
+    reallocate_clients = False
+    threshold_min_client_cluster = 80
 
 @ex.named_config
 def briggs():
@@ -144,7 +147,7 @@ def run_hierarchical_clustering(
         num_clients,
         sample_threshold,
         num_label_limit,
-        #optimizer_args,
+        # optimizer_args,
         train_args,
         model_args,
         dataset,
@@ -152,7 +155,9 @@ def run_hierarchical_clustering(
         linkage_mech,
         criterion,
         dis_metric,
-        max_value_criterion
+        max_value_criterion,
+        reallocate_clients,
+        threshold_min_client_cluster
 ):
     fix_random_seeds(seed)
     global_tag = 'global_performance'
@@ -168,7 +173,6 @@ def run_hierarchical_clustering(
 
     if not hasattr(max_value_criterion, '__iter__'):
         max_value_criterion = [max_value_criterion]
-
 
     data_distribution_logged = False
     for cf in client_fraction:
@@ -205,7 +209,8 @@ def run_hierarchical_clustering(
                 cluster_args = ClusterArgs(partitioner_class, linkage_mech=linkage_mech,
                                            criterion=criterion, dis_metric=dis_metric,
                                            max_value_criterion=max_value,
-                                           plot_dendrogram=False, **round_configuration)
+                                           plot_dendrogram=False, reallocate_clients=reallocate_clients,
+                                           threshold_min_client_cluster=threshold_min_client_cluster, **round_configuration)
                 # create new logger for cluster experiment
                 experiment_specification = f'{fedavg_context}_{cluster_args}'
                 experiment_logger = create_tensorboard_logger(fedavg_context.name, experiment_specification)
