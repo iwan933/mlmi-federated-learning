@@ -55,12 +55,12 @@ def hpsearch():
     seed = 123123123
     lr = [0.068]
     name = 'hpsearch_altClust_80'
-    total_fedavg_rounds = 3
-    cluster_initialization_rounds = [1]
+    total_fedavg_rounds = 75
+    cluster_initialization_rounds = [5, 10, 15, 20]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
-    num_clients = 100
+    num_clients = 367
     sample_threshold = 250  # we need clients with at least 250 samples to make sure all labels are present
     num_label_limit = 15
     num_classes = 62
@@ -72,8 +72,8 @@ def hpsearch():
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = [.5]
-    reallocate_clients = False
+    max_value_criterion = [3.5, 4.0, 5.0]
+    reallocate_clients = True
     threshold_min_client_cluster = 80
 
 @ex.named_config

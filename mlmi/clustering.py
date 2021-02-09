@@ -212,7 +212,7 @@ class AlternativePartitioner(BaseClusterPartitioner):
         if self.reallocate_clients:
             logging.info('Start reallocating lonely clients')
             logging.info(f'Initially found {num_cluster} clusters')
-            #threshold_min_client_cluster = 80
+
             lonely_clusters_id = []
             cluster_ids_arr = np.asarray(cluster_ids)
             for cluster_id in range(num_cluster):
