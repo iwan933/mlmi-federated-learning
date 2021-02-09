@@ -56,7 +56,7 @@ def hpsearch():
     lr = [0.1]
     name = 'briggs_altClust'
     total_fedavg_rounds = 50
-    cluster_initialization_rounds = [3, 5, 10]
+    cluster_initialization_rounds = [1, 3, 5, 10]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
