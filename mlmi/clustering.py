@@ -6,7 +6,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 
+import sklearn
 import torch
+from torch.utils import data
 from torch import Tensor
 
 from mlmi.participant import BaseParticipant
@@ -254,3 +256,56 @@ class AlternativePartitioner(BaseClusterPartitioner):
         logging.info('Finished clustering')
         return clusters_hac_dic_new
 
+
+class DatadependentPartitioner(BaseClusterPartitioner):
+
+    def __init__(
+            self,
+            dataloader: torch.utils.data.DataLoader,
+            linkage_mech,
+            criterion,
+            dis_metric,
+            max_value_criterion,
+            threshold_min_client_cluster,
+            *args,
+            **kwargs
+    ):
+        self.linkage_mech = linkage_mech
+        self.criterion = criterion
+        self.dis_metric = dis_metric
+        self.max_value_criterion = max_value_criterion
+        self.dataloader = dataloader
+
+    def predict(self, participant: BaseParticipant):
+        predictions = np.array([], dtype=np.float)
+        model = participant.model.cpu()
+        for x, _ in self.dataloader:
+            x = x.cpu()
+            logits = model.model(x)
+            prob, idx = torch.max(logits, dim=1)
+            predictions = np.append(predictions, idx.cpu())
+            # label and probability version:
+            # predictions = np.append(predictions, np.array(list(zip(prob.cpu(),idx.cpu()))))
+        return predictions
+
+    def cluster(
+            self,
+            participants: List['BaseParticipant'],
+            server: BaseParticipant
+    ) -> Dict[str, List['BaseParticipant']]:
+        model_predictions = np.array([self.predict(p) for p in participants])
+        cluster_ids = hac.fclusterdata(model_predictions, self.max_value_criterion, self.criterion,
+                                       method=self.linkage_mech, metric=self.dis_metric)
+
+        num_cluster = max(cluster_ids)
+
+        # Allocate participants to clusters
+        i = 0
+        clusters_hac_dic = {}
+        for id in range(1, num_cluster + 1):
+            clusters_hac_dic[str(id)] = []
+        for participant in participants:
+            participant.cluster_id = str(cluster_ids[i])
+            clusters_hac_dic[participant.cluster_id].append(participant)
+            i += 1
+        return clusters_hac_dic

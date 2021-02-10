@@ -5,9 +5,10 @@ from functools import partial
 
 from torch import Tensor, optim
 
-from mlmi.clustering import ModelFlattenWeightsPartitioner, AlternativePartitioner, RandomClusterPartitioner
+from mlmi.clustering import DatadependentPartitioner, ModelFlattenWeightsPartitioner, AlternativePartitioner, \
+    RandomClusterPartitioner
 from mlmi.experiments.log import log_goal_test_acc, log_loss_and_acc
-from mlmi.fedavg.data import scratch_labels
+from mlmi.fedavg.data import load_n_of_each_class, scratch_labels
 from mlmi.fedavg.femnist import load_femnist_dataset
 from mlmi.fedavg.model import CNNLightning, CNNMnistLightning, FedAvgServer
 from mlmi.fedavg.run import run_fedavg
@@ -37,9 +38,7 @@ def default_configuration():
     sample_threshold = -1
     num_label_limit = -1
     num_classes = 62
-    optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
-    model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
     dataset = 'femnist'
     partitioner_class = ModelFlattenWeightsPartitioner
     linkage_mech = 'ward'
@@ -64,9 +63,7 @@ def hpsearch():
     sample_threshold = -1  # we need clients with at least 250 samples to make sure all labels are present
     num_label_limit = -1
     num_classes = 62
-    optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
-    model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
     dataset = 'femnist'
     partitioner_class = ModelFlattenWeightsPartitioner
     linkage_mech = 'ward'
@@ -75,6 +72,32 @@ def hpsearch():
     max_value_criterion = [10.0]
     reallocate_clients = False
     threshold_min_client_cluster = 80
+
+
+@ex.named_config
+def datadependent_clustering():
+    seed = 123123123
+    lr = [0.1]
+    name = 'briggs_Clust'
+    total_fedavg_rounds = 10
+    cluster_initialization_rounds = [5]
+    client_fraction = [0.1]
+    local_epochs = 3
+    batch_size = 10
+    num_clients = 367
+    sample_threshold = -1  # we need clients with at least 250 samples to make sure all labels are present
+    num_label_limit = -1
+    num_classes = 62
+    train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
+    dataset = 'femnist'
+    partitioner_class = DatadependentPartitioner
+    linkage_mech = 'ward'
+    criterion = 'distance'
+    dis_metric = 'euclidean'
+    max_value_criterion = [5.0, 7.5, 10.0, 20.0]
+    reallocate_clients = False
+    threshold_min_client_cluster = 80
+
 
 @ex.named_config
 def briggs():
@@ -90,15 +113,14 @@ def briggs():
     sample_threshold = 250  # we need clients with at least 250 samples to make sure all labels are present
     num_label_limit = 15
     num_classes = 62
-    optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
-    model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
     dataset = 'femnist'
     partitioner_class = ModelFlattenWeightsPartitioner
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
     max_value_criterion = 10.0
+    threshold_min_client_cluster = 1
 
 
 def log_after_round_evaluation(
@@ -147,9 +169,7 @@ def run_hierarchical_clustering(
         num_clients,
         sample_threshold,
         num_label_limit,
-        # optimizer_args,
         train_args,
-        model_args,
         dataset,
         partitioner_class,
         linkage_mech,
@@ -206,11 +226,26 @@ def run_hierarchical_clustering(
                     'num_rounds_init': init_rounds,
                     'num_rounds_cluster': total_fedavg_rounds - init_rounds
                 }
-                cluster_args = ClusterArgs(partitioner_class, linkage_mech=linkage_mech,
-                                           criterion=criterion, dis_metric=dis_metric,
-                                           max_value_criterion=max_value,
-                                           plot_dendrogram=False, reallocate_clients=reallocate_clients,
-                                           threshold_min_client_cluster=threshold_min_client_cluster, **round_configuration)
+                if partitioner_class == DatadependentPartitioner:
+                    clustering_dataset = load_femnist_dataset(str((REPO_ROOT / 'data').absolute()),
+                                                       num_clients=150, batch_size=batch_size,
+                                                       sample_threshold=250)
+                    dataloader = load_n_of_each_class(clustering_dataset, n=5,
+                                                      tabu=list(fed_dataset.train_data_local_dict.keys()))
+                    cluster_args = ClusterArgs(partitioner_class, linkage_mech=linkage_mech,
+                                               criterion=criterion, dis_metric=dis_metric,
+                                               max_value_criterion=max_value,
+                                               plot_dendrogram=False, reallocate_clients=reallocate_clients,
+                                               threshold_min_client_cluster=threshold_min_client_cluster,
+                                               dataloader=dataloader,
+                                               **round_configuration)
+                else:
+                    cluster_args = ClusterArgs(partitioner_class, linkage_mech=linkage_mech,
+                                               criterion=criterion, dis_metric=dis_metric,
+                                               max_value_criterion=max_value,
+                                               plot_dendrogram=False, reallocate_clients=reallocate_clients,
+                                               threshold_min_client_cluster=threshold_min_client_cluster,
+                                               **round_configuration)
                 # create new logger for cluster experiment
                 experiment_specification = f'{fedavg_context}_{cluster_args}'
                 experiment_logger = create_tensorboard_logger(fedavg_context.name, experiment_specification)
