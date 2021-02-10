@@ -54,18 +54,18 @@ def hpsearch():
     seed = 123123123
     lr = [0.1]
     name = 'briggs_Clust'
-    total_fedavg_rounds = 50
-    cluster_initialization_rounds = [1, 3, 5, 10]
+    total_fedavg_rounds = 2
+    cluster_initialization_rounds = [1]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
-    num_clients = 367
+    num_clients = 20
     sample_threshold = -1  # we need clients with at least 250 samples to make sure all labels are present
     num_label_limit = -1
     num_classes = 62
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     dataset = 'femnist'
-    partitioner_class = ModelFlattenWeightsPartitioner
+    partitioner_class = DatadependentPartitioner
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
@@ -78,13 +78,13 @@ def hpsearch():
 def datadependent_clustering():
     seed = 123123123
     lr = [0.1]
-    name = 'briggs_Clust'
-    total_fedavg_rounds = 10
-    cluster_initialization_rounds = [5]
+    name = 'briggs_dataClust'
+    total_fedavg_rounds = 50
+    cluster_initialization_rounds = [1, 3, 5, 10]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
-    num_clients = 367
+    num_clients = 20
     sample_threshold = -1  # we need clients with at least 250 samples to make sure all labels are present
     num_label_limit = -1
     num_classes = 62
@@ -94,7 +94,7 @@ def datadependent_clustering():
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = [5.0, 7.5, 10.0, 20.0]
+    max_value_criterion = [5.0, 10.0, 20.0]
     reallocate_clients = False
     threshold_min_client_cluster = 80
 
