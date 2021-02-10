@@ -228,8 +228,8 @@ def run_hierarchical_clustering(
                 }
                 if partitioner_class == DatadependentPartitioner:
                     clustering_dataset = load_femnist_dataset(str((REPO_ROOT / 'data').absolute()),
-                                                       num_clients=150, batch_size=batch_size,
-                                                       sample_threshold=250)
+                                                              num_clients=num_clients, batch_size=batch_size,
+                                                              sample_threshold=sample_threshold)
                     dataloader = load_n_of_each_class(clustering_dataset, n=5,
                                                       tabu=list(fed_dataset.train_data_local_dict.keys()))
                     cluster_args = ClusterArgs(partitioner_class, linkage_mech=linkage_mech,
