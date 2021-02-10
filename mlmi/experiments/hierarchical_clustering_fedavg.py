@@ -78,7 +78,7 @@ def hpsearch():
 def datadependent_clustering():
     seed = 123123123
     lr = [0.1]
-    name = 'briggs_dataClust'
+    name = 'briggs_dataClust0'
     total_fedavg_rounds = 50
     cluster_initialization_rounds = [1, 3, 5, 10]
     client_fraction = [0.1]
