@@ -1,6 +1,6 @@
 import math
 import random
-from typing import Tuple
+from typing import List, Optional, Tuple
 
 import torch
 import numpy as np
@@ -111,26 +111,9 @@ def scratch_labels(fed_dataset: FederatedDatasetData, num_limit_label: int):
 
 
 def scratch_labels_from_dataloaders(
-        dataloader: data.DataLoader, num_limit_label: int) -> Tuple[data.DataLoader, int]:
-    datapoints = None
-    labels = None
-    for x, y in dataloader:
-        if datapoints is None:
-            datapoints = x.numpy()
-            labels = y.numpy()
-            continue
-        datapoints = np.concatenate((datapoints, x.numpy()))
-        labels = np.concatenate((labels, y.numpy()))
-    unique_labels = np.unique(labels)
-    chosen_labels = np.random.choice(unique_labels, size=num_limit_label, replace=False)
-    indices = np.isin(labels, chosen_labels)
-
-    scratched_data_tensor: Tensor = torch.from_numpy(datapoints[indices])
-    scratched_label_tensor: Tensor = torch.from_numpy(labels[indices])
-
-    dataset = data.TensorDataset(scratched_data_tensor, scratched_label_tensor)
-    out_dataloader = data.DataLoader(dataset=dataset, batch_size=dataloader.batch_size, shuffle=True, drop_last=False)
-    return out_dataloader, len(scratched_label_tensor)
+        dataloader: data.DataLoader, num_classes: int, num_limit_label: int) -> Tuple[data.DataLoader, int]:
+    chosen_labels = np.random.choice(np.arange(num_classes), size=num_limit_label, replace=False)
+    return _keep_only_specific_labels_from_dataloader(dataloader, chosen_labels)
 
 
 def non_iid_scratch(fed_dataset: FederatedDatasetData, num_mnist_label_zero):
@@ -151,7 +134,6 @@ def non_iid_scratch(fed_dataset: FederatedDatasetData, num_mnist_label_zero):
 
 
 def scratch_non_idd_from_dataloader(dataloader: data.DataLoader, random_mnist_indices):
-
     batch_data_list = []
     batch_label_list = []
     for x, y in dataloader:
@@ -221,5 +203,104 @@ def scratch_data_briggs(dataloader: data.DataLoader, num_data_points: int):
     return out_dataloader
 
 
+def load_n_of_each_class(
+        dataset: FederatedDatasetData,
+        n=5,
+        tabu: Optional[List[str]] = None
+) -> data.DataLoader:
+    client_ids = list(dataset.data_local_test_num_dict.keys())
+    if tabu is not None:
+        allowed_client_ids = [client_id for client_id in client_ids if client_id not in tabu]
+    else:
+        allowed_client_ids = client_ids
+
+    datapoints = []
+    labels = []
+
+    for cls in range(dataset.class_num):
+        for _ in range(n):
+            tries = 0
+            not_found = True
+            while not_found:
+                if tries > 30:
+                    raise ValueError(f'Last 30 client picks did not have a sample of class {cls}')
+                selected_client = np.random.choice(allowed_client_ids, size=1, replace=False)[0]
+                test_dl = dataset.train_data_local_dict[selected_client]
+                for x, y in test_dl:
+                    x = x.numpy()
+                    y = y.numpy()
+                    if cls not in y:
+                        continue
+                    indices = np.argwhere(y == cls).reshape(-1)
+                    index = np.random.choice(indices, size=1, replace=False)[0]
+                    datapoints.append(x[index])
+                    labels.append(y[index])
+                    not_found = False
+                    break
+                tries += 1
+
+    t_data = torch.stack([torch.from_numpy(d) for d in datapoints], dim=0)
+    t_labels = torch.FloatTensor(labels)
+    out_dataset = data.TensorDataset(t_data, t_labels)
+    return data.DataLoader(out_dataset, batch_size=dataset.batch_size, shuffle=False, drop_last=False)
 
 
+def augment_for_clustering(
+        dataset: FederatedDatasetData,
+        keep_as_is_percentage: float,
+        cluster_num: int,
+        label_core_num: int,
+        label_deviation: int
+):
+    label_deviation_range = np.arange(-label_deviation, label_deviation + 1)
+    label_array = np.arange(dataset.class_num)
+    if keep_as_is_percentage != 0.0:
+        keep_as_is_num = int(keep_as_is_percentage * len(dataset.train_data_local_dict.keys()))
+        kept_clients = np.random.choice([k for k in list(dataset.train_data_local_dict.keys())], size=keep_as_is_num,
+                                        replace=False)
+    else:
+        kept_clients = []
+
+    cluster_probabilities = np.random.dirichlet(np.full((cluster_num,), 3), size=1).reshape(-1)
+    cluster_labels_list = [
+        np.random.choice(np.arange(dataset.class_num), size=label_core_num, replace=False) for _ in range(cluster_num)
+    ]
+    cluster_ids = np.arange(cluster_num)
+    for key in dataset.train_data_local_dict.keys():
+        if key in kept_clients:
+            continue
+        cluster_id = np.random.choice(cluster_ids, size=1, replace=False, p=cluster_probabilities).reshape(-1)[0]
+        cluster_labels = cluster_labels_list[cluster_id]
+        label_deviation_choice = np.random.choice(label_deviation_range, size=1, replace=False)
+        if label_deviation_choice <= 0:
+            client_labels = np.random.choice(cluster_labels, size=len(cluster_labels) + label_deviation_choice,
+                                             replace=False)
+        else:
+            client_labels = np.random.choice([label for label in label_array if label not in cluster_labels],
+                                             size=label_deviation_choice, replace=False)
+            client_labels = np.append(client_labels, cluster_labels)
+
+        dataset.train_data_local_dict[key], dataset.data_local_train_num_dict[key] = \
+            _keep_only_specific_labels_from_dataloader(dataset.train_data_local_dict[key], client_labels)
+        dataset.test_data_local_dict[key], dataset.data_local_test_num_dict[key] = \
+            _keep_only_specific_labels_from_dataloader(dataset.test_data_local_dict[key], client_labels)
+
+
+def _keep_only_specific_labels_from_dataloader(dataloader: data.DataLoader, labels_to_keep: List[int]):
+    datapoints = None
+    labels = None
+    for x, y in dataloader:
+        if datapoints is None:
+            datapoints = x.numpy()
+            labels = y.numpy()
+            continue
+        datapoints = np.concatenate((datapoints, x.numpy()))
+        labels = np.concatenate((labels, y.numpy()))
+    indices = np.isin(labels, labels_to_keep)
+
+    scratched_data_tensor: Tensor = torch.from_numpy(datapoints[indices])
+    scratched_label_tensor: Tensor = torch.from_numpy(labels[indices])
+
+    dataset = data.TensorDataset(scratched_data_tensor, scratched_label_tensor)
+    out_dataloader = data.DataLoader(dataset=dataset, batch_size=dataloader.batch_size, shuffle=True, drop_last=False)
+    return out_dataloader, len(scratched_label_tensor)

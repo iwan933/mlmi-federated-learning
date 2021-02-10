@@ -10,7 +10,7 @@ from pytorch_lightning.loggers import LightningLoggerBase
 from torch import IntTensor, Tensor, optim
 from torch.utils.data import DataLoader
 
-from mlmi.fedavg.data import scratch_data, non_iid_scratch
+from mlmi.fedavg.data import augment_for_clustering, scratch_data, non_iid_scratch
 from mlmi.plot import generate_data_label_heatmap
 from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.participant import BaseTrainingParticipant
@@ -255,7 +255,7 @@ if __name__ == '__main__':
         add_args(parser)
         args = parser.parse_args()
 
-        fix_random_seeds(args.seed)
+        # fix_random_seeds(args.seed)
 
         logger.debug('loading experiment data ...')
         data_dir = REPO_ROOT / 'data'
@@ -270,7 +270,8 @@ if __name__ == '__main__':
             fed_dataset = load_mnist_dataset(str(data_dir.absolute()), num_clients=100, batch_size=10)
         else:
             # default to femnist dataset
-            fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=367, batch_size=10)
+            fed_dataset = load_femnist_dataset(str(data_dir.absolute()), num_clients=367, batch_size=10,
+                                               only_digits=False, sample_threshold=250)
 
         if args.non_iid_scratch:
             non_iid_scratch(fed_dataset, num_mnist_label_zero=5)
@@ -289,8 +290,9 @@ if __name__ == '__main__':
             return
 
         if args.plot_client_labels:
+            augment_for_clustering(fed_dataset, 0.1, 4, label_core_num=12, label_deviation=3)
             image = generate_data_label_heatmap('initial distribution', fed_dataset.train_data_local_dict.values(), 62)
-            experiment_logger = create_tensorboard_logger('datadistribution', fed_dataset.name, version=0)
+            experiment_logger = create_tensorboard_logger('datadistribution', fed_dataset.name)
             experiment_logger.experiment.add_image('label distribution/test', image.numpy())
             return
 

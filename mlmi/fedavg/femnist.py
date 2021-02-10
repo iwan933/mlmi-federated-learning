@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+import torch
 from tensorflow import Tensor
 from torch.utils import data
 from torch.utils.data.dataset import T_co
