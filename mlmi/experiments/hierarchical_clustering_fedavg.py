@@ -84,7 +84,7 @@ def datadependent_clustering():
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
-    num_clients = 20
+    num_clients = 367
     sample_threshold = -1  # we need clients with at least 250 samples to make sure all labels are present
     num_label_limit = -1
     num_classes = 62
