@@ -92,6 +92,7 @@ def datadependent_clustering():
     num_label_limit = -1
     num_classes = 62
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
+    train_cluster_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     dataset = 'femnist'
     partitioner_class = DatadependentPartitioner
     linkage_mech = 'ward'
@@ -190,6 +191,7 @@ def run_hierarchical_clustering(
         sample_threshold,
         num_label_limit,
         train_args,
+        train_cluster_args,
         dataset,
         partitioner_class,
         linkage_mech,
