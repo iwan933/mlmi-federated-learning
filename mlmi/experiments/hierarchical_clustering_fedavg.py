@@ -211,6 +211,7 @@ def run_hierarchical_clustering(
                                                        num_clients=num_clients, batch_size=batch_size,
                                                        sample_threshold=sample_threshold)
         else:
+            print(0)
             fed_dataset = load_femnist_dataset(str((REPO_ROOT / 'data').absolute()),
                                                num_clients=num_clients, batch_size=batch_size,
                                                sample_threshold=sample_threshold)
