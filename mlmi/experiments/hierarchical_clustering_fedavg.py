@@ -30,7 +30,7 @@ def default_configuration():
     lr = 0.068
     name = 'default_hierarchical_fedavg'
     total_fedavg_rounds = 20
-    cluster_initialization_rounds = [1, 3, 5, 10]
+    cluster_initialization_rounds = [3, 5, 10]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
@@ -42,11 +42,11 @@ def default_configuration():
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     train_cluster_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     dataset = 'femnist'
-    partitioner_class = ModelFlattenWeightsPartitioner
+    partitioner_class = DatadependentPartitioner
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = 8.0
+    max_value_criterion = 15.0
     reallocate_clients = False
     threshold_min_client_cluster = 80
 
@@ -255,7 +255,7 @@ def run_hierarchical_clustering(
                     'num_rounds_cluster': total_fedavg_rounds - init_rounds
                 }
                 if partitioner_class == DatadependentPartitioner:
-                    clustering_dataset = load_femnist_dataset(str((REPO_ROOT / 'data').absolute()),
+                    clustering_dataset = load_femnist_colored_dataset(str((REPO_ROOT / 'data').absolute()),
                                                               num_clients=num_clients, batch_size=batch_size,
                                                               sample_threshold=sample_threshold)
                     dataloader = load_n_of_each_class(clustering_dataset, n=5,

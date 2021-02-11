@@ -134,7 +134,7 @@ def load_femnist_dataset(data_dir, num_clients=367, batch_size=10, only_digits=F
         femnist_train = FEMNISTDataset(torch.from_numpy(h5data_train['label']), train_channel_data)
         h5data_test = collections.OrderedDict((name, ds[()]) for name, ds in sorted(
             emnist_test._h5_file[HDF5ClientData._EXAMPLES_GROUP][client_id].items()))
-        test_channel_data = torch.unsqueeze(torch.from_numpy(), 1)
+        test_channel_data = torch.unsqueeze(torch.from_numpy(h5data_test['pixels']), 1)
         femnist_test = FEMNISTDataset(torch.from_numpy(h5data_test['label']), test_channel_data)
         dl_train = data.DataLoader(femnist_train, batch_size=batch_size)
         dl_test = data.DataLoader(femnist_test, batch_size=batch_size)
@@ -257,5 +257,9 @@ if __name__ == '__main__':
     experiment_logger = create_tensorboard_logger('colortest', 'femnist')
     dataset = load_femnist_colored_dataset(str((REPO_ROOT / 'data').absolute()))
     dataloader = list(dataset.train_data_local_dict.values())[0]
+    images = []
     for i, (x, y) in enumerate(dataloader):
-        experiment_logger.experiment.add_image('test', x.numpy(), dataformats='NCHW', global_step=i)
+        for s in x:
+            images.append(s)
+    images_array = np.stack(images)
+    experiment_logger.experiment.add_image('test', images_array, dataformats='NCHW')
