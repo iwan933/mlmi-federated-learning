@@ -61,10 +61,10 @@ class FedAvgServer(BaseAggregatorParticipant):
 
 class CNN_OriginalFedAvg(torch.nn.Module):
 
-    def __init__(self, only_digits=True):
+    def __init__(self, only_digits=True, input_channels=1):
         super(CNN_OriginalFedAvg, self).__init__()
         self.only_digits = only_digits
-        self.conv2d_1 = torch.nn.Conv2d(1, 32, kernel_size=5, padding=2)
+        self.conv2d_1 = torch.nn.Conv2d(input_channels, 32, kernel_size=5, padding=2)
         self.max_pooling = nn.MaxPool2d(2, stride=2)
         self.conv2d_2 = torch.nn.Conv2d(32, 64, kernel_size=5, padding=2)
         self.flatten = nn.Flatten()
@@ -84,8 +84,8 @@ class CNN_OriginalFedAvg(torch.nn.Module):
 
 class CNNLightning(BaseParticipantModel, pl.LightningModule):
 
-    def __init__(self, only_digits=False, *args, **kwargs):
-        model = CNN_OriginalFedAvg(only_digits=only_digits)
+    def __init__(self, only_digits=False, input_channels=1, *args, **kwargs):
+        model = CNN_OriginalFedAvg(only_digits=only_digits, input_channels=input_channels)
         super().__init__(*args, model=model, **kwargs)
         self.model = model
         # self.model.apply(init_weights)

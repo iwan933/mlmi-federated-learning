@@ -160,6 +160,7 @@ def run_fedavg(
         if restore_state and round_model_state is not None:
             logger.info(f'skipping training and loading model from disk ...')
             server.overwrite_model_state(round_model_state)
+            continue
         else:
             run_fedavg_round(server, clients, context.train_args, client_fraction=context.client_fraction)
         # test over all clients

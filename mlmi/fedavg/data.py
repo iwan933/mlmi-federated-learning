@@ -99,12 +99,14 @@ def scratch_labels(fed_dataset: FederatedDatasetData, num_limit_label: int):
     """
     for i in fed_dataset.train_data_local_dict.keys():
         train_dl = fed_dataset.train_data_local_dict[i]
-        scratched_train_dl, train_num = scratch_labels_from_dataloaders(train_dl, num_limit_label)
+        scratched_train_dl, train_num = scratch_labels_from_dataloaders(train_dl, fed_dataset.class_num,
+                                                                        num_limit_label)
         fed_dataset.train_data_local_dict[i] = scratched_train_dl
         fed_dataset.data_local_train_num_dict[i] = train_num
 
         test_dl = fed_dataset.test_data_local_dict[i]
-        scratched_train_dl, test_num = scratch_labels_from_dataloaders(test_dl, num_limit_label)
+        scratched_train_dl, test_num = scratch_labels_from_dataloaders(test_dl, fed_dataset.class_num,
+                                                                       num_limit_label)
         fed_dataset.test_data_local_dict[i] = scratched_train_dl
         fed_dataset.data_local_test_num_dict[i] = test_num
     return fed_dataset

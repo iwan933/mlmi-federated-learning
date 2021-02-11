@@ -279,11 +279,14 @@ class DatadependentPartitioner(BaseClusterPartitioner):
     def predict(self, participant: BaseParticipant):
         predictions = np.array([], dtype=np.float)
         model = participant.model.cpu()
-        for x, _ in self.dataloader:
+        for x, y in self.dataloader:
             x = x.cpu()
+            y = y.cpu()
             logits = model.model(x)
             prob, idx = torch.max(logits, dim=1)
-            predictions = np.append(predictions, idx.cpu())
+            correct = np.zeros((*idx.shape,))
+            correct[idx.numpy() == y.numpy()] = 1
+            predictions = np.append(predictions, correct)
             # label and probability version:
             # predictions = np.append(predictions, np.array(list(zip(prob.cpu(),idx.cpu()))))
         return predictions

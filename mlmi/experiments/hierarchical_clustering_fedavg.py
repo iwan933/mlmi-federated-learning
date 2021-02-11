@@ -9,7 +9,7 @@ from mlmi.clustering import DatadependentPartitioner, ModelFlattenWeightsPartiti
     RandomClusterPartitioner
 from mlmi.experiments.log import log_goal_test_acc, log_loss_and_acc
 from mlmi.fedavg.data import load_n_of_each_class, scratch_labels
-from mlmi.fedavg.femnist import load_femnist_dataset
+from mlmi.fedavg.femnist import load_femnist_colored_dataset, load_femnist_dataset
 from mlmi.fedavg.model import CNNLightning, CNNMnistLightning, FedAvgServer
 from mlmi.fedavg.run import run_fedavg
 from mlmi.fedavg.structs import FedAvgExperimentContext
@@ -27,7 +27,7 @@ ex = Experiment('hierachical_clustering')
 @ex.config
 def default_configuration():
     seed = 123123123
-    lr = 0.1
+    lr = 0.068
     name = 'default_hierarchical_fedavg'
     total_fedavg_rounds = 20
     cluster_initialization_rounds = [1, 3, 5, 10]
@@ -35,16 +35,18 @@ def default_configuration():
     local_epochs = 3
     batch_size = 10
     num_clients = 367
-    sample_threshold = -1
+    sample_threshold = 250
     num_label_limit = -1
     num_classes = 62
+    use_colored_images = True
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
+    train_cluster_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     dataset = 'femnist'
     partitioner_class = ModelFlattenWeightsPartitioner
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = 10.0
+    max_value_criterion = 8.0
     reallocate_clients = False
     threshold_min_client_cluster = 80
 
@@ -144,6 +146,22 @@ def log_cluster_distribution(
         experiment_logger.experiment.add_image(f'label distribution/cluster_{cluster_id}', image.numpy())
 
 
+def log_sample_images_from_each_client(
+        experiment_logger,
+        cluster_clients_dic: Dict[str, List['BaseTrainingParticipant']]
+):
+    import numpy as np
+    for cluster_id, clients in cluster_clients_dic.items():
+        images = []
+        for c in clients:
+            x, y = next(c.train_data_loader.__iter__())
+            images.append(x[0].numpy())
+        images_array = np.stack(images, axis=0)
+        experiment_logger.experiment.add_image(f'color distribution/cluster_{cluster_id}',
+                                               images_array,
+                                               dataformats='NCHW')
+
+
 def log_dataset_distribution(experiment_logger, tag: str, dataset: FederatedDatasetData):
     dataloaders = list(dataset.train_data_local_dict.values())
     image = generate_data_label_heatmap(tag, dataloaders, dataset.class_num)
@@ -177,15 +195,22 @@ def run_hierarchical_clustering(
         dis_metric,
         max_value_criterion,
         reallocate_clients,
-        threshold_min_client_cluster
+        threshold_min_client_cluster,
+        use_colored_images,
+        train_cluster_args=None
 ):
     fix_random_seeds(seed)
     global_tag = 'global_performance'
 
     if dataset == 'femnist':
-        fed_dataset = load_femnist_dataset(str((REPO_ROOT / 'data').absolute()),
-                                           num_clients=num_clients, batch_size=batch_size,
-                                           sample_threshold=sample_threshold)
+        if use_colored_images:
+            fed_dataset = load_femnist_colored_dataset(str((REPO_ROOT / 'data').absolute()),
+                                                       num_clients=num_clients, batch_size=batch_size,
+                                                       sample_threshold=sample_threshold)
+        else:
+            fed_dataset = load_femnist_dataset(str((REPO_ROOT / 'data').absolute()),
+                                               num_clients=num_clients, batch_size=batch_size,
+                                               sample_threshold=sample_threshold)
         if num_label_limit != -1:
             fed_dataset = scratch_labels(fed_dataset, num_label_limit)
     else:
@@ -193,12 +218,15 @@ def run_hierarchical_clustering(
 
     if not hasattr(max_value_criterion, '__iter__'):
         max_value_criterion = [max_value_criterion]
-
+    if not hasattr(lr, '__iter__'):
+        lr = [lr]
+    input_channels = 3 if use_colored_images else 1
     data_distribution_logged = False
     for cf in client_fraction:
         for lr_i in lr:
             optimizer_args = OptimizerArgs(optim.SGD, lr=lr_i)
-            model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
+            model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args,
+                                   input_channels=input_channels, only_digits=False)
             fedavg_context = FedAvgExperimentContext(name=name, client_fraction=cf, local_epochs=local_epochs,
                                                      lr=lr_i, batch_size=batch_size, optimizer_args=optimizer_args,
                                                      model_args=model_args, train_args=train_args,
@@ -251,7 +279,7 @@ def run_hierarchical_clustering(
                 experiment_logger = create_tensorboard_logger(fedavg_context.name, experiment_specification)
                 fedavg_context.experiment_logger = experiment_logger
 
-                initial_train_fn = partial(run_fedavg_train_round, round_model_state, training_args=train_args)
+                initial_train_fn = partial(run_fedavg_train_round, round_model_state, training_args=train_cluster_args)
                 create_aggregator_fn = partial(FedAvgServer, model_args=model_args, context=fedavg_context)
                 federated_round_fn = partial(run_fedavg_round, training_args=train_args, client_fraction=cf)
 
@@ -266,7 +294,8 @@ def run_hierarchical_clustering(
                     partial(log_after_round_evaluation, experiment_logger, global_tag)
                 ]
                 after_clustering_fn = [
-                    partial(log_cluster_distribution, experiment_logger, num_classes=fed_dataset.class_num)
+                    partial(log_cluster_distribution, experiment_logger, num_classes=fed_dataset.class_num),
+                    partial(log_sample_images_from_each_client, experiment_logger)
                 ]
                 run_fedavg_hierarchical(server, clients, cluster_args,
                                         initial_train_fn,
