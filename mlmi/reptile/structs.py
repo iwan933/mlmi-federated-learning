@@ -25,6 +25,7 @@ class ReptileExperimentContext(object):
                  meta_learning_rate_final: float,
                  eval_interval: int,
                  do_final_evaluation: bool,
+                 num_eval_clients: int,
                  inner_batch_size: int,
                  inner_learning_rate: float,
                  num_inner_steps: int,
@@ -97,6 +98,13 @@ class ReptileExperimentContext(object):
         # Arguments for evaluation
         self.eval_interval = eval_interval
         self.do_final_evaluation = do_final_evaluation
+        if num_eval_clients is not None and \
+                num_eval_clients > max(num_clients_train, num_clients_test):
+            raise ValueError(
+                "num_eval_clients must be lower or equal to num_clients_train "
+                "and num_clients_test"
+            )
+        self.num_eval_clients = num_eval_clients
 
         self.weighted_aggregation: bool = True
         self._cluster_args = None

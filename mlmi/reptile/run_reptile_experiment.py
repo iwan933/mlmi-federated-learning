@@ -125,17 +125,20 @@ def run_reptile(context: ReptileExperimentContext,
         logger.info('finished training round')
 
     if context.do_final_evaluation:
-        # Final evaluation on all train / test clients
+        # Final evaluation on subsample of train / test clients
         losses, accs = [], []
         for client_set in [train_clients, test_clients]:
             if client_set is not None:
+                eval_clients = RANDOM.sample(
+                    population=client_set, k=context.num_eval_clients
+                )
                 reptile_train_step(
                     aggregator=server,
-                    participants=client_set,
+                    participants=eval_clients,
                     inner_training_args=context.get_inner_training_args(eval=True),
                     evaluation_mode=True
                 )
-                result = evaluate_local_models(participants=client_set)
+                result = evaluate_local_models(participants=eval_clients)
                 losses.append(result.get('test/loss'))
                 accs.append(result.get('test/acc'))
             else:

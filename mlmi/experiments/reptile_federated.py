@@ -44,6 +44,7 @@ def cfg():
     meta_learning_rate_final = 0
     eval_interval = 50
     do_final_evaluation = True
+    num_eval_clients = None
 
     inner_batch_size = 10
     inner_learning_rate = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
@@ -65,11 +66,12 @@ def omniglot():
     num_clients_train = 10000
     num_clients_test = 1000  # Used only with dataset='omniglot'
     meta_batch_size = 5
-    num_meta_steps = 3000
+    num_meta_steps = 100000
     meta_learning_rate_initial = 1
     meta_learning_rate_final = 0
     eval_interval = 10
-    do_final_evaluation = False
+    do_final_evaluation = True
+    num_eval_clients = 1000  # Applies only when do_final_evaluation=True
 
     inner_batch_size = 10
     inner_learning_rate = [0.001]
@@ -126,6 +128,7 @@ def run_reptile_experiment(
     meta_learning_rate_final,
     eval_interval,
     do_final_evaluation,
+    num_eval_clients,
     inner_batch_size,
     inner_learning_rate,
     num_inner_steps,
@@ -173,6 +176,7 @@ def run_reptile_experiment(
             meta_learning_rate_final=meta_learning_rate_final,
             eval_interval=eval_interval,
             do_final_evaluation=do_final_evaluation,
+            num_eval_clients=num_eval_clients,
             inner_batch_size=inner_batch_size,
             inner_learning_rate=lr,
             num_inner_steps=num_inner_steps,
