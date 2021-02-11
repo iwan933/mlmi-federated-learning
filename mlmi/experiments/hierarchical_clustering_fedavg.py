@@ -49,7 +49,7 @@ def default_configuration():
     max_value_criterion = 15.0
     reallocate_clients = False
     threshold_min_client_cluster = 80
-
+    use_colored_images = False
 
 @ex.named_config
 def hpsearch():
@@ -206,6 +206,7 @@ def run_hierarchical_clustering(
 
     if dataset == 'femnist':
         if use_colored_images:
+            print(1)
             fed_dataset = load_femnist_colored_dataset(str((REPO_ROOT / 'data').absolute()),
                                                        num_clients=num_clients, batch_size=batch_size,
                                                        sample_threshold=sample_threshold)
