@@ -199,19 +199,17 @@ def run_hierarchical_clustering(
         reallocate_clients,
         threshold_min_client_cluster,
         use_colored_images,
-        train_cluster_args=None
+        #train_cluster_args=None
 ):
     fix_random_seeds(seed)
     global_tag = 'global_performance'
 
     if dataset == 'femnist':
         if use_colored_images:
-            print(1)
             fed_dataset = load_femnist_colored_dataset(str((REPO_ROOT / 'data').absolute()),
                                                        num_clients=num_clients, batch_size=batch_size,
                                                        sample_threshold=sample_threshold)
         else:
-            print(0)
             fed_dataset = load_femnist_dataset(str((REPO_ROOT / 'data').absolute()),
                                                num_clients=num_clients, batch_size=batch_size,
                                                sample_threshold=sample_threshold)
