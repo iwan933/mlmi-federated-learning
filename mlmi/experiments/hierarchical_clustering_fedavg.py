@@ -191,7 +191,6 @@ def run_hierarchical_clustering(
         sample_threshold,
         num_label_limit,
         train_args,
-        train_cluster_args,
         dataset,
         partitioner_class,
         linkage_mech,
@@ -201,7 +200,7 @@ def run_hierarchical_clustering(
         reallocate_clients,
         threshold_min_client_cluster,
         use_colored_images,
-        #train_cluster_args=None
+        train_cluster_args=None
 ):
     fix_random_seeds(seed)
     global_tag = 'global_performance'
