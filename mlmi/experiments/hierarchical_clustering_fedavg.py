@@ -96,7 +96,7 @@ def datadependent_clustering():
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = [5.0, 10.0, 20.0]
+    max_value_criterion = [100.0, 150.0]
     reallocate_clients = False
     threshold_min_client_cluster = 80
 
