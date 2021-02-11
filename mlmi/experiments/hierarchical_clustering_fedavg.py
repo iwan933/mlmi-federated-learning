@@ -55,32 +55,33 @@ def default_configuration():
 def hpsearch():
     seed = 123123123
     lr = [0.1]
-    name = 'briggs_Clust'
-    total_fedavg_rounds = 2
-    cluster_initialization_rounds = [1]
+    name = 'briggs_Clust0'
+    total_fedavg_rounds = 15
+    cluster_initialization_rounds = [10]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
-    num_clients = 20
-    sample_threshold = -1  # we need clients with at least 250 samples to make sure all labels are present
-    num_label_limit = -1
+    num_clients = 367
+    sample_threshold = 250  # we need clients with at least 250 samples to make sure all labels are present
+    num_label_limit = 15
     num_classes = 62
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     dataset = 'femnist'
-    partitioner_class = DatadependentPartitioner
+    partitioner_class = ModelFlattenWeightsPartitioner
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = [10.0]
+    max_value_criterion = [1]
     reallocate_clients = False
     threshold_min_client_cluster = 80
+    use_colored_images = False
 
 
 @ex.named_config
 def datadependent_clustering():
     seed = 123123123
     lr = [0.1]
-    name = 'briggs_dataClust0'
+    name = 'briggs_dataClust2'
     total_fedavg_rounds = 50
     cluster_initialization_rounds = [1, 3, 5, 10]
     client_fraction = [0.1]
@@ -99,6 +100,7 @@ def datadependent_clustering():
     max_value_criterion = [100.0, 150.0]
     reallocate_clients = False
     threshold_min_client_cluster = 80
+    use_colored_images = False
 
 
 @ex.named_config
