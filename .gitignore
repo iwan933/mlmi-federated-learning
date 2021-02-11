@@ -142,6 +142,7 @@ cache/
 run/
 data/*
 checkpoints/
+model_checkpoint/
 ckpt_o55/
 # Do not ignore omniglot dataset
 !data/omniglot

@@ -98,18 +98,19 @@ class FEMNISTDataset(data.Dataset):
         return self.pixels[index], self.labels[index]
 
 
-def load_femnist_dataset(data_dir, num_clients=367, batch_size=10, only_digits=False, sample_threshold=-1):
+def load_femnist_dataset(data_dir, num_clients=367, batch_size=10, only_digits=False, sample_threshold=-1, random_seed=0):
     import torch
     import os, collections
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     import tensorflow as tf
     import tensorflow_federated as tff
     from tensorflow_federated.python.simulation import HDF5ClientData
+    RANDOM = np.random.RandomState(seed=random_seed)
 
     _datasets: Tuple[HDF5ClientData, HDF5ClientData] = tff.simulation.datasets.emnist.load_data(only_digits=only_digits,
                                                                                                 cache_dir=data_dir)
     emnist_train, emnist_test = _datasets
-    selected_client_ids = np.random.choice(emnist_train.client_ids, size=num_clients, replace=False)
+    selected_client_ids = RANDOM.choice(emnist_train.client_ids, size=num_clients, replace=False)
     train_data_local_dict = dict()
     data_local_num_dict = dict()
     data_local_train_num_dict = dict()
@@ -125,7 +126,7 @@ def load_femnist_dataset(data_dir, num_clients=367, batch_size=10, only_digits=F
         if len(clients_exceeding_threshold) < num_clients:
             raise ValueError(f'Only {len(clients_exceeding_threshold)} clients with more than {sample_threshold} '
                              f'samples available. But asked for {num_clients}.')
-        selected_client_ids = np.random.choice(clients_exceeding_threshold, size=num_clients, replace=False)
+        selected_client_ids = RANDOM.choice(clients_exceeding_threshold, size=num_clients, replace=False)
 
     for client_id in selected_client_ids:
         h5data_train = collections.OrderedDict((name, ds[()]) for name, ds in sorted(
@@ -139,6 +140,7 @@ def load_femnist_dataset(data_dir, num_clients=367, batch_size=10, only_digits=F
         dl_train = data.DataLoader(femnist_train, batch_size=batch_size)
         dl_test = data.DataLoader(femnist_test, batch_size=batch_size)
         train_data_local_dict[client_id] = dl_train
+        data_local_train_num_dict[client_id] = len(femnist_train)
         data_local_train_num_dict[client_id] = len(femnist_train)
         test_data_local_dict[client_id] = dl_test
         data_local_test_num_dict[client_id] = len(femnist_test)

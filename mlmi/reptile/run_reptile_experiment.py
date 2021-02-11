@@ -1,0 +1,148 @@
+import sys
+sys.path.append('C:/Users/Richard/Desktop/Informatik/Semester_5/MLMI/git/mlmi-federated-learning')
+
+from mlmi.structs import FederatedDatasetData, ModelArgs
+
+import random
+
+from mlmi.log import getLogger
+from mlmi.reptile.model import ReptileClient, ReptileServer
+from mlmi.reptile.util import reptile_train_step
+from mlmi.reptile.structs import ReptileExperimentContext
+from mlmi.settings import REPO_ROOT
+from mlmi.utils import evaluate_local_models
+
+
+logger = getLogger(__name__)
+
+
+def cyclerange(start, stop, len):
+    assert start < len and stop < len, "Error: start and stop must be < len"
+    if start > stop:
+        return list(range(start, len)) + list(range(0, stop))
+    return list(range(start, stop))
+
+def initialize_clients(dataset: FederatedDatasetData,
+                       model_args: ModelArgs,
+                       context,
+                       experiment_logger):
+    clients = []
+    for c in dataset.train_data_local_dict.keys():
+        client = ReptileClient(
+            client_id=str(c),
+            model_args=model_args,
+            context=context,
+            train_dataloader=dataset.train_data_local_dict[c],
+            num_train_samples=dataset.data_local_train_num_dict[c],
+            test_dataloader=dataset.test_data_local_dict[c],
+            num_test_samples=dataset.data_local_test_num_dict[c],
+            lightning_logger=experiment_logger
+        )
+        clients.append(client)
+    return clients
+
+
+def run_reptile(context: ReptileExperimentContext,
+                dataset_train: FederatedDatasetData,
+                dataset_test: FederatedDatasetData,
+                initial_model_state,
+                after_round_evaluation):
+    RANDOM = random.Random(context.seed)
+
+    # Set up clients
+    train_clients = initialize_clients(
+        dataset=dataset_train,
+        model_args=context.inner_model_args,
+        context=context.name,
+        experiment_logger=context.experiment_logger
+    )
+    if dataset_test is not None:
+        test_clients = initialize_clients(
+            dataset=dataset_test,
+            model_args=context.inner_model_args,
+            context=context.name,
+            experiment_logger=context.experiment_logger
+        )
+    else:
+        test_clients = None
+
+    # Set up server
+    server = ReptileServer(
+        participant_name='initial_server',
+        model_args=context.meta_model_args,
+        context=context.name,
+        initial_model_state=initial_model_state
+    )
+
+    # Perform training
+    for i in range(context.num_meta_steps):
+        if context.meta_batch_size == -1:
+            meta_batch = train_clients
+        else:
+            meta_batch = [
+                train_clients[k] for k in cyclerange(
+                    start=i*context.meta_batch_size % len(train_clients),
+                    stop=(i+1)*context.meta_batch_size % len(train_clients),
+                    len=len(train_clients)
+                )
+            ]
+        # Meta training step
+        reptile_train_step(
+            aggregator=server,
+            participants=meta_batch,
+            inner_training_args=context.get_inner_training_args(),
+            meta_training_args=context.get_meta_training_args(
+                frac_done=i / context.num_meta_steps
+            )
+        )
+
+        # Evaluation on train and test clients
+        if i % context.eval_interval == 0:
+            # Pick one train / test client at random and test on it
+            losses, accs = [], []
+            for client_set in [train_clients, test_clients]:
+                if client_set is not None:
+                    k = RANDOM.randrange(len(client_set))
+                    client = [client_set[k]]
+                    reptile_train_step(
+                        aggregator=server,
+                        participants=client,
+                        inner_training_args=context.get_inner_training_args(eval=True),
+                        evaluation_mode=True
+                    )
+                    result = evaluate_local_models(participants=client)
+                    losses.append(result.get('test/loss'))
+                    accs.append(result.get('test/acc'))
+                else:
+                    losses.append(None)
+                    accs.append(None)
+
+            # Log
+            if after_round_evaluation is not None:
+                for c in after_round_evaluation:
+                    c('', losses[0], accs[0], losses[1], accs[1], i)
+
+        logger.info('finished training round')
+
+    if context.do_final_evaluation:
+        # Final evaluation on all train / test clients
+        losses, accs = [], []
+        for client_set in [train_clients, test_clients]:
+            if client_set is not None:
+                reptile_train_step(
+                    aggregator=server,
+                    participants=client_set,
+                    inner_training_args=context.get_inner_training_args(eval=True),
+                    evaluation_mode=True
+                )
+                result = evaluate_local_models(participants=client_set)
+                losses.append(result.get('test/loss'))
+                accs.append(result.get('test/acc'))
+            else:
+                losses.append(None)
+                accs.append(None)
+
+        # Log
+        if after_round_evaluation is not None:
+            for c in after_round_evaluation:
+                c('final_', losses[0], accs[0], losses[1], accs[1], 0)
