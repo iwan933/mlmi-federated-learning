@@ -23,3 +23,10 @@ run fedavg with the MNIST dataset
 
 run fedavg with the FEMNIST dataset
 ``python mlmi/experiments/fedavg.py``
+
+## Results & Logging
+
+The project uses Tensorboard to log results. 
+
+1. Start Tensorboard ``tensorboard --logdir run``
+2. View results in Browser at ``http://localhost:6006``
