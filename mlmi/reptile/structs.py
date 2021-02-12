@@ -24,8 +24,9 @@ class ReptileExperimentContext(object):
                  meta_learning_rate_initial: float,
                  meta_learning_rate_final: float,
                  eval_interval: int,
+                 num_eval_clients_training: int,
                  do_final_evaluation: bool,
-                 num_eval_clients: int,
+                 num_eval_clients_final: int,
                  inner_batch_size: int,
                  inner_learning_rate: float,
                  num_inner_steps: int,
@@ -47,7 +48,6 @@ class ReptileExperimentContext(object):
 
         # Arguments for inner training
         self.num_inner_steps = num_inner_steps
-        self.num_inner_steps_eval = num_inner_steps_eval
         self.inner_learning_rate = inner_learning_rate
         self.inner_batch_size = inner_batch_size
         if self.sgd:
@@ -61,7 +61,6 @@ class ReptileExperimentContext(object):
                 lr=self.inner_learning_rate,
                 betas=self.adam_betas
             )
-        # TODO: Not every model takes takes num_classes. Tend to this.
         if self.dataset_name == 'omniglot':
             self.inner_model_args = ModelArgs(
                 model_class=self.model_class,
@@ -96,15 +95,25 @@ class ReptileExperimentContext(object):
             )
 
         # Arguments for evaluation
+        self.num_inner_steps_eval = num_inner_steps_eval
         self.eval_interval = eval_interval
-        self.do_final_evaluation = do_final_evaluation
-        if num_eval_clients is not None and \
-                num_eval_clients > max(num_clients_train, num_clients_test):
+        self.num_eval_clients_training = num_eval_clients_training
+        if num_eval_clients_training > num_clients_train or \
+                (num_clients_test and num_eval_clients_training > num_clients_test):
             raise ValueError(
-                "num_eval_clients must be lower or equal to num_clients_train "
-                "and num_clients_test"
+                "num_eval_clients_training must be lower or equal to "
+                "num_clients_train and num_clients_test"
             )
-        self.num_eval_clients = num_eval_clients
+        self.do_final_evaluation = do_final_evaluation
+        if do_final_evaluation and (
+                num_eval_clients_final > num_clients_train or
+                (num_clients_test and num_eval_clients_final > num_clients_test)
+        ):
+            raise ValueError(
+                "num_eval_clients_final must be lower or equal to "
+                "num_clients_train and num_clients_test"
+            )
+        self.num_eval_clients_final = num_eval_clients_final
 
         self.weighted_aggregation: bool = True
         self._cluster_args = None
@@ -164,13 +173,31 @@ class ReptileExperimentContext(object):
             dataset_string = (
                 f""
             )
+        data_size_string = (
+            f"trainc{self.num_clients_train}"
+            f"testc{self.num_clients_test}"
+        )
+        model_string = f"{'sgd' if self.sgd else 'adam'}"
+        inner_learning_string = (
+            f"is{self.num_inner_steps}"
+            f"ilr{str(self.inner_learning_rate).replace('.', '')}"
+            f"ib{self.inner_batch_size}"
+        )
+        meta_learning_string = (
+            f"ms{self.num_meta_steps}"
+            f"mlri{str(self.meta_learning_rate_initial).replace('.', '')}"
+            f"mlrf{str(self.meta_learning_rate_final).replace('.', '')}"
+            f"mb{self.meta_batch_size}"
+        )
+        evaluation_string = (
+            f"isev{self.num_inner_steps_eval}"
+            f"ect{self.num_eval_clients_training}"
+            f"ecf{self.num_eval_clients_final if self.do_final_evaluation else 'N'}"
+        )
         experiment_string = (
             f"{self.dataset_name}_seed{self.seed}_"
-            f"{dataset_string}_train-clients{self.num_clients_train}_"
-            f"ib{self.inner_batch_size}is{self.num_inner_steps}"
-            f"ilr{str(self.inner_learning_rate).replace('.', '')}"
-            f"ms{str(self.meta_learning_rate_initial).replace('.', '')}"
-            f"mb{self.meta_batch_size}ei{self.num_inner_steps_eval}"
-            f"{'sgd' if self.sgd else 'adam'}"
+            f"{dataset_string}{data_size_string}_"
+            f"{model_string}_{inner_learning_string}_"
+            f"{meta_learning_string}_{evaluation_string}"
         )
         return experiment_string

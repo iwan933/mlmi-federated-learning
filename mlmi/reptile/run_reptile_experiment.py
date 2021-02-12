@@ -98,19 +98,23 @@ def run_reptile(context: ReptileExperimentContext,
 
         # Evaluation on train and test clients
         if i % context.eval_interval == 0:
-            # Pick one train / test client at random and test on it
+            # Pick train / test clients at random and test on them
             losses, accs = [], []
             for client_set in [train_clients, test_clients]:
-                if client_set is not None:
-                    k = RANDOM.randrange(len(client_set))
-                    client = [client_set[k]]
+                if client_set:
+                    if context.num_eval_clients_training == -1:
+                        clients = client_set
+                    else:
+                        clients = RANDOM.sample(
+                            client_set, context.num_eval_clients_training
+                        )
                     reptile_train_step(
                         aggregator=server,
-                        participants=client,
+                        participants=clients,
                         inner_training_args=context.get_inner_training_args(eval=True),
                         evaluation_mode=True
                     )
-                    result = evaluate_local_models(participants=client)
+                    result = evaluate_local_models(participants=clients)
                     losses.append(result.get('test/loss'))
                     accs.append(result.get('test/acc'))
                 else:
@@ -128,10 +132,13 @@ def run_reptile(context: ReptileExperimentContext,
         # Final evaluation on subsample of train / test clients
         losses, accs = [], []
         for client_set in [train_clients, test_clients]:
-            if client_set is not None:
-                eval_clients = RANDOM.sample(
-                    population=client_set, k=context.num_eval_clients
-                )
+            if client_set:
+                if context.num_eval_clients_final == -1:
+                    eval_clients = client_set
+                else:
+                    eval_clients = RANDOM.sample(
+                        client_set, context.num_eval_clients_final
+                    )
                 reptile_train_step(
                     aggregator=server,
                     participants=eval_clients,

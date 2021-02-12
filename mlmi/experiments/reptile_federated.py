@@ -25,7 +25,7 @@ ex = Experiment('reptile')
 
 
 @ex.config
-def cfg():
+def femnist():
     name = 'reptile'
     dataset = 'femnist'  # Options: 'omniglot', 'femnist'
     classes = 5  # Only used with dataset='omniglot'
@@ -39,15 +39,17 @@ def cfg():
     num_clients_train = 367
     num_clients_test = 0  # Used only with dataset='omniglot'
     meta_batch_size = 5
-    num_meta_steps = 3000
+    num_meta_steps = 10000
     meta_learning_rate_initial = 1
     meta_learning_rate_final = 0
-    eval_interval = 50
+
+    eval_interval = 100
+    num_eval_clients_training = 100
     do_final_evaluation = True
-    num_eval_clients = None
+    num_eval_clients_final = -1
 
     inner_batch_size = 10
-    inner_learning_rate = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
+    inner_learning_rate = [1e-4, 1e-3, 1e-2, 0.068, 1e-1]
     num_inner_steps = 5
     num_inner_steps_eval = 50
 
@@ -69,9 +71,11 @@ def omniglot():
     num_meta_steps = 100000
     meta_learning_rate_initial = 1
     meta_learning_rate_final = 0
+
     eval_interval = 10
+    num_eval_clients_training = 1
     do_final_evaluation = True
-    num_eval_clients = 1000  # Applies only when do_final_evaluation=True
+    num_eval_clients_final = 1000  # Applies only when do_final_evaluation=True
 
     inner_batch_size = 10
     inner_learning_rate = [0.001]
@@ -127,8 +131,9 @@ def run_reptile_experiment(
     meta_learning_rate_initial,
     meta_learning_rate_final,
     eval_interval,
+    num_eval_clients_training,
     do_final_evaluation,
-    num_eval_clients,
+    num_eval_clients_final,
     inner_batch_size,
     inner_learning_rate,
     num_inner_steps,
@@ -175,8 +180,9 @@ def run_reptile_experiment(
             meta_learning_rate_initial=meta_learning_rate_initial,
             meta_learning_rate_final=meta_learning_rate_final,
             eval_interval=eval_interval,
+            num_eval_clients_training=num_eval_clients_training,
             do_final_evaluation=do_final_evaluation,
-            num_eval_clients=num_eval_clients,
+            num_eval_clients_final=num_eval_clients_final,
             inner_batch_size=inner_batch_size,
             inner_learning_rate=lr,
             num_inner_steps=num_inner_steps,
