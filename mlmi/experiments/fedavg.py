@@ -35,7 +35,7 @@ def femnist():
     num_classes = 62
     optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
-    model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False)
+    model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args, only_digits=False, input_channels=1)
     dataset = 'femnist'
 
 
