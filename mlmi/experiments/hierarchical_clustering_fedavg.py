@@ -54,7 +54,7 @@ def default_configuration():
 @ex.named_config
 def fedavg_hierachCluster_color():
     seed = 123123123
-    lr = [0.1]
+    lr = [0.01]
     name = 'color'
     total_fedavg_rounds = 50
     cluster_initialization_rounds = [1, 3, 5, 10]
