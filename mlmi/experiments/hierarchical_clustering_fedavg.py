@@ -56,12 +56,12 @@ def fedavg_hierachCluster_color():
     seed = 123123123
     lr = [0.1]
     name = 'color'
-    total_fedavg_rounds = 2
-    cluster_initialization_rounds = [1]
+    total_fedavg_rounds = 50
+    cluster_initialization_rounds = [1, 3, 5, 10]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
-    num_clients = 20
+    num_clients = 367
     sample_threshold = -1  # we need clients with at least 250 samples to make sure all labels are present
     num_label_limit = -1
     num_classes = 62
@@ -71,7 +71,7 @@ def fedavg_hierachCluster_color():
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = [15]
+    max_value_criterion = [10, 11, 12, 13, 14]
     reallocate_clients = False
     threshold_min_client_cluster = 80
     use_colored_images = True
