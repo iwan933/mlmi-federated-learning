@@ -275,7 +275,7 @@ def run_hierarchical_clustering(
 
             for init_rounds, max_value in generate_configuration(cluster_initialization_rounds, max_value_criterion):
                 # load the model state
-                round_model_state = load_fedavg_state(fedavg_context, init_rounds, input_channels)
+                round_model_state = load_fedavg_state(fedavg_context, init_rounds)
                 overwrite_participants_models(round_model_state, clients)
                 # initialize the cluster configuration
                 round_configuration = {

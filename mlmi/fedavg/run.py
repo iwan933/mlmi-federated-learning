@@ -150,15 +150,13 @@ def run_fedavg(
     if start_round + 1 > num_rounds:
         return server, clients
 
-    weights_first_layer = server.model.state_dict()[list(server.model.state_dict().keys())[0]]
-    channels = weights_first_layer.shape[1]
     num_train_samples = [client.num_train_samples for client in clients]
     num_total_samples = sum(num_train_samples)
     logger.info(f'... copied {num_total_samples} data samples in total')
 
     for i in range(start_round, num_rounds):
         logger.info(f'starting training round {i + 1} ...')
-        round_model_state = load_fedavg_state(context, i + 1, channels)
+        round_model_state = load_fedavg_state(context, i + 1)
         if restore_state and round_model_state is not None:
             logger.info(f'skipping training and loading model from disk ...')
             server.overwrite_model_state(round_model_state)
@@ -175,9 +173,7 @@ def run_fedavg(
             f'... finished training round (mean loss: {torch.mean(loss):.2f}, mean acc: {torch.mean(acc):.2f})')
         # log and save
         if save_states:
-            #weights_first_layer=server.model.state_dict()[list(server.model.state_dict().keys())[0]]
-            #channels = weights_first_layer.shape[1]
-            save_fedavg_state(context, i + 1, server.model.state_dict(), channels)
+            save_fedavg_state(context, i + 1, server.model.state_dict())
     return server, clients
 
 
