@@ -158,15 +158,15 @@ def load_fedavg_hierarchical_cluster_state(
     return torch.load(path)
 
 
-def load_fedavg_state(experiment_context: 'FedAvgExperimentContext', fl_round: int) -> Union[Dict[str, Tensor], None]:
-    path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{experiment_context}r{fl_round}.mdl'
+def load_fedavg_state(experiment_context: 'FedAvgExperimentContext', fl_round: int, channels: int) -> Union[Dict[str, Tensor], None]:
+    path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{experiment_context}r{fl_round}ch{channels}.mdl'
     if not path.exists():
         return None
     return torch.load(path)
 
 
-def save_fedavg_state(experiment_context: 'FedAvgExperimentContext', fl_round: int, model_state: Dict[str, Tensor]):
-    path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{experiment_context}r{fl_round}.mdl'
+def save_fedavg_state(experiment_context: 'FedAvgExperimentContext', fl_round: int, model_state: Dict[str, Tensor], channels: int):
+    path = REPO_ROOT / 'run' / 'states' / 'fedavg' / f'{experiment_context}r{fl_round}ch{channels}.mdl'
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model_state, path)
 

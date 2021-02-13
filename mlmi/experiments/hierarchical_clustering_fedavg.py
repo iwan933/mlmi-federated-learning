@@ -52,6 +52,31 @@ def default_configuration():
     use_colored_images = False
 
 @ex.named_config
+def fedavg_hierachCluster_color():
+    seed = 123123123
+    lr = [0.1]
+    name = 'color'
+    total_fedavg_rounds = 2
+    cluster_initialization_rounds = [1]
+    client_fraction = [0.1]
+    local_epochs = 3
+    batch_size = 10
+    num_clients = 20
+    sample_threshold = -1  # we need clients with at least 250 samples to make sure all labels are present
+    num_label_limit = -1
+    num_classes = 62
+    train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
+    dataset = 'femnist'
+    partitioner_class = ModelFlattenWeightsPartitioner
+    linkage_mech = 'ward'
+    criterion = 'distance'
+    dis_metric = 'euclidean'
+    max_value_criterion = [15]
+    reallocate_clients = False
+    threshold_min_client_cluster = 80
+    use_colored_images = True
+
+@ex.named_config
 def hpsearch():
     seed = 123123123
     lr = [0.1]
@@ -245,12 +270,12 @@ def run_hierarchical_clustering(
                 partial(log_after_round_evaluation, experiment_logger, global_tag)
             ]
             server, clients = run_fedavg(context=fedavg_context, num_rounds=total_fedavg_rounds, dataset=fed_dataset,
-                                         save_states=True, restore_state=False,
+                                         save_states=True, restore_state=True,
                                          after_round_evaluation=log_after_round_evaluation_fns)
 
             for init_rounds, max_value in generate_configuration(cluster_initialization_rounds, max_value_criterion):
                 # load the model state
-                round_model_state = load_fedavg_state(fedavg_context, init_rounds)
+                round_model_state = load_fedavg_state(fedavg_context, init_rounds, input_channels)
                 overwrite_participants_models(round_model_state, clients)
                 # initialize the cluster configuration
                 round_configuration = {

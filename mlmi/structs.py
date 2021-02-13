@@ -119,6 +119,15 @@ class ModelArgs(object):
         self.args = args
         self.kwargs = kwargs
         self.model_class = model_class
+        self._config_string = self._create_config_string(**kwargs)
+
+    def _create_config_string(self, **kwargs):
+        input_channel = kwargs.get('input_channels', None)
+        unique_str = f'_bw' if input_channel == 1 else f'_rgb'
+        return unique_str
+
+    def __str__(self):
+        return self._config_string
 
     def __call__(self, **kwargs):
         return self.model_class(*self.args, **self.kwargs, **kwargs)

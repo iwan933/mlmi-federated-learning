@@ -34,5 +34,5 @@ class FedAvgExperimentContext(object):
         :return:
         """
         id = f'{self.dataset_name}_bs{self.batch_size}lr{self.lr:.2E}cf{self.client_fraction:.2f}{self.train_args}' \
-             f'_{self.optimizer_args}'
+             f'_{self.optimizer_args}'f'{self.model_args}'
         return id
