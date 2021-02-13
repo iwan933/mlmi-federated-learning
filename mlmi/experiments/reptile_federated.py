@@ -28,8 +28,8 @@ ex = Experiment('reptile')
 def femnist():
     name = 'reptile'
     dataset = 'femnist'  # Options: 'omniglot', 'femnist'
-    classes = 5  # Only used with dataset='omniglot'
-    shots = 5  # Only used with dataset='omniglot'
+    classes = 0  # Only used with dataset='omniglot'
+    shots = 0  # Only used with dataset='omniglot'
     seed = 123123123
 
     model_class = CNNLightning
@@ -38,8 +38,8 @@ def femnist():
 
     num_clients_train = 367
     num_clients_test = 0  # Used only with dataset='omniglot'
-    meta_batch_size = 5
-    num_meta_steps = 40000
+    meta_batch_size = 30
+    num_meta_steps = 10000
     meta_learning_rate_initial = 1
     meta_learning_rate_final = 0
 
@@ -49,7 +49,7 @@ def femnist():
     num_eval_clients_final = -1
 
     inner_batch_size = 10
-    inner_learning_rate = [0.005, 0.01, 0.03]
+    inner_learning_rate = [0.005]
     num_inner_steps = 5
     num_inner_steps_eval = 50
 
