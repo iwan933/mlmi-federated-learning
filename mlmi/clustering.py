@@ -134,6 +134,8 @@ class ModelFlattenWeightsPartitioner(BaseClusterPartitioner):
         self.dis_metric = dis_metric
         self.max_value_criterion = max_value_criterion
         self.plot_dendrogram = plot_dendrogram
+        self.reallocate_clients = reallocate_clients
+        self.threshold_min_client_cluster = threshold_min_client_cluster
 
     def cluster(self, participants: List['BaseParticipant'], server: BaseParticipant) -> Dict[str, List['BaseParticipant']]:
         logging.info('start clustering...')
@@ -163,13 +165,55 @@ class ModelFlattenWeightsPartitioner(BaseClusterPartitioner):
             clusters_hac_dic[participant.cluster_id].append(participant)
             i += 1
 
+        if self.reallocate_clients:
+            logging.info('Start reallocating lonely clients')
+            logging.info(f'Initially found {num_cluster} clusters')
+            server: Dict[str, Tensor] = server.model.state_dict()
+            global_parameter = flatten_model_parameter(server, keys).cpu().numpy()
+            euclidean_dist = np.array([((model_parameter[participant_id] - global_parameter) ** 2).sum(axis=0)
+                                       for participant_id in range(len(participants))])
+
+            lonely_clusters_id = []
+            cluster_ids_arr = np.asarray(cluster_ids)
+            for cluster_id in range(num_cluster):
+                if np.count_nonzero(cluster_ids_arr == cluster_id + 1) <= self.threshold_min_client_cluster:
+                    logging.info('cluster {} is under the minimal client threshold'.format(cluster_id + 1))
+                    lonely_clusters_id.append(cluster_id + 1)
+
+            empty_cluster_id = []
+            nearest_cluster_id = None
+            for lonely_cluster_id in lonely_clusters_id:
+                i = 1
+                if len(clusters_hac_dic[str(lonely_cluster_id)]) > self.threshold_min_client_cluster:
+                    pass
+                else:
+                    # reallocate lonely client to nearest cluster
+                    lonely_clients = clusters_hac_dic[str(lonely_cluster_id)]
+                    id_clients = np.where(cluster_ids == lonely_cluster_id)[0]
+                    for k, id_client in enumerate(id_clients):
+                        while nearest_cluster_id in empty_cluster_id or nearest_cluster_id == lonely_cluster_id or i == 1:
+                            nearest_client_id = find_nearest(euclidean_dist, id_client, i)
+                            nearest_cluster_id = cluster_ids[nearest_client_id]
+                            i += 1
+                        clusters_hac_dic[str(nearest_cluster_id)].append(lonely_clients[k])
+                        cluster_ids[id_client] = nearest_cluster_id
+                    clusters_hac_dic[str(lonely_cluster_id)] = {}
+                    empty_cluster_id.append(lonely_cluster_id)
+
+            for key in empty_cluster_id:
+                del clusters_hac_dic[str(key)]
+            num_cluster = num_cluster - len(empty_cluster_id)
+
+        logging.info(f'Final cluster number:{num_cluster}')
+        clusters_hac_dic_new = {str(i + 1): val for i, (key, val) in enumerate(clusters_hac_dic.items())}
+
         logging.info('Used linkage method: ' + str(self.linkage_mech))
         logging.info('Used distance method: ' + str(self.dis_metric))
         logging.info('Used criterion for clustering: ' + str(self.criterion))
         logging.info('Found %i clusters', num_cluster)
         logging.info('Finished clustering')
 
-        return clusters_hac_dic
+        return clusters_hac_dic_new
 
 
 class AlternativePartitioner(BaseClusterPartitioner):

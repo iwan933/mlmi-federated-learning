@@ -67,7 +67,7 @@ def fedavg_hierachCluster_color():
     num_classes = 62
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     dataset = 'femnist'
-    partitioner_class = AlternativePartitioner
+    partitioner_class = ModelFlattenWeightsPartitioner
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
