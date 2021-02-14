@@ -55,9 +55,9 @@ def default_configuration():
 def fedavg_hierachCluster_color():
     seed = 123123123
     lr = [0.065]
-    name = 'color_hpsearch_lr'
-    total_fedavg_rounds = 100
-    cluster_initialization_rounds = [1]
+    name = 'color_hpsearch_ri'
+    total_fedavg_rounds = 75
+    cluster_initialization_rounds = [1, 10, 20, 30, 50]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
@@ -270,7 +270,7 @@ def run_hierarchical_clustering(
                 partial(log_after_round_evaluation, experiment_logger, global_tag)
             ]
             server, clients = run_fedavg(context=fedavg_context, num_rounds=total_fedavg_rounds, dataset=fed_dataset,
-                                         save_states=True, restore_state=False,
+                                         save_states=True, restore_state=True,
                                          after_round_evaluation=log_after_round_evaluation_fns)
 
             for init_rounds, max_value in generate_configuration(cluster_initialization_rounds, max_value_criterion):
