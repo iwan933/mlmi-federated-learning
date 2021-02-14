@@ -57,7 +57,7 @@ def fedavg_hierachCluster_color():
     lr = [0.065]
     name = 'color_hpsearch'
     total_fedavg_rounds = 75
-    cluster_initialization_rounds = [1, 10, 20, 30, 40]
+    cluster_initialization_rounds = [10]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
@@ -67,13 +67,13 @@ def fedavg_hierachCluster_color():
     num_classes = 62
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     dataset = 'femnist'
-    partitioner_class = ModelFlattenWeightsPartitioner
+    partitioner_class = AlternativePartitioner
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = [10, 8, 6, 4]
-    reallocate_clients = False
-    threshold_min_client_cluster = 80
+    max_value_criterion = [6]
+    reallocate_clients = True
+    threshold_min_client_cluster = 40
     use_colored_images = True
 
 @ex.named_config
