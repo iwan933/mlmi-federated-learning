@@ -54,9 +54,9 @@ def default_configuration():
 @ex.named_config
 def fedavg_hierachCluster_color():
     seed = 123123123
-    lr = [0.066, 0.067]
+    lr = [0.065]
     name = 'color_hpsearch_lr'
-    total_fedavg_rounds = 50
+    total_fedavg_rounds = 100
     cluster_initialization_rounds = [1]
     client_fraction = [0.1]
     local_epochs = 3
