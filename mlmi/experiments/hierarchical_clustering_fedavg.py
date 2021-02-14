@@ -270,7 +270,7 @@ def run_hierarchical_clustering(
                 partial(log_after_round_evaluation, experiment_logger, global_tag)
             ]
             server, clients = run_fedavg(context=fedavg_context, num_rounds=total_fedavg_rounds, dataset=fed_dataset,
-                                         save_states=True, restore_state=True,
+                                         save_states=True, restore_state=False,
                                          after_round_evaluation=log_after_round_evaluation_fns)
 
             for init_rounds, max_value in generate_configuration(cluster_initialization_rounds, max_value_criterion):
