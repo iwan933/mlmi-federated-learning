@@ -57,7 +57,7 @@ def fedavg_hierachCluster_color():
     lr = [0.065]
     name = 'color_hpsearch'
     total_fedavg_rounds = 75
-    cluster_initialization_rounds = [10]
+    cluster_initialization_rounds = [6, 8, 10, 12, 14]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
@@ -71,8 +71,8 @@ def fedavg_hierachCluster_color():
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = [6]
-    reallocate_clients = True
+    max_value_criterion = [5, 5.3, 5.5, 5.8, 6]
+    reallocate_clients = False
     threshold_min_client_cluster = 40
     use_colored_images = True
 
