@@ -55,7 +55,7 @@ def default_configuration():
 def fedavg_hierachCluster_color():
     seed = 123123123
     lr = [0.065]
-    name = 'color_hpsearch'
+    name = 'color_hpsearch_scratch'
     total_fedavg_rounds = 75
     cluster_initialization_rounds = [5, 10, 15, 20]
     client_fraction = [0.1]
