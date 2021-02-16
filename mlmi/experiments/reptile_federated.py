@@ -41,7 +41,7 @@ def femnist():
     num_clients_test = 0  # Used only with dataset='omniglot'
     meta_batch_size = 5
     num_meta_steps = 20000
-    meta_learning_rate_initial = 1
+    meta_learning_rate_initial = 0.1
     meta_learning_rate_final = 0
 
     eval_interval = 250
