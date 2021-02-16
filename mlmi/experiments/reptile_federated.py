@@ -35,7 +35,7 @@ def femnist():
 
     model_class = CNNLightning
     sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
-    adam_betas = None  # Used only if sgd = False
+    adam_betas = (0.9, 0.999)  # Used only if sgd = False
 
     num_clients_train = 367
     num_clients_test = 0  # Used only with dataset='omniglot'
@@ -50,7 +50,7 @@ def femnist():
     num_eval_clients_final = -1
 
     inner_batch_size = 10
-    inner_learning_rate = [0.1]
+    inner_learning_rate = [0.3]
     num_inner_steps = 5
     num_inner_steps_eval = 50
 
