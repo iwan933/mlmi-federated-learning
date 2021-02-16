@@ -28,6 +28,7 @@ ex = Experiment('reptile')
 def femnist():
     name = 'reptile'
     dataset = 'femnist'  # Options: 'omniglot', 'femnist'
+    swap_labels = True  # Only used with dataset='femnist'
     classes = 0  # Only used with dataset='omniglot'
     shots = 0  # Only used with dataset='omniglot'
     seed = 123123123
@@ -41,7 +42,7 @@ def femnist():
     meta_batch_size = 20
     num_meta_steps = 20000
     meta_learning_rate_initial = 1
-    meta_learning_rate_final = 0.5
+    meta_learning_rate_final = 0
 
     eval_interval = 250
     num_eval_clients_training = -1
@@ -57,6 +58,7 @@ def femnist():
 def omniglot():
     name = 'reptile'
     dataset = 'omniglot'  # Options: 'omniglot', 'femnist'
+    swap_labels = False
     classes = 5  # Only used with dataset='omniglot'
     shots = 5  # Only used with dataset='omniglot'
     seed = 0
@@ -118,6 +120,7 @@ def log_dataset_distribution(experiment_logger, tag: str, dataset: FederatedData
 def run_reptile_experiment(
     name,
     dataset,
+    swap_labels,
     classes,
     shots,
     seed,
@@ -167,6 +170,7 @@ def run_reptile_experiment(
         reptile_context = ReptileExperimentContext(
             name=name,
             dataset_name=dataset,
+            swap_labels=swap_labels,
             num_classes_per_client=classes,
             num_shots_per_class=shots,
             seed=seed,

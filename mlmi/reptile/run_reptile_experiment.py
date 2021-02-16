@@ -11,6 +11,7 @@ from mlmi.reptile.util import reptile_train_step
 from mlmi.reptile.structs import ReptileExperimentContext
 from mlmi.settings import REPO_ROOT
 from mlmi.utils import evaluate_local_models
+from mlmi.fedavg.data import swap_labels
 
 
 logger = getLogger(__name__)
@@ -48,6 +49,20 @@ def run_reptile(context: ReptileExperimentContext,
                 initial_model_state,
                 after_round_evaluation):
     RANDOM = random.Random(context.seed)
+
+    # Randomly swap labels
+    if context.swap_labels:
+        dataset_train = swap_labels(
+            fed_dataset=dataset_train,
+            max_classes_per_client=62,
+            random_seed=context.seed
+        )
+        if dataset_test is not None:
+            dataset_test = swap_labels(
+                fed_dataset=dataset_test,
+                max_classes_per_client=62,
+                random_seed=context.seed
+            )
 
     # Set up clients
     train_clients = initialize_clients(

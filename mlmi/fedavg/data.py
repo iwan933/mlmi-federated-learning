@@ -1,5 +1,6 @@
 import math
 import random
+from copy import deepcopy
 from typing import List, Optional, Tuple
 
 import torch
@@ -306,3 +307,35 @@ def _keep_only_specific_labels_from_dataloader(dataloader: data.DataLoader, labe
     dataset = data.TensorDataset(scratched_data_tensor, scratched_label_tensor)
     out_dataloader = data.DataLoader(dataset=dataset, batch_size=dataloader.batch_size, shuffle=True, drop_last=False)
     return out_dataloader, len(scratched_label_tensor)
+
+
+def swap_labels(fed_dataset: FederatedDatasetData,
+                max_classes_per_client: int,
+                random_seed: int = None):
+    """
+    Randomly swaps labels of each client in fed_dataset
+
+    Args:
+        fed_dataset (FederatedDatasetData): Federated dataset
+        max_classes_per_client (int): Maximum number of different classes per
+            client
+        random_seed (int): Random number seed
+
+    Returns:
+        FederatedDatasetData: fed_dataset with swapped labels
+    """
+    new_fed_dataset = deepcopy(fed_dataset)
+    RANDOM = np.random.RandomState(seed=random_seed)
+    for client_key in fed_dataset.train_data_local_dict.keys():
+        swap_dict = dict(zip(
+            range(max_classes_per_client),
+            RANDOM.permutation(range(max_classes_per_client))
+        ))
+        for i, item in enumerate(new_fed_dataset.train_data_local_dict[client_key].dataset.labels):
+            new_fed_dataset.train_data_local_dict[client_key].dataset.labels[i] = swap_dict[
+                item.detach().item()]
+        for i, item in enumerate(new_fed_dataset.test_data_local_dict[client_key].dataset.labels):
+            new_fed_dataset.test_data_local_dict[client_key].dataset.labels[i] = swap_dict[
+                item.detach().item()]
+
+    return new_fed_dataset

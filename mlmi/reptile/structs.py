@@ -11,6 +11,7 @@ class ReptileExperimentContext(object):
     def __init__(self,
                  name: str,
                  dataset_name: str,
+                 swap_labels: bool,
                  num_classes_per_client: int,
                  num_shots_per_class: int,
                  seed: int,
@@ -36,6 +37,7 @@ class ReptileExperimentContext(object):
 
         # Arguments pertaining to data set
         self.dataset_name = dataset_name
+        self.swap_labels = swap_labels
         self.num_classes_per_client = num_classes_per_client
         self.num_shots_per_class = num_shots_per_class
         self.num_clients_train = num_clients_train
@@ -171,7 +173,7 @@ class ReptileExperimentContext(object):
             )
         elif self.dataset_name == 'femnist':
             dataset_string = (
-                f""
+                f"{'swap' if self.swap_labels else ''}"
             )
         data_size_string = (
             f"trainc{self.num_clients_train}"
