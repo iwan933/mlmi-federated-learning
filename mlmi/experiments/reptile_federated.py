@@ -50,7 +50,7 @@ def femnist():
     num_eval_clients_final = -1
 
     inner_batch_size = 10
-    inner_learning_rate = [0.03]
+    inner_learning_rate = [0.01]
     num_inner_steps = 5
     num_inner_steps_eval = 50
 
