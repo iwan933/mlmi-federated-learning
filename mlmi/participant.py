@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 import torch
+from pytorch_lightning.metrics import Accuracy
 from torch import Tensor, optim
 from torch.utils import data
 
@@ -46,8 +47,8 @@ class BaseParticipant(object):
         self._name = participant_name
         self._cluster_id = None
         self._experiment_context = context
-        self._model_args = model_args
         self._model = model_args(participant_name=participant_name)
+        self._model_args = model_args
 
     @property
     def model(self) -> Union[pl.LightningModule, 'BaseParticipantModel']:
@@ -167,7 +168,7 @@ class BaseTrainingParticipant(BaseParticipant):
         """
         trainer = self.create_trainer(enable_logging=False, **training_args.kwargs)
         train_dataloader = self.train_data_loader
-        trainer.fit(self.model, train_dataloader, train_dataloader)
+        trainer.fit(self.model, train_dataloader)
         del self.model.trainer
 
     def test(self, model: Optional[torch.nn.Module] = None, use_local_model: bool = False):
@@ -182,9 +183,11 @@ class BaseTrainingParticipant(BaseParticipant):
         trainer = self.create_trainer(enable_logging=False, progress_bar_refresh_rate=0)
 
         if use_local_model:
-            model = self.model
-
-        result = trainer.test(model=model, test_dataloaders=self.test_data_loader, verbose=False)
+            result = trainer.test(model=self.model, test_dataloaders=self.test_data_loader, verbose=False)
+            self._model = self._model.cpu()
+            del self._model.trainer
+        else:
+            result = trainer.test(model=model, test_dataloaders=self.test_data_loader, verbose=False)
         return result
 
 

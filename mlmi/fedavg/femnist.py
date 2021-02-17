@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Optional, Tuple
 from torch.utils import data
 from torch.utils.data.dataset import T_co
 from torchvision.datasets import MNIST
@@ -161,7 +161,7 @@ def load_femnist_dataset(data_dir, num_clients=367, batch_size=10, only_digits=F
 
 
 def load_femnist_colored_dataset(data_dir, num_clients=367, batch_size=10, only_digits=False,
-                                 sample_threshold=-1, color_probabilities=(0.34, 0.33, 0.33)):
+                                 sample_threshold=-1, color_probabilities=(0.34, 0.33, 0.33), add_pattern=False):
     import torch
     import os, collections
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -197,20 +197,24 @@ def load_femnist_colored_dataset(data_dir, num_clients=367, batch_size=10, only_
     ]
     color_choices = np.random.choice(np.arange(len(color_variants)), size=len(selected_client_ids), replace=True,
                                      p=color_probabilities)
+    patterns = np.random.choice(np.arange(len(color_variants)), size=len(selected_client_ids), replace=True,
+                                p=color_probabilities)
 
-    for color_choice, client_id in zip(color_choices, selected_client_ids):
+    for color_choice, pattern, client_id in zip(color_choices, patterns, selected_client_ids):
         color_variant = color_variants[color_choice]
+        if not add_pattern:
+            pattern = None
 
         h5data_train = collections.OrderedDict((name, ds[()]) for name, ds in sorted(
             emnist_train._h5_file[HDF5ClientData._EXAMPLES_GROUP][client_id].items()))
         train_channel_data = torch.from_numpy(
-            _get_colored_pixels(h5data_train['pixels'], color_variant)).type(torch.FloatTensor)
+            _get_colored_pixels(h5data_train['pixels'], color_variant, pattern=pattern)).type(torch.FloatTensor)
         femnist_train = FEMNISTDataset(torch.from_numpy(h5data_train['label']), train_channel_data)
 
         h5data_test = collections.OrderedDict((name, ds[()]) for name, ds in sorted(
             emnist_test._h5_file[HDF5ClientData._EXAMPLES_GROUP][client_id].items()))
         test_channel_data = torch.from_numpy(
-            _get_colored_pixels(h5data_test['pixels'], color_variant)).type(torch.FloatTensor)
+            _get_colored_pixels(h5data_test['pixels'], color_variant, pattern=pattern)).type(torch.FloatTensor)
         femnist_test = FEMNISTDataset(torch.from_numpy(h5data_test['label']), test_channel_data)
 
         dl_train = data.DataLoader(femnist_train, batch_size=batch_size)
@@ -237,11 +241,21 @@ def load_femnist_colored_dataset(data_dir, num_clients=367, batch_size=10, only_
     return result_dataset
 
 
-def _get_colored_pixels(bw_images: np.ndarray, color_variant: np.ndarray):
+def _pattern_map():
+    return {
+        0: _add_dots,
+        1: _add_stripes,
+        2: _add_circles
+    }
+
+
+def _get_colored_pixels(bw_images: np.ndarray, color_variant: np.ndarray, pattern: Optional[int] = None):
     colored_images = []
     white_replacement, black_replacement = color_variant[0], color_variant[1]
     for bw_image in bw_images:
         colored_image = np.zeros((3, *bw_images.shape[1:]))
+        if pattern is not None:
+            bw_image = _pattern_map().get(pattern)(bw_image)
         for channel in range(3):
             v1 = black_replacement[channel]
             v2 = white_replacement[channel]
@@ -253,15 +267,54 @@ def _get_colored_pixels(bw_images: np.ndarray, color_variant: np.ndarray):
     return np_colored_images / 255
 
 
+def _add_stripes(original_pixels):
+    dotmap = np.ones((28, 28))
+    for r in range(4, 28, 6):
+        rnd = np.random.random_sample((len(dotmap[r]),))
+        for c in range(len(dotmap[r])):
+            dotmap[r, c] = rnd[c] * 0.4
+    return original_pixels * dotmap
+
+
+def _add_dots(original_pixels):
+    dotmap = np.ones((28, 28))
+    for r in range(4, 28, 8):
+        for c in range(4, 28, 8):
+            rnd = np.random.random_sample((8,))
+            dotmap[r, c] = rnd[0] * 0.5
+            dotmap[r - 1, c] = rnd[1] * 0.5
+            dotmap[r + 1, c] = rnd[2] * 0.5
+            dotmap[r, c - 1] = rnd[3] * 0.5
+            dotmap[r, c + 1] = rnd[4] * 0.5
+    return original_pixels * dotmap
+
+
+def _add_circles(original_pixels):
+    dotmap = np.ones((28, 28))
+    for r in range(8, 23, 10):
+        for c in range(8, 23, 10):
+            rnd = np.random.random_sample((8,))
+            dotmap[r - 2, c] = rnd[0] * 0.3
+            dotmap[r - 1, c - 1] = rnd[1] * 0.3
+            dotmap[r - 1, c + 1] = rnd[2] * 0.3
+            dotmap[r + 2, c] = rnd[3] * 0.3
+            dotmap[r + 1, c - 1] = rnd[4] * 0.3
+            dotmap[r + 1, c + 1] = rnd[5] * 0.3
+            dotmap[r, c + 2] = rnd[6] * 0.3
+            dotmap[r, c - 2] = rnd[7] * 0.3
+    return original_pixels * dotmap
+
+
 if __name__ == '__main__':
     from mlmi.settings import REPO_ROOT
     from mlmi.utils import create_tensorboard_logger
     experiment_logger = create_tensorboard_logger('colortest', 'femnist')
     dataset = load_femnist_colored_dataset(str((REPO_ROOT / 'data').absolute()))
-    dataloader = list(dataset.train_data_local_dict.values())[0]
+    dataloaders = list(dataset.train_data_local_dict.values())[0:5]
     images = []
-    for i, (x, y) in enumerate(dataloader):
-        for s in x:
-            images.append(s)
+    for dl in dataloaders:
+        for i, (x, y) in enumerate(dl):
+            for s in x:
+                images.append(s)
     images_array = np.stack(images)
     experiment_logger.experiment.add_image('test', images_array, dataformats='NCHW')

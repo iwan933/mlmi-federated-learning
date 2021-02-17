@@ -57,13 +57,16 @@ def overwrite_participants_optimizers(optimizer_state: Dict[str, Tensor], partic
             logger.error('sendign model to participant {0} failed'.format(participant._name), e)
 
 
-def _evaluate_model(participants: List['BaseTrainingParticipant'], test_on_participant):
+def _evaluate_model(participants: List['BaseTrainingParticipant'], model):
     test_losses = []
     test_acc = []
     num_participants = len(participants)
     logger.debug('testing model ...')
     for i, participant in enumerate(participants):
-        results = test_on_participant(participant)
+        if model is None:
+            results = participant.test(use_local_model=True)
+        else:
+            results = participant.test(model)
         logger.debug(f'... tested model on {i+1:<4}/{num_participants} participants')
         for result in results:
             for key in result.keys():
@@ -77,20 +80,12 @@ def _evaluate_model(participants: List['BaseTrainingParticipant'], test_on_parti
 
 
 def evaluate_local_models(participants: List['BaseTrainingParticipant']):
-
-    def _eval(participant):
-        return participant.test(use_local_model=True)
-
-    losses, acc = _evaluate_model(participants, _eval)
+    losses, acc = _evaluate_model(participants, None)
     return {'test/loss': losses, 'test/acc': acc}
 
 
 def evaluate_global_model(global_model_participant: 'BaseParticipant', participants: List['BaseTrainingParticipant']):
-
-    def _eval(participant):
-        return participant.test(model=global_model_participant.model)
-
-    losses, acc = _evaluate_model(participants, _eval)
+    losses, acc = _evaluate_model(participants, global_model_participant.model)
     return {'test/loss': losses, 'test/acc': acc}
 
 

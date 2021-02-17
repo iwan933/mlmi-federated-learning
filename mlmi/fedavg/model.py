@@ -112,7 +112,6 @@ class CNNLightning(BaseParticipantModel, pl.LightningModule):
         preds = torch.argmax(logits, dim=1)
         self.log(f'test/acc/{self.participant_name}', self.accuracy(preds, y).item())
         self.log(f'test/loss/{self.participant_name}', loss.item())
-        return loss
 
 
 class CNNMnist(nn.Module):

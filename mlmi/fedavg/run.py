@@ -135,6 +135,7 @@ def run_fedavg(
         server: Optional['FedAvgServer'] = None,
         start_round=0,
         restore_state=False,
+        after_aggregation: Optional[List[Callable]] = None,
         after_round_evaluation: Optional[List[Callable]] = None
 ):
     assert (server is None and clients is None) or (server is not None and clients is not None)
@@ -163,6 +164,10 @@ def run_fedavg(
             continue
         else:
             run_fedavg_round(server, clients, context.train_args, client_fraction=context.client_fraction)
+        # after aggregation callback
+        if after_aggregation is not None:
+            for c in after_aggregation:
+                c(server, clients, i)
         # test over all clients
         result = evaluate_global_model(global_model_participant=server, participants=clients)
         loss, acc = result.get('test/loss'), result.get('test/acc')
