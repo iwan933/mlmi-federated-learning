@@ -29,21 +29,22 @@ ex = Experiment('hierachical_clustering_reptile')
 @ex.config
 def default_configuration():
     seed = 123123123
-    hc_lr = 0.068
     name = 'hierarchical_reptile'
-    total_fedavg_rounds = 20
-    cluster_initialization_rounds = [3, 5, 10]
-    client_fraction = [0.1]
-    local_epochs = 3
-    batch_size = 10
+    dataset = 'femnist'
     num_clients = 367
+
+    hc_lr = 0.068
+    #total_fedavg_rounds = 20
+    hc_cluster_initialization_rounds = [3, 5, 10]
+    hc_client_fraction = [0.1]
+    hc_local_epochs = 3
+    hc_batch_size = 10
     sample_threshold = 250
     num_label_limit = -1
     num_classes = 62
     use_colored_images = False
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     train_cluster_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
-    dataset = 'femnist'
     num_label_limit = -1
     sample_threshold = -1
     partitioner_class = DatadependentPartitioner
@@ -62,7 +63,6 @@ def default_configuration():
     rp_meta_learning_rate_initial = 1
     rp_meta_learning_rate_final = 0
     rp_eval_interval = 250
-    rp_do_final_evaluation = True
     rp_inner_learning_rate = 0.1
     rp_num_inner_steps = 5
     rp_num_inner_steps_eval = 50
@@ -120,18 +120,18 @@ def generate_configuration(init_rounds_list, max_value_criterion_list):
 @ex.automain
 def run_hierarchical_clustering_reptile(
         seed,
-        lr,
         name,
+        dataset,
+        num_clients,
+        hc_lr,
         total_fedavg_rounds,
         cluster_initialization_rounds,
         client_fraction,
         local_epochs,
         batch_size,
-        num_clients,
         sample_threshold,
         num_label_limit,
         train_args,
-        dataset,
         partitioner_class,
         linkage_mech,
         criterion,
@@ -148,7 +148,6 @@ def run_hierarchical_clustering_reptile(
         rp_meta_learning_rate_initial,
         rp_meta_learning_rate_final,
         rp_eval_interval,
-        rp_do_final_evaluation,
         rp_inner_learning_rate,
         rp_num_inner_steps,
         rp_num_inner_steps_eval
@@ -178,6 +177,7 @@ def run_hierarchical_clustering_reptile(
     data_distribution_logged = False
     for cf in client_fraction:
         for lr_i in lr:
+            # Initialize experiment context parameters
             fedavg_optimizer_args = OptimizerArgs(optim.SGD, lr=lr_i)
             fedavg_model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args,
                                    input_channels=input_channels, only_digits=False)
@@ -203,7 +203,7 @@ def run_hierarchical_clustering_reptile(
                 meta_learning_rate_final=rp_meta_learning_rate_final,
                 eval_interval=rp_eval_interval,
                 num_eval_clients_training=-1,
-                do_final_evaluation=do_final_evaluation,
+                do_final_evaluation=True,
                 num_eval_clients_final=-1,
                 inner_batch_size=rp_inner_batch_size,
                 inner_learning_rate=rp_inner_learning_rate,
