@@ -153,4 +153,4 @@ jupyter_notebooks/
 lightning_logs/
 
 # exclude reptile/debugging
-mlmi/reptile/debugging/
+mlmi/reptile/debugging
