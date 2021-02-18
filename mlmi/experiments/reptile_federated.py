@@ -40,7 +40,7 @@ def femnist():
     num_clients_train = 367
     num_clients_test = 0  # Used only with dataset='omniglot'
     meta_batch_size = 5
-    num_meta_steps = 20000
+    num_meta_steps = 8000
     meta_learning_rate_initial = 1
     meta_learning_rate_final = 0
 
@@ -50,8 +50,8 @@ def femnist():
     num_eval_clients_final = -1
 
     inner_batch_size = 100
-    inner_learning_rate = [0.02]
-    num_inner_steps = 10
+    inner_learning_rate = [0.02, 0.01, 0.05]
+    num_inner_steps = [4, 7, 10]
     num_inner_steps_eval = 10
 
 @ex.named_config
@@ -167,51 +167,46 @@ def run_reptile_experiment(
 
     #data_distribution_logged = False
     for lr in inner_learning_rate:
-        reptile_context = ReptileExperimentContext(
-            name=name,
-            dataset_name=dataset,
-            swap_labels=swap_labels,
-            num_classes_per_client=classes,
-            num_shots_per_class=shots,
-            seed=seed,
-            model_class=model_class,
-            sgd=sgd,
-            adam_betas=adam_betas,
-            num_clients_train=num_clients_train,
-            num_clients_test=num_clients_test,
-            meta_batch_size=meta_batch_size,
-            num_meta_steps=num_meta_steps,
-            meta_learning_rate_initial=meta_learning_rate_initial,
-            meta_learning_rate_final=meta_learning_rate_final,
-            eval_interval=eval_interval,
-            num_eval_clients_training=num_eval_clients_training,
-            do_final_evaluation=do_final_evaluation,
-            num_eval_clients_final=num_eval_clients_final,
-            inner_batch_size=inner_batch_size,
-            inner_learning_rate=lr,
-            num_inner_steps=num_inner_steps,
-            num_inner_steps_eval=num_inner_steps_eval
-        )
+        for _is in num_inner_steps:
+            reptile_context = ReptileExperimentContext(
+                name=name,
+                dataset_name=dataset,
+                swap_labels=swap_labels,
+                num_classes_per_client=classes,
+                num_shots_per_class=shots,
+                seed=seed,
+                model_class=model_class,
+                sgd=sgd,
+                adam_betas=adam_betas,
+                num_clients_train=num_clients_train,
+                num_clients_test=num_clients_test,
+                meta_batch_size=meta_batch_size,
+                num_meta_steps=num_meta_steps,
+                meta_learning_rate_initial=meta_learning_rate_initial,
+                meta_learning_rate_final=meta_learning_rate_final,
+                eval_interval=eval_interval,
+                num_eval_clients_training=num_eval_clients_training,
+                do_final_evaluation=do_final_evaluation,
+                num_eval_clients_final=num_eval_clients_final,
+                inner_batch_size=inner_batch_size,
+                inner_learning_rate=lr,
+                num_inner_steps=_is,
+                num_inner_steps_eval=_is
+            )
 
-        experiment_specification = f'{reptile_context}'
-        experiment_logger = create_tensorboard_logger(
-            reptile_context.name, experiment_specification
-        )
-        reptile_context.experiment_logger = experiment_logger
+            experiment_specification = f'{reptile_context}'
+            experiment_logger = create_tensorboard_logger(
+                reptile_context.name, experiment_specification
+            )
+            reptile_context.experiment_logger = experiment_logger
 
-        #if not data_distribution_logged:
-        #    log_dataset_distribution(
-        #        experiment_logger, 'full dataset', fed_dataset_train
-        #    )
-        #    data_distribution_logged = True
-
-        log_after_round_evaluation_fns = [
-            partial(log_after_round_evaluation, experiment_logger)
-        ]
-        run_reptile(
-            context=reptile_context,
-            dataset_train=fed_dataset_train,
-            dataset_test=fed_dataset_test,
-            initial_model_state=None,
-            after_round_evaluation=log_after_round_evaluation_fns
-        )
+            log_after_round_evaluation_fns = [
+                partial(log_after_round_evaluation, experiment_logger)
+            ]
+            run_reptile(
+                context=reptile_context,
+                dataset_train=fed_dataset_train,
+                dataset_test=fed_dataset_test,
+                initial_model_state=None,
+                after_round_evaluation=log_after_round_evaluation_fns
+            )
