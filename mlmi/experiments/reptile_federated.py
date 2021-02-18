@@ -28,7 +28,7 @@ ex = Experiment('reptile')
 def femnist():
     name = 'reptile'
     dataset = 'femnist'  # Options: 'omniglot', 'femnist'
-    swap_labels = True  # Only used with dataset='femnist'
+    swap_labels = False  # Only used with dataset='femnist'
     classes = 0  # Only used with dataset='omniglot'
     shots = 0  # Only used with dataset='omniglot'
     seed = 123123123
@@ -39,7 +39,7 @@ def femnist():
 
     num_clients_train = 367
     num_clients_test = 0  # Used only with dataset='omniglot'
-    meta_batch_size = 5
+    meta_batch_size = 10
     num_meta_steps = 20000
     meta_learning_rate_initial = 1
     meta_learning_rate_final = 0
@@ -52,7 +52,7 @@ def femnist():
     inner_batch_size = 10
     inner_learning_rate = [0.1]
     num_inner_steps = 10
-    num_inner_steps_eval = 100
+    num_inner_steps_eval = 50
 
 @ex.named_config
 def omniglot():

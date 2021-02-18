@@ -63,7 +63,7 @@ def default_configuration():
     rp_meta_learning_rate_final = 0
     rp_eval_interval = 250
     rp_do_final_evaluation = True
-    rp_inner_learning_rate = [0.1]
+    rp_inner_learning_rate = 0.1
     rp_num_inner_steps = 5
     rp_num_inner_steps_eval = 50
 
