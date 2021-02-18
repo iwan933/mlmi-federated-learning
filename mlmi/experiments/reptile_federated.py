@@ -51,7 +51,7 @@ def femnist():
 
     inner_batch_size = 100
     inner_learning_rate = [0.02, 0.01, 0.05]
-    num_inner_steps = [4, 7, 10]
+    num_inner_steps = [4, 7, 10, 20]
     num_inner_steps_eval = 10
 
 @ex.named_config
