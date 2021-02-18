@@ -1,3 +1,6 @@
+import sys
+sys.path.append('C:/Users/Richard/Desktop/Informatik/Semester_5/MLMI/git/mlmi-federated-learning')
+
 from typing import Callable, Dict, List, Optional
 
 from sacred import Experiment
@@ -32,29 +35,25 @@ def default_configuration():
     name = 'hierarchical_reptile'
     dataset = 'femnist'
     num_clients = 367
+    batch_size = 10
+    num_label_limit = -1
+    use_colored_images = False
+    sample_threshold = -1
 
     hc_lr = 0.068
-    #total_fedavg_rounds = 20
+    hc_total_fedavg_rounds = 20
     hc_cluster_initialization_rounds = [3, 5, 10]
     hc_client_fraction = [0.1]
     hc_local_epochs = 3
-    hc_batch_size = 10
-    sample_threshold = 250
-    num_label_limit = -1
-    num_classes = 62
-    use_colored_images = False
-    train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
-    train_cluster_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
-    num_label_limit = -1
-    sample_threshold = -1
-    partitioner_class = DatadependentPartitioner
-    linkage_mech = 'ward'
-    criterion = 'distance'
-    dis_metric = 'euclidean'
-    max_value_criterion = 15.0
-    reallocate_clients = False
-    threshold_min_client_cluster = 80
-    use_colored_images = False
+    hc_train_args = TrainArgs(max_epochs=hc_local_epochs, min_epochs=hc_local_epochs, progress_bar_refresh_rate=0)
+    hc_train_cluster_args = TrainArgs(max_epochs=hc_local_epochs, min_epochs=hc_local_epochs, progress_bar_refresh_rate=0)
+    hc_partitioner_class = DatadependentPartitioner
+    hc_linkage_mech = 'ward'
+    hc_criterion = 'distance'
+    hc_dis_metric = 'euclidean'
+    hc_max_value_criterion = 15.0
+    hc_reallocate_clients = False
+    hc_threshold_min_client_cluster = 80
 
     rp_sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
     rp_adam_betas = (0.9, 0.999)  # Used only if sgd = False
@@ -123,24 +122,24 @@ def run_hierarchical_clustering_reptile(
         name,
         dataset,
         num_clients,
-        hc_lr,
-        total_fedavg_rounds,
-        cluster_initialization_rounds,
-        client_fraction,
-        local_epochs,
         batch_size,
-        sample_threshold,
         num_label_limit,
-        train_args,
-        partitioner_class,
-        linkage_mech,
-        criterion,
-        dis_metric,
-        max_value_criterion,
-        reallocate_clients,
-        threshold_min_client_cluster,
         use_colored_images,
-        train_cluster_args,
+        sample_threshold,
+        hc_lr,
+        hc_total_fedavg_rounds,
+        hc_cluster_initialization_rounds,
+        hc_client_fraction,
+        hc_local_epochs,
+        hc_train_args,
+        hc_partitioner_class,
+        hc_linkage_mech,
+        hc_criterion,
+        hc_dis_metric,
+        hc_max_value_criterion,
+        hc_reallocate_clients,
+        hc_threshold_min_client_cluster,
+        hc_train_cluster_args,
         rp_sgd,  # True -> Use SGD as inner optimizer; False -> Use Adam
         rp_adam_betas,  # Used only if sgd = False
         rp_meta_batch_size,
@@ -157,34 +156,51 @@ def run_hierarchical_clustering_reptile(
 
     if dataset == 'femnist':
         if use_colored_images:
-            fed_dataset = load_femnist_colored_dataset(str((REPO_ROOT / 'data').absolute()),
-                                                       num_clients=num_clients, batch_size=batch_size,
-                                                       sample_threshold=sample_threshold)
+            fed_dataset = load_femnist_colored_dataset(
+                data_dir=str((REPO_ROOT / 'data').absolute()),
+                num_clients=num_clients,
+                batch_size=batch_size,
+                sample_threshold=sample_threshold
+            )
         else:
-            fed_dataset = load_femnist_dataset(str((REPO_ROOT / 'data').absolute()),
-                                               num_clients=num_clients, batch_size=batch_size,
-                                               sample_threshold=sample_threshold)
+            fed_dataset = load_femnist_dataset(
+                data_dir=str((REPO_ROOT / 'data').absolute()),
+                num_clients=num_clients,
+                batch_size=batch_size,
+                sample_threshold=sample_threshold
+            )
         if num_label_limit != -1:
             fed_dataset = scratch_labels(fed_dataset, num_label_limit)
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
 
-    if not hasattr(max_value_criterion, '__iter__'):
-        max_value_criterion = [max_value_criterion]
-    if not hasattr(lr, '__iter__'):
-        lr = [lr]
+    if not hasattr(hc_max_value_criterion, '__iter__'):
+        hc_max_value_criterion = [hc_max_value_criterion]
+    if not hasattr(hc_lr, '__iter__'):
+        hc_lr = [hc_lr]
     input_channels = 3 if use_colored_images else 1
     data_distribution_logged = False
-    for cf in client_fraction:
-        for lr_i in lr:
+    for cf in hc_client_fraction:
+        for lr_i in hc_lr:
             # Initialize experiment context parameters
             fedavg_optimizer_args = OptimizerArgs(optim.SGD, lr=lr_i)
-            fedavg_model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args,
-                                   input_channels=input_channels, only_digits=False)
-            fedavg_context = FedAvgExperimentContext(name=name, client_fraction=cf, local_epochs=local_epochs,
-                                                     lr=lr_i, batch_size=batch_size, optimizer_args=optimizer_args,
-                                                     model_args=model_args, train_args=train_args,
-                                                     dataset_name=dataset)
+            fedavg_model_args = ModelArgs(
+                CNNLightning,
+                optimizer_args=fedavg_optimizer_args,
+                input_channels=input_channels,
+                only_digits=False
+            )
+            fedavg_context = FedAvgExperimentContext(
+                name=name,
+                client_fraction=cf,
+                local_epochs=hc_local_epochs,
+                lr=lr_i,
+                batch_size=batch_size,
+                optimizer_args=fedavg_optimizer_args,
+                model_args=fedavg_model_args,
+                train_args=hc_train_args,
+                dataset_name=dataset
+            )
             reptile_context = ReptileExperimentContext(
                 name=name,
                 dataset_name=dataset,
@@ -195,7 +211,7 @@ def run_hierarchical_clustering_reptile(
                 model_class=CNNLightning,
                 sgd=rp_sgd,
                 adam_betas=rp_adam_betas,
-                num_clients_train=rp_num_clients_train,
+                num_clients_train=num_clients,
                 num_clients_test=0,
                 meta_batch_size=rp_meta_batch_size,
                 num_meta_steps=rp_num_meta_steps,
@@ -205,13 +221,13 @@ def run_hierarchical_clustering_reptile(
                 num_eval_clients_training=-1,
                 do_final_evaluation=True,
                 num_eval_clients_final=-1,
-                inner_batch_size=rp_inner_batch_size,
+                inner_batch_size=batch_size,
                 inner_learning_rate=rp_inner_learning_rate,
                 num_inner_steps=rp_num_inner_steps,
                 num_inner_steps_eval=rp_num_inner_steps_eval
             )
             experiment_specification = f'{fedavg_context}_{reptile_context}'
-            experiment_logger = create_tensorboard_logger(fedavg_context.name, experiment_specification)
+            experiment_logger = create_tensorboard_logger(name, experiment_specification)
             if not data_distribution_logged:
                 log_dataset_distribution(experiment_logger, 'full dataset', fed_dataset)
                 data_distribution_logged = True
@@ -220,9 +236,14 @@ def run_hierarchical_clustering_reptile(
                 partial(log_after_round_evaluation, experiment_logger, 'fedavg'),
                 partial(log_after_round_evaluation, experiment_logger, global_tag)
             ]
-            server, clients = run_fedavg(context=fedavg_context, num_rounds=total_fedavg_rounds, dataset=fed_dataset,
-                                         save_states=True, restore_state=True,
-                                         after_round_evaluation=log_after_round_evaluation_fns)
+            server, clients = run_fedavg(
+                context=fedavg_context,
+                num_rounds=hc_total_fedavg_rounds,
+                dataset=fed_dataset,
+                save_states=True,
+                restore_state=True,
+                after_round_evaluation=log_after_round_evaluation_fns
+            )
 
             for init_rounds, max_value in generate_configuration(cluster_initialization_rounds, max_value_criterion):
                 # load the model state
@@ -231,31 +252,34 @@ def run_hierarchical_clustering_reptile(
                 # initialize the cluster configuration
                 round_configuration = {
                     'num_rounds_init': init_rounds,
-                    'num_rounds_cluster': total_fedavg_rounds - init_rounds
+                    'num_rounds_cluster': hc_total_fedavg_rounds - init_rounds
                 }
                 if partitioner_class == DatadependentPartitioner:
-                    clustering_dataset = load_femnist_colored_dataset(str((REPO_ROOT / 'data').absolute()),
-                                                              num_clients=num_clients, batch_size=batch_size,
-                                                              sample_threshold=sample_threshold)
+                    clustering_dataset = load_femnist_colored_dataset(
+                        data_dir=str((REPO_ROOT / 'data').absolute()),
+                        num_clients=num_clients,
+                        batch_size=batch_size,
+                        sample_threshold=sample_threshold
+                    )
                     dataloader = load_n_of_each_class(clustering_dataset, n=5,
                                                       tabu=list(fed_dataset.train_data_local_dict.keys()))
-                    cluster_args = ClusterArgs(partitioner_class, linkage_mech=linkage_mech,
-                                               criterion=criterion, dis_metric=dis_metric,
+                    cluster_args = ClusterArgs(partitioner_class, linkage_mech=hc_linkage_mech,
+                                               criterion=hc_criterion, dis_metric=hc_dis_metric,
                                                max_value_criterion=max_value,
-                                               plot_dendrogram=False, reallocate_clients=reallocate_clients,
-                                               threshold_min_client_cluster=threshold_min_client_cluster,
+                                               plot_dendrogram=False, reallocate_clients=hc_reallocate_clients,
+                                               threshold_min_client_cluster=hc_threshold_min_client_cluster,
                                                dataloader=dataloader,
                                                **round_configuration)
                 else:
-                    cluster_args = ClusterArgs(partitioner_class, linkage_mech=linkage_mech,
-                                               criterion=criterion, dis_metric=dis_metric,
+                    cluster_args = ClusterArgs(partitioner_class, linkage_mech=hc_linkage_mech,
+                                               criterion=hc_criterion, dis_metric=hc_dis_metric,
                                                max_value_criterion=max_value,
-                                               plot_dendrogram=False, reallocate_clients=reallocate_clients,
-                                               threshold_min_client_cluster=threshold_min_client_cluster,
+                                               plot_dendrogram=False, reallocate_clients=hc_reallocate_clients,
+                                               threshold_min_client_cluster=hc_threshold_min_client_cluster,
                                                **round_configuration)
                 # create new logger for cluster experiment
                 experiment_specification = f'{fedavg_context}_{cluster_args}'
-                experiment_logger = create_tensorboard_logger(fedavg_context.name, experiment_specification)
+                experiment_logger = create_tensorboard_logger(name, experiment_specification)
                 fedavg_context.experiment_logger = experiment_logger
 
                 initial_train_fn = partial(run_fedavg_train_round, round_model_state, training_args=train_cluster_args)
@@ -318,9 +342,9 @@ def run_hierarchical_clustering_reptile(
                             meta_batch = participants
                         else:
                             meta_batch = [
-                                train_clients[k] for k in cyclerange(
-                                    start=i * context.meta_batch_size % len(participants),
-                                    stop=(i + 1) * context.meta_batch_size % len(participants),
+                                participants[k] for k in cyclerange(
+                                    start=i * reptile_context.meta_batch_size % len(participants),
+                                    stop=(i + 1) * reptile_context.meta_batch_size % len(participants),
                                     len=len(participants)
                                 )
                             ]
@@ -360,25 +384,24 @@ def run_hierarchical_clustering_reptile(
 
                     for cluster_id, participants in cluster_clients_dic.items():
                         # Final evaluation on train and test clients
-                        if i % reptile_context.eval_interval == 0:
-                            # Test on all clients inside clusters
-                            reptile_train_step(
-                                aggregator=cluster_server_dic[cluster_id],
-                                participants=participants,
-                                inner_training_args=reptile_context.get_inner_training_args(
-                                    eval=True),
-                                evaluation_mode=True
-                            )
-                            result = evaluate_local_models(participants=participants)
-                            loss = result.get('test/loss')
-                            accs = result.get('test/acc')
-                            global_loss.extend(loss.tolist())
-                            global_loss.extend(acc.tolist())
+                        # Test on all clients inside clusters
+                        reptile_train_step(
+                            aggregator=cluster_server_dic[cluster_id],
+                            participants=participants,
+                            inner_training_args=reptile_context.get_inner_training_args(
+                                eval=True),
+                            evaluation_mode=True
+                        )
+                        result = evaluate_local_models(participants=participants)
+                        loss = result.get('test/loss')
+                        accs = result.get('test/acc')
+                        global_loss.extend(loss.tolist())
+                        global_acc.extend(acc.tolist())
 
-                            # Log
-                            if after_round_evaluation is not None:
-                                for c in after_round_evaluation:
-                                    c(f'cluster_{cluster_id}', loss, acc, i)
+                        # Log
+                        if after_round_evaluation is not None:
+                            for c in after_round_evaluation:
+                                c(f'cluster_{cluster_id}', loss, acc, reptile_context.num_meta_steps)
 
                     experiment_logger.add_scalar('Final_loss', mean(global_loss), global_step=0)
                     experiment_logger.add_scalar('Final_acc', mean(global_acc), global_step=0)

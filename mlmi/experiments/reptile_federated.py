@@ -39,7 +39,7 @@ def femnist():
 
     num_clients_train = 367
     num_clients_test = 0  # Used only with dataset='omniglot'
-    meta_batch_size = 20
+    meta_batch_size = 5
     num_meta_steps = 20000
     meta_learning_rate_initial = 1
     meta_learning_rate_final = 0
@@ -51,8 +51,8 @@ def femnist():
 
     inner_batch_size = 100
     inner_learning_rate = [0.02]
-    num_inner_steps = 50
-    num_inner_steps_eval = 50
+    num_inner_steps = 5
+    num_inner_steps_eval = 5
 
 @ex.named_config
 def omniglot():
