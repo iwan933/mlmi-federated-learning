@@ -245,7 +245,7 @@ def run_hierarchical_clustering_reptile(
                 after_round_evaluation=log_after_round_evaluation_fns
             )
 
-            for init_rounds, max_value in generate_configuration(cluster_initialization_rounds, max_value_criterion):
+            for init_rounds, max_value in generate_configuration(hc_cluster_initialization_rounds, hc_max_value_criterion):
                 # load the model state
                 round_model_state = load_fedavg_state(fedavg_context, init_rounds)
                 overwrite_participants_models(round_model_state, clients)

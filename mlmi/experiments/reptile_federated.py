@@ -51,8 +51,8 @@ def femnist():
 
     inner_batch_size = 100
     inner_learning_rate = [0.02]
-    num_inner_steps = 2
-    num_inner_steps_eval = 2
+    num_inner_steps = 10
+    num_inner_steps_eval = 10
 
 @ex.named_config
 def omniglot():
