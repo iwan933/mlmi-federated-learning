@@ -135,9 +135,10 @@ def run_hierarchical_clustering_reptile(
         hc_linkage_mech,
         hc_criterion,
         hc_dis_metric,
-        hc_max_value_criterion,
-        hc_reallocate_clients,
-        hc_threshold_min_client_cluster,
+        hc_max_value_criterion,  # distance threshold
+        hc_reallocate_clients,  #
+        hc_threshold_min_client_cluster,  # only with hc_reallocate_clients = True,
+                                          # results in clusters having at least this number of clients
         hc_train_cluster_args,
         rp_sgd,  # True -> Use SGD as inner optimizer; False -> Use Adam
         rp_adam_betas,  # Used only if sgd = False
