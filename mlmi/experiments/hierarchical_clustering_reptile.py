@@ -126,7 +126,6 @@ def run_hierarchical_clustering_reptile(
         use_colored_images,
         sample_threshold,
         hc_lr,
-        hc_total_fedavg_rounds,
         hc_cluster_initialization_rounds,
         hc_client_fraction,
         hc_local_epochs,
