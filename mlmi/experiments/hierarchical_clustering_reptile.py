@@ -2,10 +2,12 @@ import sys
 sys.path.append('C:/Users/Richard/Desktop/Informatik/Semester_5/MLMI/git/mlmi-federated-learning')
 
 from typing import Callable, Dict, List, Optional
+import random
 
 from sacred import Experiment
 from functools import partial
 
+import torch
 from torch import Tensor, optim
 
 from mlmi.clustering import DatadependentPartitioner, ModelFlattenWeightsPartitioner, AlternativePartitioner, \
@@ -22,11 +24,17 @@ from mlmi.participant import BaseTrainingParticipant
 from mlmi.plot import generate_client_label_heatmap, generate_data_label_heatmap
 from mlmi.settings import REPO_ROOT
 from mlmi.structs import ClusterArgs, FederatedDatasetData, ModelArgs, OptimizerArgs, TrainArgs
-from mlmi.utils import create_tensorboard_logger, fix_random_seeds, overwrite_participants_models
+from mlmi.utils import create_tensorboard_logger, fix_random_seeds, overwrite_participants_models, \
+    evaluate_local_models
 
 from mlmi.reptile.structs import ReptileExperimentContext
+from mlmi.reptile.model import ReptileServer
+from mlmi.reptile.run_reptile_experiment import cyclerange
+from mlmi.reptile.util import reptile_train_step
+from mlmi.log import getLogger
 
 ex = Experiment('hierachical_clustering_reptile')
+logger = getLogger(__name__)
 
 
 @ex.config
@@ -40,30 +48,30 @@ def default_configuration():
     use_colored_images = False
     sample_threshold = -1
 
-    hc_lr = 0.068
+    hc_lr = 0.065
     hc_cluster_initialization_rounds = [8]
     hc_client_fraction = [0.1]
     hc_local_epochs = 3
     hc_train_args = TrainArgs(max_epochs=hc_local_epochs, min_epochs=hc_local_epochs, progress_bar_refresh_rate=0)
     hc_train_cluster_args = TrainArgs(max_epochs=hc_local_epochs, min_epochs=hc_local_epochs, progress_bar_refresh_rate=0)
-    hc_partitioner_class = DatadependentPartitioner
+    hc_partitioner_class = ModelFlattenWeightsPartitioner
     hc_linkage_mech = 'ward'
     hc_criterion = 'distance'
     hc_dis_metric = 'euclidean'
-    hc_max_value_criterion = 15.0
+    hc_max_value_criterion = 6.00
     hc_reallocate_clients = False
     hc_threshold_min_client_cluster = 80
 
     rp_sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
     rp_adam_betas = (0.9, 0.999)  # Used only if sgd = False
     rp_meta_batch_size = 5
-    rp_num_meta_steps = 100
+    rp_num_meta_steps = 5000
     rp_meta_learning_rate_initial = 1
     rp_meta_learning_rate_final = 0
     rp_eval_interval = 10
-    rp_inner_learning_rate = 0.1
-    rp_num_inner_steps = 5
-    rp_num_inner_steps_eval = 50
+    rp_inner_learning_rate = 0.05
+    rp_num_inner_steps = 7
+    rp_num_inner_steps_eval = 7
 
 
 def log_after_round_evaluation(
@@ -252,14 +260,14 @@ def run_hierarchical_clustering_reptile(
                     'num_rounds_init': init_rounds,
                     'num_rounds_cluster': 0
                 }
-                cluster_args = ClusterArgs(partitioner_class, linkage_mech=hc_linkage_mech,
+                cluster_args = ClusterArgs(hc_partitioner_class, linkage_mech=hc_linkage_mech,
                                            criterion=hc_criterion, dis_metric=hc_dis_metric,
                                            max_value_criterion=max_value,
                                            plot_dendrogram=False, reallocate_clients=hc_reallocate_clients,
                                            threshold_min_client_cluster=hc_threshold_min_client_cluster,
                                            **round_configuration)
                 # create new logger for cluster experiment
-                experiment_specification = f'{fedavg_context}_{cluster_args}'  # TODO: Solve logging
+                experiment_specification = f'{fedavg_context}_{cluster_args}_{reptile_context}'  # TODO: Solve logging
                 experiment_logger = create_tensorboard_logger(name, experiment_specification)
                 fedavg_context.experiment_logger = experiment_logger
 
@@ -286,8 +294,8 @@ def run_hierarchical_clustering_reptile(
                     intermediate_cluster_server = create_aggregator_fn('cluster_server' + cluster_id)
                     intermediate_cluster_server.aggregate(participants)
                     cluster_server = ReptileServer(
-                        participant_name='cluster_server' + cluster_id,
-                        model_args=model_args,
+                        participant_name=f'cluster_server{cluster_id}',
+                        model_args=reptile_context.meta_model_args,
                         context=reptile_context,
                         initial_model_state=intermediate_cluster_server.model.state_dict()
                     )
@@ -296,7 +304,8 @@ def run_hierarchical_clustering_reptile(
                     cluster_server_dic[cluster_id] = cluster_server
 
                 # REPTILE TRAINING INSIDE CLUSTERS
-                RANDOM = random.Random(context.seed)
+                after_round_evaluation = [log_after_round_evaluation]
+                RANDOM = random.Random(seed)
 
                 # Perform training
                 for i in range(reptile_context.num_meta_steps):
@@ -333,18 +342,18 @@ def run_hierarchical_clustering_reptile(
                             )
                             result = evaluate_local_models(participants=participants)
                             loss = result.get('test/loss')
-                            accs = result.get('test/acc')
+                            acc = result.get('test/acc')
 
                             # Log
                             if after_round_evaluation is not None:
                                 for c in after_round_evaluation:
-                                    c(f'cluster_{cluster_id}', loss, acc, i)
+                                    c(experiment_logger, f'cluster_{cluster_id}', loss, acc, i)
 
-                    logger.info('finished training round')
+                    logger.info(f'Finished Reptile training round {i}')
 
                 # Final evaluation at end of training
                 if reptile_context.do_final_evaluation:
-                    global_loss, global_acc = [], []
+                    global_loss, global_acc = Tensor([]), Tensor([])
 
                     for cluster_id, participants in cluster_clients_dic.items():
                         # Final evaluation on train and test clients
@@ -358,14 +367,14 @@ def run_hierarchical_clustering_reptile(
                         )
                         result = evaluate_local_models(participants=participants)
                         loss = result.get('test/loss')
-                        accs = result.get('test/acc')
-                        global_loss.extend(loss.tolist())
-                        global_acc.extend(acc.tolist())
+                        acc = result.get('test/acc')
+
+                        global_loss = torch.cat((global_loss, loss))
+                        global_acc = torch.cat((global_acc, acc))
 
                         # Log
                         if after_round_evaluation is not None:
                             for c in after_round_evaluation:
-                                c(f'cluster_{cluster_id}', loss, acc, reptile_context.num_meta_steps)
+                                c(experiment_logger, f'cluster_{cluster_id}', loss, acc, reptile_context.num_meta_steps)
 
-                    experiment_logger.add_scalar('Final_loss', mean(global_loss), global_step=0)
-                    experiment_logger.add_scalar('Final_acc', mean(global_acc), global_step=0)
+                    log_loss_and_acc('final_overall_mean', global_loss, global_acc, experiment_logger, 0)
