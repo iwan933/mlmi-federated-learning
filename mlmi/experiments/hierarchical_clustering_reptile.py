@@ -41,8 +41,7 @@ def default_configuration():
     sample_threshold = -1
 
     hc_lr = 0.068
-    hc_total_fedavg_rounds = 20
-    hc_cluster_initialization_rounds = [3, 5, 10]
+    hc_cluster_initialization_rounds = [3]
     hc_client_fraction = [0.1]
     hc_local_epochs = 3
     hc_train_args = TrainArgs(max_epochs=hc_local_epochs, min_epochs=hc_local_epochs, progress_bar_refresh_rate=0)
@@ -58,10 +57,10 @@ def default_configuration():
     rp_sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
     rp_adam_betas = (0.9, 0.999)  # Used only if sgd = False
     rp_meta_batch_size = 5
-    rp_num_meta_steps = 20000
+    rp_num_meta_steps = 100
     rp_meta_learning_rate_initial = 1
     rp_meta_learning_rate_final = 0
-    rp_eval_interval = 250
+    rp_eval_interval = 10
     rp_inner_learning_rate = 0.1
     rp_num_inner_steps = 5
     rp_num_inner_steps_eval = 50
@@ -238,7 +237,7 @@ def run_hierarchical_clustering_reptile(
             ]
             server, clients = run_fedavg(
                 context=fedavg_context,
-                num_rounds=hc_total_fedavg_rounds,
+                num_rounds=max(hc_cluster_initialization_rounds),
                 dataset=fed_dataset,
                 save_states=True,
                 restore_state=True,
@@ -248,11 +247,10 @@ def run_hierarchical_clustering_reptile(
             for init_rounds, max_value in generate_configuration(hc_cluster_initialization_rounds, hc_max_value_criterion):
                 # load the model state
                 round_model_state = load_fedavg_state(fedavg_context, init_rounds)
-                overwrite_participants_models(round_model_state, clients)
                 # initialize the cluster configuration
                 round_configuration = {
                     'num_rounds_init': init_rounds,
-                    'num_rounds_cluster': hc_total_fedavg_rounds - init_rounds
+                    'num_rounds_cluster': 0
                 }
                 if partitioner_class == DatadependentPartitioner:
                     clustering_dataset = load_femnist_colored_dataset(
@@ -282,27 +280,10 @@ def run_hierarchical_clustering_reptile(
                 experiment_logger = create_tensorboard_logger(name, experiment_specification)
                 fedavg_context.experiment_logger = experiment_logger
 
-                initial_train_fn = partial(run_fedavg_train_round, round_model_state, training_args=train_cluster_args)
-                create_aggregator_fn = partial(FedAvgServer, model_args=model_args, context=fedavg_context)
-
-                after_post_clustering_evaluation = [
-                    partial(log_after_round_evaluation, experiment_logger, 'post_clustering')
-                ]
-                after_clustering_round_evaluation = [
-                    partial(log_after_round_evaluation, experiment_logger)
-                ]
-                after_federated_round_evaluation = [
-                    partial(log_after_round_evaluation, experiment_logger, 'final hierarchical'),
-                    partial(log_after_round_evaluation, experiment_logger, global_tag)
-                ]
-                after_clustering_fn = [
-                    partial(log_cluster_distribution, experiment_logger, num_classes=fed_dataset.class_num),
-                    partial(log_sample_images_from_each_client, experiment_logger)
-                ]
+                initial_train_fn = partial(run_fedavg_train_round, round_model_state, training_args=hc_train_cluster_args)
+                create_aggregator_fn = partial(FedAvgServer, model_args=fedavg_model_args, context=fedavg_context)
 
                 # HIERARCHICAL CLUSTERING
-                num_rounds_init = cluster_args.num_rounds_init
-                num_rounds_cluster = cluster_args.num_rounds_cluster
                 logger.debug('starting local training before clustering.')
                 trained_participants = initial_train_fn(clients)
                 if len(trained_participants) != len(clients):
