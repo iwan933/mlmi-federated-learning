@@ -41,7 +41,7 @@ def default_configuration():
     sample_threshold = -1
 
     hc_lr = 0.068
-    hc_cluster_initialization_rounds = [3]
+    hc_cluster_initialization_rounds = [8]
     hc_client_fraction = [0.1]
     hc_local_epochs = 3
     hc_train_args = TrainArgs(max_epochs=hc_local_epochs, min_epochs=hc_local_epochs, progress_bar_refresh_rate=0)
@@ -225,7 +225,7 @@ def run_hierarchical_clustering_reptile(
                 num_inner_steps=rp_num_inner_steps,
                 num_inner_steps_eval=rp_num_inner_steps_eval
             )
-            experiment_specification = f'{fedavg_context}_{reptile_context}'
+            experiment_specification = f'{fedavg_context}'
             experiment_logger = create_tensorboard_logger(name, experiment_specification)
             if not data_distribution_logged:
                 log_dataset_distribution(experiment_logger, 'full dataset', fed_dataset)
@@ -237,7 +237,7 @@ def run_hierarchical_clustering_reptile(
             ]
             server, clients = run_fedavg(
                 context=fedavg_context,
-                num_rounds=max(hc_cluster_initialization_rounds),
+                num_rounds=75,  # max(hc_cluster_initialization_rounds),
                 dataset=fed_dataset,
                 save_states=True,
                 restore_state=True,
@@ -252,31 +252,14 @@ def run_hierarchical_clustering_reptile(
                     'num_rounds_init': init_rounds,
                     'num_rounds_cluster': 0
                 }
-                if partitioner_class == DatadependentPartitioner:
-                    clustering_dataset = load_femnist_colored_dataset(
-                        data_dir=str((REPO_ROOT / 'data').absolute()),
-                        num_clients=num_clients,
-                        batch_size=batch_size,
-                        sample_threshold=sample_threshold
-                    )
-                    dataloader = load_n_of_each_class(clustering_dataset, n=5,
-                                                      tabu=list(fed_dataset.train_data_local_dict.keys()))
-                    cluster_args = ClusterArgs(partitioner_class, linkage_mech=hc_linkage_mech,
-                                               criterion=hc_criterion, dis_metric=hc_dis_metric,
-                                               max_value_criterion=max_value,
-                                               plot_dendrogram=False, reallocate_clients=hc_reallocate_clients,
-                                               threshold_min_client_cluster=hc_threshold_min_client_cluster,
-                                               dataloader=dataloader,
-                                               **round_configuration)
-                else:
-                    cluster_args = ClusterArgs(partitioner_class, linkage_mech=hc_linkage_mech,
-                                               criterion=hc_criterion, dis_metric=hc_dis_metric,
-                                               max_value_criterion=max_value,
-                                               plot_dendrogram=False, reallocate_clients=hc_reallocate_clients,
-                                               threshold_min_client_cluster=hc_threshold_min_client_cluster,
-                                               **round_configuration)
+                cluster_args = ClusterArgs(partitioner_class, linkage_mech=hc_linkage_mech,
+                                           criterion=hc_criterion, dis_metric=hc_dis_metric,
+                                           max_value_criterion=max_value,
+                                           plot_dendrogram=False, reallocate_clients=hc_reallocate_clients,
+                                           threshold_min_client_cluster=hc_threshold_min_client_cluster,
+                                           **round_configuration)
                 # create new logger for cluster experiment
-                experiment_specification = f'{fedavg_context}_{cluster_args}'
+                experiment_specification = f'{fedavg_context}_{cluster_args}'  # TODO: Solve logging
                 experiment_logger = create_tensorboard_logger(name, experiment_specification)
                 fedavg_context.experiment_logger = experiment_logger
 
