@@ -49,10 +49,10 @@ def default_configuration():
     use_colored_images = False
     sample_threshold = -1
 
-    hc_lr = 0.065
+    hc_lr = 0.05
     hc_cluster_initialization_rounds = [70]
     hc_client_fraction = [0.1]
-    hc_local_epochs = 3
+    hc_local_epochs = 7
     hc_train_args = TrainArgs(max_epochs=hc_local_epochs, min_epochs=hc_local_epochs, progress_bar_refresh_rate=0)
     hc_train_cluster_args = TrainArgs(max_epochs=hc_local_epochs, min_epochs=hc_local_epochs, progress_bar_refresh_rate=0)
     hc_partitioner_class = ModelFlattenWeightsPartitioner
@@ -371,6 +371,7 @@ def run_hierarchical_clustering_reptile(
                         result = evaluate_local_models(participants=participants)
                         loss = result.get('test/loss')
                         acc = result.get('test/acc')
+                        print(f'Cluster {cluster_id} ({len(participants)} part.): loss = {loss}, acc = {acc}')
 
                         global_loss = torch.cat((global_loss, loss))
                         global_acc = torch.cat((global_acc, acc))
