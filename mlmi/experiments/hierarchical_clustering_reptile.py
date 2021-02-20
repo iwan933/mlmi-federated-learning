@@ -40,7 +40,7 @@ def default_configuration():
     name = 'hierarchical_reptile'
     dataset = 'femnist'
     num_clients = 367
-    batch_size = 100
+    batch_size = 50
     num_label_limit = -1
     use_colored_images = False
     sample_threshold = -1
