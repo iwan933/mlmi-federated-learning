@@ -44,15 +44,15 @@ def default_configuration():
     name = 'hierarchical_reptile'
     dataset = 'femnist'
     num_clients = 367
-    batch_size = 100
+    batch_size = 10
     num_label_limit = -1
     use_colored_images = False
     sample_threshold = -1
 
-    hc_lr = 0.05
+    hc_lr = 0.065
     hc_cluster_initialization_rounds = [70]
     hc_client_fraction = [0.1]
-    hc_local_epochs = 7
+    hc_local_epochs = 3
     hc_train_args = TrainArgs(max_epochs=hc_local_epochs, min_epochs=hc_local_epochs, progress_bar_refresh_rate=0)
     hc_train_cluster_args = TrainArgs(max_epochs=hc_local_epochs, min_epochs=hc_local_epochs, progress_bar_refresh_rate=0)
     hc_partitioner_class = ModelFlattenWeightsPartitioner
