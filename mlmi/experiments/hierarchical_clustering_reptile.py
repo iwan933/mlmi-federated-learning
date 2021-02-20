@@ -285,6 +285,7 @@ def run_hierarchical_clustering_reptile(
                 _cluster_clients_dic = dict()
                 for cluster_id, participants in cluster_clients_dic.items():
                     _cluster_clients_dic[cluster_id] = [c._name for c in participants]
+                log_cluster_distribution(experiment_logger, cluster_clients_dic, 62)
 
                 # Initialize cluster models
                 cluster_server_dic = {}
