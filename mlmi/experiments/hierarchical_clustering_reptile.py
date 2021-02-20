@@ -1,3 +1,7 @@
+import sys
+sys.path.append('C:/Users/Richard/Desktop/Informatik/Semester_5/MLMI/git/mlmi-federated-learning')
+
+
 from typing import Callable, Dict, List, Optional
 import random
 
@@ -46,7 +50,7 @@ def default_configuration():
     sample_threshold = -1
 
     hc_lr = 0.065
-    hc_cluster_initialization_rounds = [8]
+    hc_cluster_initialization_rounds = [70]
     hc_client_fraction = [0.1]
     hc_local_epochs = 3
     hc_train_args = TrainArgs(max_epochs=hc_local_epochs, min_epochs=hc_local_epochs, progress_bar_refresh_rate=0)
