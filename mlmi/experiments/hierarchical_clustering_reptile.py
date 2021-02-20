@@ -1,6 +1,3 @@
-import sys
-sys.path.append('C:/Users/Richard/Desktop/Informatik/Semester_5/MLMI/git/mlmi-federated-learning')
-
 from typing import Callable, Dict, List, Optional
 import random
 
@@ -43,7 +40,7 @@ def default_configuration():
     name = 'hierarchical_reptile'
     dataset = 'femnist'
     num_clients = 367
-    batch_size = 10
+    batch_size = 100
     num_label_limit = -1
     use_colored_images = False
     sample_threshold = -1
@@ -60,15 +57,15 @@ def default_configuration():
     hc_dis_metric = 'euclidean'
     hc_max_value_criterion = 6.00
     hc_reallocate_clients = False
-    hc_threshold_min_client_cluster = 80
+    hc_threshold_min_client_cluster = 0
 
     rp_sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
     rp_adam_betas = (0.9, 0.999)  # Used only if sgd = False
     rp_meta_batch_size = 5
-    rp_num_meta_steps = 5000
+    rp_num_meta_steps = 10000
     rp_meta_learning_rate_initial = 1
     rp_meta_learning_rate_final = 0
-    rp_eval_interval = 10
+    rp_eval_interval = 20
     rp_inner_learning_rate = 0.05
     rp_num_inner_steps = 7
     rp_num_inner_steps_eval = 7
@@ -255,6 +252,7 @@ def run_hierarchical_clustering_reptile(
             for init_rounds, max_value in generate_configuration(hc_cluster_initialization_rounds, hc_max_value_criterion):
                 # load the model state
                 round_model_state = load_fedavg_state(fedavg_context, init_rounds)
+                overwrite_participants_models(round_model_state, clients)
                 # initialize the cluster configuration
                 round_configuration = {
                     'num_rounds_init': init_rounds,
@@ -267,7 +265,7 @@ def run_hierarchical_clustering_reptile(
                                            threshold_min_client_cluster=hc_threshold_min_client_cluster,
                                            **round_configuration)
                 # create new logger for cluster experiment
-                experiment_specification = f'{fedavg_context}_{cluster_args}_{reptile_context}'  # TODO: Solve logging
+                experiment_specification = f'{fedavg_context}_{cluster_args}_{reptile_context}'
                 experiment_logger = create_tensorboard_logger(name, experiment_specification)
                 fedavg_context.experiment_logger = experiment_logger
 
