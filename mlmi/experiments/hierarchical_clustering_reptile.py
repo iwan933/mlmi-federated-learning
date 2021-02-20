@@ -40,7 +40,7 @@ def default_configuration():
     name = 'hierarchical_reptile'
     dataset = 'femnist'
     num_clients = 367
-    batch_size = 50
+    batch_size = 100
     num_label_limit = -1
     use_colored_images = False
     sample_threshold = -1
@@ -55,14 +55,14 @@ def default_configuration():
     hc_linkage_mech = 'ward'
     hc_criterion = 'distance'
     hc_dis_metric = 'euclidean'
-    hc_max_value_criterion = 1.00
+    hc_max_value_criterion = 3.00
     hc_reallocate_clients = False
     hc_threshold_min_client_cluster = 1
 
     rp_sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
     rp_adam_betas = (0.9, 0.999)  # Used only if sgd = False
     rp_meta_batch_size = 5
-    rp_num_meta_steps = 10000
+    rp_num_meta_steps = 1000
     rp_meta_learning_rate_initial = 1
     rp_meta_learning_rate_final = 0
     rp_eval_interval = 20
