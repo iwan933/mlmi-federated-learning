@@ -66,7 +66,7 @@ def default_configuration():
     rp_sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
     rp_adam_betas = (0.9, 0.999)  # Used only if sgd = False
     rp_meta_batch_size = 5
-    rp_num_meta_steps = 1000
+    rp_num_meta_steps = 10
     rp_meta_learning_rate_initial = 1
     rp_meta_learning_rate_final = 0
     rp_eval_interval = 20
