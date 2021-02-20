@@ -47,8 +47,15 @@ class BaseParticipant(object):
         self._name = participant_name
         self._cluster_id = None
         self._experiment_context = context
-        self._model = model_args(participant_name=participant_name)
+        participant_model_kwargs = self.get_model_kwargs()
+        if participant_model_kwargs is not None:
+            self._model = model_args(participant_name=participant_name, **participant_model_kwargs)
+        else:
+            self._model = model_args(participant_name=participant_name)
         self._model_args = model_args
+
+    def get_model_kwargs(self) -> Optional[Dict]:
+        return None
 
     @property
     def model(self) -> Union[pl.LightningModule, 'BaseParticipantModel']:
@@ -105,7 +112,6 @@ class BaseTrainingParticipant(BaseParticipant):
                  train_dataloader: data.DataLoader, num_train_samples: int,
                  test_dataloader: data.DataLoader, num_test_samples: int,
                  lightning_logger: LightningLoggerBase, *args, **kwargs):
-        super().__init__(client_id, model_args, context)
         self._train_dataloader = train_dataloader
         self._test_dataloader = test_dataloader
         self._num_train_samples = sum([len(y) for x, y in train_dataloader])
@@ -114,6 +120,7 @@ class BaseTrainingParticipant(BaseParticipant):
         self._callbacks = None
         self._model_state = None
         self._trainer = None
+        super().__init__(client_id, model_args, context)
 
     def create_trainer(self, enable_logging=True, **kwargs) -> pl.Trainer:
         """

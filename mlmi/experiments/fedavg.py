@@ -6,13 +6,16 @@ from functools import partial
 from torch import Tensor, optim
 
 from mlmi.clustering import ModelFlattenWeightsPartitioner
+from mlmi.datasets.ham10k import load_ham10k_federated
 from mlmi.experiments.log import log_goal_test_acc, log_loss_and_acc
 from mlmi.fedavg.femnist import load_femnist_dataset, load_mnist_dataset
+from mlmi.fedavg.ham10k import initialize_ham10k_clients
 from mlmi.fedavg.model import CNNLightning, CNNMnistLightning, FedAvgServer
-from mlmi.fedavg.run import run_fedavg
+from mlmi.fedavg.run import DEFAULT_CLIENT_INIT_FN, run_fedavg
 from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.fedavg.util import load_fedavg_state, run_fedavg_round, run_fedavg_train_round
 from mlmi.hierarchical.run import run_fedavg_hierarchical
+from mlmi.models.ham10k import ResNet18Lightning
 from mlmi.participant import BaseTrainingParticipant
 from mlmi.plot import generate_client_label_heatmap, generate_data_label_heatmap
 from mlmi.settings import REPO_ROOT
@@ -56,6 +59,25 @@ def mnist():
     dataset = 'mnist'
 
 
+@ex.named_config
+def ham10k():
+    seed = 123123123
+    lr = 0.001
+    name = 'ham10k'
+    total_fedavg_rounds = 10
+    client_fraction = [0.1]
+    local_epochs = 3
+    batch_size = 32
+    num_clients = 50
+    num_classes = 7
+    optimizer_args = OptimizerArgs(optim.Adam, lr=lr)
+    train_args = TrainArgs(max_epochs=local_epochs,
+                           min_epochs=local_epochs,
+                           progress_bar_refresh_rate=5)
+    model_args = ModelArgs(ResNet18Lightning, optimizer_args=optimizer_args, num_classes=num_classes)
+    dataset = 'ham10k'
+
+
 def log_after_round_evaluation(
         experiment_logger,
         tag: str,
@@ -89,6 +111,7 @@ def run_fedavg_experiment(
         dataset,
 ):
     fix_random_seeds(seed)
+    initialize_clients_fn = DEFAULT_CLIENT_INIT_FN
 
     if dataset == 'femnist':
         fed_dataset = load_femnist_dataset(str((REPO_ROOT / 'data').absolute()),
@@ -96,6 +119,9 @@ def run_fedavg_experiment(
     elif dataset == 'mnist':
         fed_dataset = load_mnist_dataset(str((REPO_ROOT / 'data').absolute()),
                                          num_clients=num_clients, batch_size=batch_size)
+    elif dataset == 'ham10k':
+        fed_dataset = load_ham10k_federated(partitions=num_clients, batch_size=batch_size)
+        initialize_clients_fn = initialize_ham10k_clients
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
 
@@ -116,4 +142,5 @@ def run_fedavg_experiment(
             partial(log_after_round_evaluation, experiment_logger, 'fedavg')
         ]
         run_fedavg(context=fedavg_context, num_rounds=total_fedavg_rounds, dataset=fed_dataset,
-                   save_states=True, restore_state=True, after_round_evaluation=log_after_round_evaluation_fns)
+                   save_states=True, restore_state=True, after_round_evaluation=log_after_round_evaluation_fns,
+                   initialize_clients_fn=initialize_clients_fn)
