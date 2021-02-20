@@ -50,7 +50,7 @@ def default_configuration():
     sample_threshold = -1
 
     hc_lr = 0.065
-    hc_cluster_initialization_rounds = [70]
+    hc_cluster_initialization_rounds = [8]
     hc_client_fraction = [0.1]
     hc_local_epochs = 3
     hc_train_args = TrainArgs(max_epochs=hc_local_epochs, min_epochs=hc_local_epochs, progress_bar_refresh_rate=0)
@@ -71,8 +71,8 @@ def default_configuration():
     rp_meta_learning_rate_final = 0
     rp_eval_interval = 20
     rp_inner_learning_rate = 0.05
-    rp_num_inner_steps = 7
-    rp_num_inner_steps_eval = 7
+    rp_num_inner_steps = 10
+    rp_num_inner_steps_eval = 10
 
 
 def log_after_round_evaluation(
