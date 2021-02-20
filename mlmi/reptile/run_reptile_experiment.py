@@ -17,11 +17,13 @@ from mlmi.fedavg.data import swap_labels
 logger = getLogger(__name__)
 
 
-def cyclerange(start, stop, len):
-    assert start < len and stop < len, "Error: start and stop must be < len"
-    if start > stop:
-        return list(range(start, len)) + list(range(0, stop))
-    return list(range(start, stop))
+def cyclerange(start, interval, total_len):
+    assert start < total_len, "Error: start must be < total_len"
+    if interval >= total_len:
+        return list(range(start, total_len)) + list(range(0, start))
+    if start + interval > total_len:
+        return list(range(start, total_len)) + list(range(0, (start + interval) % total_len))
+    return list(range(start, start + interval))
 
 def initialize_clients(dataset: FederatedDatasetData,
                        model_args: ModelArgs,
@@ -97,8 +99,8 @@ def run_reptile(context: ReptileExperimentContext,
             meta_batch = [
                 train_clients[k] for k in cyclerange(
                     start=i*context.meta_batch_size % len(train_clients),
-                    stop=(i+1)*context.meta_batch_size % len(train_clients),
-                    len=len(train_clients)
+                    interval=context.meta_batch_size,
+                    total_len=len(train_clients)
                 )
             ]
         # Meta training step

@@ -316,8 +316,8 @@ def run_hierarchical_clustering_reptile(
                             meta_batch = [
                                 participants[k] for k in cyclerange(
                                     start=i * reptile_context.meta_batch_size % len(participants),
-                                    stop=(i + 1) * reptile_context.meta_batch_size % len(participants),
-                                    len=len(participants)
+                                    interval=reptile_context.meta_batch_size,
+                                    total_len=len(participants)
                                 )
                             ]
                         # Meta training step
