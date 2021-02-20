@@ -57,7 +57,7 @@ def default_configuration():
     hc_dis_metric = 'euclidean'
     hc_max_value_criterion = 6.00
     hc_reallocate_clients = False
-    hc_threshold_min_client_cluster = 0
+    hc_threshold_min_client_cluster = 1
 
     rp_sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
     rp_adam_betas = (0.9, 0.999)  # Used only if sgd = False
