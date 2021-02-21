@@ -39,10 +39,10 @@ def femnist():
 
     num_clients_train = 367
     num_clients_test = 0  # Used only with dataset='omniglot'
-    meta_batch_size = 5
-    num_meta_steps = 2000
+    meta_batch_size = 37
+    num_meta_steps = 4000
     meta_learning_rate_initial = 1
-    meta_learning_rate_final = 0.25
+    meta_learning_rate_final = 0.5
 
     eval_interval = 25
     num_eval_clients_training = -1

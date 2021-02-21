@@ -59,7 +59,7 @@ def default_configuration():
     hc_linkage_mech = 'ward'
     hc_criterion = 'distance'
     hc_dis_metric = 'euclidean'
-    hc_max_value_criterion = 8.00
+    hc_max_value_criterion = 20.00
     hc_reallocate_clients = False
     hc_threshold_min_client_cluster = 1
 
