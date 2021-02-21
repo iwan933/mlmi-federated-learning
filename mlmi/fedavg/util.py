@@ -1,6 +1,6 @@
 import threading
 import json
-from typing import List, Dict, Optional, Tuple, Union
+from typing import Callable, List, Dict, Optional, Tuple, Union
 
 import torch
 from torch import Tensor

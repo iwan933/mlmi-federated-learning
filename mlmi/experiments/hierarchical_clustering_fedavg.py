@@ -3,6 +3,7 @@ from typing import Callable, Dict, List, Optional
 from sacred import Experiment
 from functools import partial
 
+import torch
 from torch import Tensor, optim
 
 from mlmi.clustering import DatadependentPartitioner, ModelFlattenWeightsPartitioner, AlternativePartitioner, \
@@ -27,14 +28,14 @@ ex = Experiment('hierachical_clustering')
 
 @ex.config
 def default_configuration():
-    local_evaluation_steps = 50
+    local_evaluation_steps = 1
     seed = 123123123
     lr = 0.068
     name = 'default_hierarchical_fedavg'
-    total_fedavg_rounds = 75
+    total_fedavg_rounds = 10
     cluster_initialization_rounds = [3, 5, 10]
     client_fraction = [0.1]
-    local_epochs = 3
+    local_epochs = 1
     batch_size = 10
     num_clients = 367
     sample_threshold = -1
@@ -45,14 +46,13 @@ def default_configuration():
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     train_cluster_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     dataset = 'femnist'
-    partitioner_class = DatadependentPartitioner
+    partitioner_class = AlternativePartitioner
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = 15.0
+    max_value_criterion = 6.5
     reallocate_clients = False
     threshold_min_client_cluster = 80
-    use_colored_images = False
 
 
 @ex.named_config
@@ -79,6 +79,34 @@ def fedavg_hierachCluster_color():
     reallocate_clients = False
     threshold_min_client_cluster = 40
     use_colored_images = True
+
+
+@ex.named_config
+def color_and_pattern():
+    local_evaluation_steps = 50
+    seed = 123123123
+    lr = [0.065]
+    name = 'color_and_pattenr'
+    total_fedavg_rounds = 75
+    cluster_initialization_rounds = [8]
+    client_fraction = [0.1]
+    local_epochs = 3
+    batch_size = 10
+    num_clients = 367
+    sample_threshold = -1  # we need clients with at least 250 samples to make sure all labels are present
+    num_label_limit = -1
+    num_classes = 62
+    train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
+    dataset = 'femnist'
+    partitioner_class = ModelFlattenWeightsPartitioner
+    linkage_mech = 'ward'
+    criterion = 'distance'
+    dis_metric = 'euclidean'
+    max_value_criterion = [6.5]
+    reallocate_clients = False
+    threshold_min_client_cluster = 40
+    use_colored_images = True
+    use_pattern = True
 
 
 @ex.named_config
@@ -184,6 +212,33 @@ def log_personalized_performance(
     log_after_round_evaluation(experiment_logger, tag, loss, acc, step)
 
 
+def log_personalized_global_cluster_performance(
+        experiment_logger,
+        tag: str,
+        max_train_steps: int,
+        cluster_server_dic,
+        cluster_clients_dic,
+        step: int
+):
+    train_args = TrainArgs(max_steps=max_train_steps, progress_bar_refresh_rate=0)
+    acc_list = []
+    loss_list = []
+    num_total_samples = 0
+    for cluster_id in cluster_clients_dic.keys():
+        server = cluster_server_dic[cluster_id]
+        clients = cluster_clients_dic[cluster_id]
+        run_fedavg_train_round(server.model.state_dict(), clients, train_args)
+        result = evaluate_local_models(participants=clients)
+        loss, acc, num_samples = result.get('test/loss'), result.get('test/acc'), result.get('num_samples')
+        acc *= num_samples
+        num_total_samples += num_samples
+        acc_list.append(acc)
+        loss_list.append(loss.mean())
+    loss = torch.squeeze(torch.FloatTensor(loss_list)).cpu()
+    acc = torch.sum(torch.FloatTensor(acc_list) / num_total_samples).cpu()
+    log_after_round_evaluation(experiment_logger, tag, loss, acc, step)
+
+
 def log_cluster_distribution(
         experiment_logger,
         cluster_clients_dic: Dict[str, List['BaseTrainingParticipant']],
@@ -246,16 +301,19 @@ def run_hierarchical_clustering(
         reallocate_clients,
         threshold_min_client_cluster,
         use_colored_images,
+        use_pattern,
         train_cluster_args=None
 ):
     fix_random_seeds(seed)
     global_tag = 'global_performance'
+    global_tag_local = 'global_performance_personalized'
 
     if dataset == 'femnist':
         if use_colored_images:
             fed_dataset = load_femnist_colored_dataset(str((REPO_ROOT / 'data').absolute()),
                                                        num_clients=num_clients, batch_size=batch_size,
-                                                       sample_threshold=sample_threshold)
+                                                       sample_threshold=sample_threshold,
+                                                       add_pattern=use_pattern)
         else:
             fed_dataset = load_femnist_dataset(str((REPO_ROOT / 'data').absolute()),
                                                num_clients=num_clients, batch_size=batch_size,
@@ -291,7 +349,8 @@ def run_hierarchical_clustering(
                 partial(log_after_round_evaluation, experiment_logger, global_tag)
             ]
             log_after_aggregation = [
-                partial(log_personalized_performance, experiment_logger, 'fedavg_personalized', local_evaluation_steps)
+                partial(log_personalized_performance, experiment_logger, 'fedavg_personalized', local_evaluation_steps),
+                partial(log_personalized_performance, experiment_logger, global_tag_local, local_evaluation_steps)
             ]
             server, clients = run_fedavg(context=fedavg_context, num_rounds=total_fedavg_rounds, dataset=fed_dataset,
                                          save_states=True, restore_state=True,
@@ -350,6 +409,12 @@ def run_hierarchical_clustering(
                     partial(log_cluster_distribution, experiment_logger, num_classes=fed_dataset.class_num),
                     partial(log_sample_images_from_each_client, experiment_logger)
                 ]
+                after_federated_round_fn = [
+                    partial(log_personalized_global_cluster_performance, experiment_logger,
+                            'final hierarchical personalized', local_evaluation_steps),
+                    partial(log_personalized_global_cluster_performance, experiment_logger,
+                            global_tag_local, local_evaluation_steps)
+                ]
                 run_fedavg_hierarchical(server, clients, cluster_args,
                                         initial_train_fn,
                                         federated_round_fn,
@@ -357,4 +422,6 @@ def run_hierarchical_clustering(
                                         after_post_clustering_evaluation,
                                         after_clustering_round_evaluation,
                                         after_federated_round_evaluation,
-                                        after_clustering_fn)
+                                        after_clustering_fn,
+                                        after_federated_round=after_federated_round_fn
+                                        )
