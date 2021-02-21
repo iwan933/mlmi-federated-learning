@@ -83,10 +83,10 @@ def fedavg_hierachCluster_color():
 
 @ex.named_config
 def color_and_pattern():
-    local_evaluation_steps = 50
+    local_evaluation_steps = 70
     seed = 123123123
-    lr = [0.065]
-    name = 'color_and_pattenr'
+    lr = [6.50E-02]
+    name = 'color_and_pattern'
     total_fedavg_rounds = 75
     cluster_initialization_rounds = [8]
     client_fraction = [0.1]
@@ -102,7 +102,7 @@ def color_and_pattern():
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = [6.5]
+    max_value_criterion = [6.00]
     reallocate_clients = False
     threshold_min_client_cluster = 40
     use_colored_images = True
