@@ -112,7 +112,6 @@ class CNNLightning(BaseParticipantModel, pl.LightningModule):
         preds = torch.argmax(logits, dim=1)
         self.log(f'test/acc/{self.participant_name}', self.accuracy(preds, y).item())
         self.log(f'test/loss/{self.participant_name}', loss.item())
-        return loss
 
 
 class CNNMnist(nn.Module):
@@ -150,7 +149,7 @@ class CNNMnistLightning(BaseParticipantModel, pl.LightningModule):
         loss = F.cross_entropy(logits, y)
         preds = torch.argmax(logits, dim=1)
         # TODO: this should actually be calculated on a validation set (missing cross entropy implementation)
-        self.log('train/acc/{}'.format(self.participant_name), self.accuracy(preds, y).item())
+        self.log('train/acc/{}'.format(self.participant_name), self.accuracy(preds, y))
         self.log('train/loss/{}'.format(self.participant_name), loss.item())
         return loss
 
@@ -160,6 +159,6 @@ class CNNMnistLightning(BaseParticipantModel, pl.LightningModule):
         logits = self.model(x)
         loss = F.cross_entropy(logits, y)
         preds = torch.argmax(logits, dim=1)
-        self.log(f'test/acc/{self.participant_name}', self.accuracy(preds, y).item())
+        self.log(f'test/acc/{self.participant_name}', self.accuracy(preds, y))
         self.log(f'test/loss/{self.participant_name}', loss.item())
         return loss

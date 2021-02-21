@@ -15,30 +15,33 @@ from mlmi.fedavg.run import run_fedavg
 from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.fedavg.util import load_fedavg_state, run_fedavg_round, run_fedavg_train_round
 from mlmi.hierarchical.run import run_fedavg_hierarchical
-from mlmi.participant import BaseTrainingParticipant
+from mlmi.participant import BaseParticipant, BaseTrainingParticipant
 from mlmi.plot import generate_client_label_heatmap, generate_data_label_heatmap
 from mlmi.settings import REPO_ROOT
 from mlmi.structs import ClusterArgs, FederatedDatasetData, ModelArgs, OptimizerArgs, TrainArgs
-from mlmi.utils import create_tensorboard_logger, fix_random_seeds, overwrite_participants_models
+from mlmi.utils import create_tensorboard_logger, evaluate_local_models, fix_random_seeds, overwrite_participants_models
+
 
 ex = Experiment('hierachical_clustering')
 
 
 @ex.config
 def default_configuration():
+    local_evaluation_steps = 50
     seed = 123123123
     lr = 0.068
     name = 'default_hierarchical_fedavg'
-    total_fedavg_rounds = 20
+    total_fedavg_rounds = 75
     cluster_initialization_rounds = [3, 5, 10]
     client_fraction = [0.1]
     local_epochs = 3
     batch_size = 10
     num_clients = 367
-    sample_threshold = 250
+    sample_threshold = -1
     num_label_limit = -1
     num_classes = 62
     use_colored_images = True
+    use_pattern = True
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     train_cluster_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     dataset = 'femnist'
@@ -50,6 +53,7 @@ def default_configuration():
     reallocate_clients = False
     threshold_min_client_cluster = 80
     use_colored_images = False
+
 
 @ex.named_config
 def fedavg_hierachCluster_color():
@@ -75,6 +79,7 @@ def fedavg_hierachCluster_color():
     reallocate_clients = False
     threshold_min_client_cluster = 40
     use_colored_images = True
+
 
 @ex.named_config
 def hpsearch():
@@ -164,6 +169,21 @@ def log_after_round_evaluation(
     log_goal_test_acc(tag, acc, experiment_logger, step)
 
 
+def log_personalized_performance(
+        experiment_logger,
+        tag: str,
+        max_train_steps: int,
+        server: BaseParticipant,
+        clients,
+        step: int
+):
+    train_args = TrainArgs(max_steps=max_train_steps, progress_bar_refresh_rate=0)
+    run_fedavg_train_round(server.model.state_dict(), clients, train_args)
+    result = evaluate_local_models(participants=clients)
+    loss, acc = result.get('test/loss'), result.get('test/acc')
+    log_after_round_evaluation(experiment_logger, tag, loss, acc, step)
+
+
 def log_cluster_distribution(
         experiment_logger,
         cluster_clients_dic: Dict[str, List['BaseTrainingParticipant']],
@@ -204,6 +224,7 @@ def generate_configuration(init_rounds_list, max_value_criterion_list):
 
 @ex.automain
 def run_hierarchical_clustering(
+        local_evaluation_steps,
         seed,
         lr,
         name,
@@ -269,9 +290,13 @@ def run_hierarchical_clustering(
                 partial(log_after_round_evaluation, experiment_logger, 'fedavg'),
                 partial(log_after_round_evaluation, experiment_logger, global_tag)
             ]
+            log_after_aggregation = [
+                partial(log_personalized_performance, experiment_logger, 'fedavg_personalized', local_evaluation_steps)
+            ]
             server, clients = run_fedavg(context=fedavg_context, num_rounds=total_fedavg_rounds, dataset=fed_dataset,
                                          save_states=True, restore_state=True,
-                                         after_round_evaluation=log_after_round_evaluation_fns)
+                                         after_round_evaluation=log_after_round_evaluation_fns,
+                                         after_aggregation=log_after_aggregation)
 
             for init_rounds, max_value in generate_configuration(cluster_initialization_rounds, max_value_criterion):
                 # load the model state

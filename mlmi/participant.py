@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 import torch
+from pytorch_lightning.metrics import Accuracy
 from torch import Tensor, optim
 from torch.utils import data
 
@@ -46,8 +47,15 @@ class BaseParticipant(object):
         self._name = participant_name
         self._cluster_id = None
         self._experiment_context = context
+        participant_model_kwargs = self.get_model_kwargs()
+        if participant_model_kwargs is not None:
+            self._model = model_args(participant_name=participant_name, **participant_model_kwargs)
+        else:
+            self._model = model_args(participant_name=participant_name)
         self._model_args = model_args
-        self._model = model_args(participant_name=participant_name)
+
+    def get_model_kwargs(self) -> Optional[Dict]:
+        return None
 
     @property
     def model(self) -> Union[pl.LightningModule, 'BaseParticipantModel']:
@@ -104,7 +112,6 @@ class BaseTrainingParticipant(BaseParticipant):
                  train_dataloader: data.DataLoader, num_train_samples: int,
                  test_dataloader: data.DataLoader, num_test_samples: int,
                  lightning_logger: LightningLoggerBase, *args, **kwargs):
-        super().__init__(client_id, model_args, context)
         self._train_dataloader = train_dataloader
         self._test_dataloader = test_dataloader
         self._num_train_samples = sum([len(y) for x, y in train_dataloader])
@@ -113,6 +120,7 @@ class BaseTrainingParticipant(BaseParticipant):
         self._callbacks = None
         self._model_state = None
         self._trainer = None
+        super().__init__(client_id, model_args, context)
 
     def create_trainer(self, enable_logging=True, **kwargs) -> pl.Trainer:
         """
@@ -167,7 +175,7 @@ class BaseTrainingParticipant(BaseParticipant):
         """
         trainer = self.create_trainer(enable_logging=False, **training_args.kwargs)
         train_dataloader = self.train_data_loader
-        trainer.fit(self.model, train_dataloader, train_dataloader)
+        trainer.fit(self.model, train_dataloader)
         del self.model.trainer
 
     def test(self, model: Optional[torch.nn.Module] = None, use_local_model: bool = False):
@@ -182,9 +190,11 @@ class BaseTrainingParticipant(BaseParticipant):
         trainer = self.create_trainer(enable_logging=False, progress_bar_refresh_rate=0)
 
         if use_local_model:
-            model = self.model
-
-        result = trainer.test(model=model, test_dataloaders=self.test_data_loader, verbose=False)
+            result = trainer.test(model=self.model, test_dataloaders=self.test_data_loader, verbose=False)
+            self._model = self._model.cpu()
+            del self._model.trainer
+        else:
+            result = trainer.test(model=model, test_dataloaders=self.test_data_loader, verbose=False)
         return result
 
 

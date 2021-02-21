@@ -73,6 +73,9 @@ def initialize_clients(context: 'FedAvgExperimentContext', dataset: 'FederatedDa
     return clients
 
 
+DEFAULT_CLIENT_INIT_FN = initialize_clients
+
+
 def log_data_distribution_by_dataset(name: str, dataset: FederatedDatasetData, experiment_logger: LightningLoggerBase,
                                      global_step=0):
     dataloaders = [d for d in dataset.train_data_local_dict.values()]
@@ -135,7 +138,9 @@ def run_fedavg(
         server: Optional['FedAvgServer'] = None,
         start_round=0,
         restore_state=False,
-        after_round_evaluation: Optional[List[Callable]] = None
+        after_aggregation: Optional[List[Callable]] = None,
+        after_round_evaluation: Optional[List[Callable]] = None,
+        initialize_clients_fn=DEFAULT_CLIENT_INIT_FN
 ):
     assert (server is None and clients is None) or (server is not None and clients is not None)
 
@@ -145,7 +150,7 @@ def run_fedavg(
         if initial_model_state is not None:
             server.overwrite_model_state(initial_model_state)
         logger.info('initializing clients ...')
-        clients = initialize_clients(context, dataset, server.model.state_dict())
+        clients = initialize_clients_fn(context, dataset, server.model.state_dict())
 
     if start_round + 1 > num_rounds:
         return server, clients
@@ -163,6 +168,10 @@ def run_fedavg(
             continue
         else:
             run_fedavg_round(server, clients, context.train_args, client_fraction=context.client_fraction)
+        # after aggregation callback
+        if after_aggregation is not None:
+            for c in after_aggregation:
+                c(server, clients, i)
         # test over all clients
         result = evaluate_global_model(global_model_participant=server, participants=clients)
         loss, acc = result.get('test/loss'), result.get('test/acc')

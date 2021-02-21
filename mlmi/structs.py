@@ -135,8 +135,8 @@ class ModelArgs(object):
 
 class FederatedDatasetData(object):
 
-    def __init__(self, client_num, train_data_global: data.DataLoader,
-                 test_data_global: data.DataLoader, data_local_num_dict: Dict[int, int],
+    def __init__(self, client_num, train_data_global: Optional[data.DataLoader],
+                 test_data_global: Optional[data.DataLoader], data_local_num_dict: Optional[Dict[int, int]],
                  data_local_train_num_dict: Dict[int, int], data_local_test_num_dict: Dict[int, int],
                  train_data_local_dict: Dict[int, data.DataLoader], test_data_local_dict: Dict[int, data.DataLoader],
                  class_num: int, name: str, batch_size: int, *args, **kwargs):
