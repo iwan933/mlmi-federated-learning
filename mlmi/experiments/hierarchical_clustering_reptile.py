@@ -356,7 +356,7 @@ def run_hierarchical_clustering_reptile(
 
                 # Final evaluation at end of training
                 if reptile_context.do_final_evaluation:
-                    global_loss, global_acc = Tensor([]), Tensor([])
+                    global_loss, global_acc = [], []
 
                     for cluster_id, participants in cluster_clients_dic.items():
                         # Final evaluation on train and test clients
@@ -373,12 +373,12 @@ def run_hierarchical_clustering_reptile(
                         acc = result.get('test/acc')
                         print(f'Cluster {cluster_id} ({len(participants)} part.): loss = {loss}, acc = {acc}')
 
-                        global_loss = torch.cat((global_loss, loss))
-                        global_acc = torch.cat((global_acc, acc))
+                        global_loss.extend(loss.tolist())
+                        global_acc.extend(acc.tolist())
 
                         # Log
                         if after_round_evaluation is not None:
                             for c in after_round_evaluation:
                                 c(experiment_logger, f'cluster_{cluster_id}', loss, acc, reptile_context.num_meta_steps)
 
-                    log_loss_and_acc('final_overall_mean', global_loss, global_acc, experiment_logger, 0)
+                    log_loss_and_acc('final_overall_mean', Tensor(global_loss), Tensor(global_acc), experiment_logger, 0)
