@@ -8,6 +8,7 @@ from mlmi.participant import BaseAggregatorParticipant, BaseParticipant, BaseTra
 from mlmi.structs import ClusterArgs, FederatedDatasetData
 from mlmi.utils import evaluate_global_model
 
+
 logger = getLogger(__name__)
 
 
@@ -21,7 +22,9 @@ def run_fedavg_hierarchical(
         after_post_clustering_evaluation: Optional[List[Callable[[Tensor, Tensor, int], None]]] = None,
         after_clustering_round_evaluation: Optional[List[Callable[[str, Tensor, Tensor, int], None]]] = None,
         after_federated_round_evaluation: Optional[List[Callable[[Tensor, Tensor, int], None]]] = None,
-        after_clustering: Optional[List[Callable[[Dict[str, List['BaseTrainingParticipant']]], None]]] = None
+        after_clustering: Optional[List[Callable[[Dict[str, List['BaseTrainingParticipant']]], None]]] = None,
+        after_cluster_aggregation: Optional[List[Callable]] = None,
+        after_federated_round: Optional[List[Callable]] = None
 ):
     num_rounds_init = cluster_args.num_rounds_init
     num_rounds_cluster = cluster_args.num_rounds_cluster
@@ -65,8 +68,11 @@ def run_fedavg_hierarchical(
             cluster_server = cluster_server_dic[cluster_id]
             cluster_clients = cluster_clients_dic[cluster_id]
             logger.info(f'starting training cluster {cluster_id} in round {i + 1}')
-            # execute federated learning round
+            # execute federated learning round and aggregation
             federated_round_fn(cluster_server, cluster_clients)
+            if after_cluster_aggregation is not None:
+                for c in after_cluster_aggregation:
+                    c(f'cluster{cluster_id}', server, clients, i)
             # test
             result = evaluate_global_model(global_model_participant=cluster_server, participants=cluster_clients)
             loss, acc = result.get('test/loss'), result.get('test/acc')
@@ -76,6 +82,10 @@ def run_fedavg_hierarchical(
                     c(f'cluster{cluster_id}', loss, acc, num_rounds_init + i)
             logger.info(f'finished training cluster {cluster_id}')
         logger.info('testing clustering round results')
+        #
+        if after_federated_round is not None:
+            for c in after_federated_round:
+                c(cluster_server_dic, cluster_clients_dic, num_rounds_init + i)
         global_losses, global_acc = evaluate_cluster_models(cluster_server_dic, cluster_clients_dic)
         # log after full round over all clusters
         if after_federated_round_evaluation is not None:

@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import torch
 from torch import Tensor, nn
@@ -90,6 +90,7 @@ class CNNLightning(BaseParticipantModel, pl.LightningModule):
         self.model = model
         # self.model.apply(init_weights)
         self.accuracy = Accuracy()
+        self.train_accuracy = Accuracy()
 
     def training_step(self, train_batch, batch_idx):
         x, y = train_batch
@@ -97,11 +98,9 @@ class CNNLightning(BaseParticipantModel, pl.LightningModule):
         logits = self.model(x)
         loss = F.cross_entropy(logits, y)
         preds = torch.argmax(logits, dim=1)
-        # TODO: this should actually be calculated on a validation set (missing cross entropy implementation)
-        self.log('train/acc/{}'.format(self.participant_name), self.accuracy(preds, y).item())
-        self.log('train/loss/{}'.format(self.participant_name), loss.item())
-        if torch.isnan(loss) or torch.isinf(loss):
-            raise GradientExplodingError('Loss is nan or inf, it seems gradient exploded.')
+
+        self.log(f'train/acc/{self.participant_name}', self.train_accuracy(preds, y).item())
+        self.log(f'train/loss/{self.participant_name}', loss.mean().item())
         return loss
 
     def test_step(self, test_batch, batch_idx):
@@ -110,8 +109,17 @@ class CNNLightning(BaseParticipantModel, pl.LightningModule):
         logits = self.model(x)
         loss = F.cross_entropy(logits, y)
         preds = torch.argmax(logits, dim=1)
-        self.log(f'test/acc/{self.participant_name}', self.accuracy(preds, y).item())
-        self.log(f'test/loss/{self.participant_name}', loss.item())
+        self.accuracy.update(preds, y)
+        return {'loss': loss}
+
+    def test_epoch_end(
+            self, outputs: List[Any]
+    ) -> None:
+        loss_list = [o['loss'] for o in outputs]
+        loss = torch.stack(loss_list)
+        self.log(f'sample_num', self.accuracy.total.item())
+        self.log(f'test/acc/{self.participant_name}', self.accuracy.compute())
+        self.log(f'test/loss/{self.participant_name}', loss.mean().item())
 
 
 class CNNMnist(nn.Module):
@@ -141,6 +149,7 @@ class CNNMnistLightning(BaseParticipantModel, pl.LightningModule):
         super().__init__(*args, model=model, **kwargs)
         self.model = model
         self.accuracy = Accuracy()
+        self.train_accuracy = Accuracy()
 
     def training_step(self, train_batch, batch_idx):
         x, y = train_batch
@@ -148,9 +157,8 @@ class CNNMnistLightning(BaseParticipantModel, pl.LightningModule):
         logits = self.model(x)
         loss = F.cross_entropy(logits, y)
         preds = torch.argmax(logits, dim=1)
-        # TODO: this should actually be calculated on a validation set (missing cross entropy implementation)
-        self.log('train/acc/{}'.format(self.participant_name), self.accuracy(preds, y))
-        self.log('train/loss/{}'.format(self.participant_name), loss.item())
+        self.log(f'train/acc/{self.participant_name}', self.train_accuracy(preds, y).item())
+        self.log(f'train/loss/{self.participant_name}', loss.mean().item())
         return loss
 
     def test_step(self, test_batch, batch_idx):
@@ -159,6 +167,14 @@ class CNNMnistLightning(BaseParticipantModel, pl.LightningModule):
         logits = self.model(x)
         loss = F.cross_entropy(logits, y)
         preds = torch.argmax(logits, dim=1)
-        self.log(f'test/acc/{self.participant_name}', self.accuracy(preds, y))
-        self.log(f'test/loss/{self.participant_name}', loss.item())
-        return loss
+        self.accuracy.update(preds, y)
+        return {'loss': loss}
+
+    def test_epoch_end(
+        self, outputs: List[Any]
+    ) -> None:
+        loss_list = [o['loss'] for o in outputs]
+        loss = torch.stack(loss_list)
+        self.log(f'sample_num', self.accuracy.total.item())
+        self.log(f'test/acc/{self.participant_name}', self.accuracy.compute())
+        self.log(f'test/loss/{self.participant_name}', loss.mean().item())

@@ -61,6 +61,7 @@ def _evaluate_model(participants: List['BaseTrainingParticipant'], model):
     test_losses = []
     test_acc = []
     num_participants = len(participants)
+    num_samples_list = []
     logger.debug('testing model ...')
     for i, participant in enumerate(participants):
         if model is None:
@@ -69,24 +70,27 @@ def _evaluate_model(participants: List['BaseTrainingParticipant'], model):
             results = participant.test(model)
         logger.debug(f'... tested model on {i+1:<4}/{num_participants} participants')
         for result in results:
+            num_samples = result.get('sample_num')
+            num_samples_list.append(num_samples)
             for key in result.keys():
                 if key.startswith('test/loss'):
                     test_losses.append(result.get(key))
                 elif key.startswith('test/acc'):
-                    test_acc.append(result.get(key))
+                    test_acc.append(result.get(key) * num_samples)
+    num_samples_total = sum(num_samples_list)
     losses = torch.squeeze(torch.FloatTensor(test_losses)).cpu()
-    acc = torch.squeeze(torch.FloatTensor(test_acc)).cpu()
-    return losses, acc
+    acc = torch.sum(torch.FloatTensor(test_acc) / num_samples_total).cpu()
+    return losses, acc, num_samples_total
 
 
 def evaluate_local_models(participants: List['BaseTrainingParticipant']):
-    losses, acc = _evaluate_model(participants, None)
-    return {'test/loss': losses, 'test/acc': acc}
+    losses, acc, num_samples = _evaluate_model(participants, None)
+    return {'test/loss': losses, 'test/acc': acc, 'num_samples': num_samples}
 
 
 def evaluate_global_model(global_model_participant: 'BaseParticipant', participants: List['BaseTrainingParticipant']):
-    losses, acc = _evaluate_model(participants, global_model_participant.model)
-    return {'test/loss': losses, 'test/acc': acc}
+    losses, acc, num_samples = _evaluate_model(participants, global_model_participant.model)
+    return {'test/loss': losses, 'test/acc': acc, 'num_samples': num_samples}
 
 
 def fix_random_seeds(seed: int):
