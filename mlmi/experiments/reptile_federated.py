@@ -40,7 +40,7 @@ def femnist():
     num_clients_train = 367
     num_clients_test = 0  # Used only with dataset='omniglot'
     meta_batch_size = 5
-    num_meta_steps = 2000
+    num_meta_steps = 4000
     meta_learning_rate_initial = 3
     meta_learning_rate_final = 1.5
 
@@ -100,7 +100,7 @@ def log_after_round_evaluation(
         experiment_logger,
         step
     )
-    log_goal_test_acc(f'{tag}train_test/80', acc_train_test, experiment_logger, step)
+    log_goal_test_acc(f'{tag}train-test/80', acc_train_test, experiment_logger, step)
     if loss_test_test is not None and acc_test_test is not None:
         log_loss_and_acc(
             f'{tag}test-test',
@@ -109,7 +109,7 @@ def log_after_round_evaluation(
             experiment_logger,
             step
         )
-        log_goal_test_acc(f'{tag}test_test/80', acc_test_test, experiment_logger, step)
+        log_goal_test_acc(f'{tag}test-test', acc_test_test, experiment_logger, step)
 
 
 def log_dataset_distribution(experiment_logger, tag: str, dataset: FederatedDatasetData):
