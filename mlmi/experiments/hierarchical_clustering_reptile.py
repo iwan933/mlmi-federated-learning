@@ -43,7 +43,7 @@ def default_configuration():
     seed = 123123123
     name = 'hierarchical_reptile'
     dataset = 'femnist'
-    num_clients = 367
+    num_clients = 10  # 367
     batch_size = 10
     num_label_limit = -1
     use_colored_images = False

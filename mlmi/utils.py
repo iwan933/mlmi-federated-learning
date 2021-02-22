@@ -79,19 +79,29 @@ def _evaluate_model(participants: List['BaseTrainingParticipant'], model):
                     test_acc.append(result.get(key) * num_samples)
     num_samples_total = sum(num_samples_list)
     losses = torch.squeeze(torch.FloatTensor(test_losses)).cpu()
-    acc = torch.sum(torch.FloatTensor(test_acc) / num_samples_total).cpu()
-    return losses, acc, num_samples_total
+    acc = torch.squeeze(torch.FloatTensor(test_acc)).cpu()
+    weighted_acc = torch.sum(torch.FloatTensor(test_acc) / num_samples_total).cpu()
+    return losses, acc, weighted_acc, num_samples_total
 
 
 def evaluate_local_models(participants: List['BaseTrainingParticipant']):
-    losses, acc, num_samples = _evaluate_model(participants, None)
-    return {'test/loss': losses, 'test/acc': acc, 'num_samples': num_samples}
+    losses, acc, weighted_acc, num_samples = _evaluate_model(participants, None)
+    return {
+        'test/loss': losses,
+        'test/acc': acc,
+        'test/weighted_acc': weighted_acc,
+        'num_samples': num_samples
+    }
 
 
 def evaluate_global_model(global_model_participant: 'BaseParticipant', participants: List['BaseTrainingParticipant']):
-    losses, acc, num_samples = _evaluate_model(participants, global_model_participant.model)
-    return {'test/loss': losses, 'test/acc': acc, 'num_samples': num_samples}
-
+    losses, acc, weighted_acc, num_samples = _evaluate_model(participants, global_model_participant.model)
+    return {
+        'test/loss': losses,
+        'test/acc': acc,
+        'test/weighted_acc': weighted_acc,
+        'num_samples': num_samples
+    }
 
 def fix_random_seeds(seed: int):
     import numpy as np
