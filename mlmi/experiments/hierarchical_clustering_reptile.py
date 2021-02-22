@@ -59,7 +59,7 @@ def default_configuration():
     hc_linkage_mech = 'ward'
     hc_criterion = 'distance'
     hc_dis_metric = 'euclidean'
-    hc_max_value_criterion = 8.00
+    hc_max_value_criterion = 6.00
     hc_reallocate_clients = False
     hc_threshold_min_client_cluster = 1
 
@@ -68,11 +68,11 @@ def default_configuration():
     rp_meta_batch_size = 5
     rp_num_meta_steps = 2000
     rp_meta_learning_rate_initial = 3
-    rp_meta_learning_rate_final = 1.5
+    rp_meta_learning_rate_final = 0
     rp_eval_interval = 20
     rp_inner_learning_rate = 0.05
-    rp_num_inner_steps = 7
-    rp_num_inner_steps_eval = 7
+    rp_num_inner_steps = 70
+    rp_num_inner_steps_eval = 70
 
 
 def log_after_round_evaluation(
