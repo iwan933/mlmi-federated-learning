@@ -56,7 +56,7 @@ class FedAvgServer(BaseAggregatorParticipant):
             aggregated_model_state = add_weighted_model(aggregated_model_state,
                                                         load_participant_model_state(participant),
                                                         participant.num_train_samples, num_total_samples)
-        self.model.load_state_dict(aggregated_model_state)
+        self.model.load_state_dict(aggregated_model_state, strict=False)
 
 
 class CNN_OriginalFedAvg(torch.nn.Module):

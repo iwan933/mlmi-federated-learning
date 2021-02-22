@@ -15,7 +15,7 @@ from mlmi.fedavg.run import DEFAULT_CLIENT_INIT_FN, run_fedavg
 from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.fedavg.util import load_fedavg_state, run_fedavg_round, run_fedavg_train_round
 from mlmi.hierarchical.run import run_fedavg_hierarchical
-from mlmi.models.ham10k import ResNet18Lightning
+from mlmi.models.ham10k import Densenet121Lightning, MobileNetV2Lightning, ResNet18Lightning
 from mlmi.participant import BaseTrainingParticipant
 from mlmi.plot import generate_client_label_heatmap, generate_data_label_heatmap
 from mlmi.settings import REPO_ROOT
@@ -27,6 +27,8 @@ ex = Experiment('fedavg')
 
 @ex.config
 def femnist():
+    mean = None
+    std = None
     seed = 123123123
     lr = 0.1
     name = 'femnist'
@@ -60,21 +62,44 @@ def mnist():
 
 
 @ex.named_config
-def ham10k():
+def ham10k_IDA_configuration():
     seed = 123123123
-    lr = 0.001
-    name = 'ham10k'
+    lr = 0.016
+    name = 'ham10k_IDA'
     total_fedavg_rounds = 10
-    client_fraction = [0.1]
-    local_epochs = 3
-    batch_size = 32
-    num_clients = 50
+    client_fraction = [0.3]
+    local_epochs = 1
+    batch_size = 16  # original: 32
+    num_clients = 11
     num_classes = 7
-    optimizer_args = OptimizerArgs(optim.Adam, lr=lr)
+    mean = (0.485, 0.456, 0.406)
+    std = (0.229, 0.224, 0.225)
+    optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     train_args = TrainArgs(max_epochs=local_epochs,
                            min_epochs=local_epochs,
                            progress_bar_refresh_rate=5)
-    model_args = ModelArgs(ResNet18Lightning, optimizer_args=optimizer_args, num_classes=num_classes)
+    model_args = ModelArgs(Densenet121Lightning, optimizer_args=optimizer_args, num_classes=num_classes)
+    dataset = 'ham10k'
+
+
+@ex.named_config
+def ham10k_MobileNetV2():
+    seed = 123123123
+    lr = 0.01
+    name = 'ham10k_mobilenet'
+    total_fedavg_rounds = 10
+    client_fraction = [0.3]
+    mean = (0.485, 0.456, 0.406)
+    std = (0.229, 0.224, 0.225)
+    local_epochs = 1
+    batch_size = 16  # original: 32 but requires 8gb gpu
+    num_clients = 11
+    num_classes = 7
+    optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
+    train_args = TrainArgs(max_epochs=local_epochs,
+                           min_epochs=local_epochs,
+                           progress_bar_refresh_rate=5)
+    model_args = ModelArgs(MobileNetV2Lightning, optimizer_args=optimizer_args, num_classes=num_classes)
     dataset = 'ham10k'
 
 
@@ -109,6 +134,8 @@ def run_fedavg_experiment(
         train_args,
         model_args,
         dataset,
+        mean,
+        std
 ):
     fix_random_seeds(seed)
     initialize_clients_fn = DEFAULT_CLIENT_INIT_FN
@@ -120,7 +147,7 @@ def run_fedavg_experiment(
         fed_dataset = load_mnist_dataset(str((REPO_ROOT / 'data').absolute()),
                                          num_clients=num_clients, batch_size=batch_size)
     elif dataset == 'ham10k':
-        fed_dataset = load_ham10k_federated(partitions=num_clients, batch_size=batch_size)
+        fed_dataset = load_ham10k_federated(partitions=num_clients, batch_size=batch_size, mean=mean, std=std)
         initialize_clients_fn = initialize_ham10k_clients
     else:
         raise ValueError(f'dataset "{dataset}" unknown')

@@ -13,8 +13,9 @@ from torchvision import datasets
 from torchvision.transforms import transforms
 import torchvision.models as models
 
+from mlmi.models.ham10k import MobileNetV2Lightning
 from mlmi.settings import REPO_ROOT
-from mlmi.structs import FederatedDatasetData
+from mlmi.structs import FederatedDatasetData, OptimizerArgs
 
 
 def collate_different_sizes(batch):
@@ -25,10 +26,16 @@ def collate_different_sizes(batch):
     return [data, target]
 
 
-def load_ham10k_federated(partitions=20, test_size=0.15, batch_size=32) -> FederatedDatasetData:
+def load_ham10k_federated(
+        partitions=20,
+        test_size=0.15,
+        batch_size=32,
+        mean = (0.485, 0.456, 0.406),
+        std = (0.229, 0.224, 0.225)
+) -> FederatedDatasetData:
     dataset = load_ham10k()
     subsets = partition_ham10k_dataset(dataset, partitions=partitions)
-    train_transformations, test_transformations = get_transformations()
+    train_transformations, test_transformations = get_transformations(mean, std)
     lazy_datasets = []
     for subset in subsets:
         test_split = int(len(subset) * (1 - test_size))
@@ -95,7 +102,7 @@ def partition_ham10k_dataset(
 ) -> List['ImageFolderSubset']:
     """
     Partitions the ham 10k dataset. Each partition is generated in the following way,
-    1. all labels except for the 'nv-label' are split into 10 parts
+    1. each label except for the 'nv-label' are split into 10 parts
     2. depending on the number of partitions each partition gets assigned (labels*10-1)/partitions parts
     3. for each label except for 'nv-label' the remaining part is split among the partitions
     4. the nv-label is distributed evenly accross the partitions
@@ -135,7 +142,10 @@ def partition_ham10k_dataset(
                                                   size=(partitions, int(len(nv_label_indices) / partitions)),
                                                   replace=False)
     for i in range(partitions):
-        partition_indices[i] = np.concatenate((partition_indices[i], nv_label_partition_indices[i])).astype(int)
+        nv_label_partition_indices_ = nv_label_partition_indices[i]
+        fraction = np.random.randint(2, size=1)
+        nv_label_partition_indices_ = nv_label_partition_indices_[:int(len(nv_label_partition_indices_)/fraction)-1]
+        partition_indices[i] = np.concatenate((partition_indices[i], nv_label_partition_indices_)).astype(int)
 
     data_subsets = []
     for indices in partition_indices:
@@ -144,21 +154,19 @@ def partition_ham10k_dataset(
     return data_subsets
 
 
-def get_transformations() -> Tuple[any, any]:
+def get_transformations(mean, std) -> Tuple[any, any]:
     # normalization values for pretrained resnet on Imagenet
-    norm_mean = (0.4914, 0.4822, 0.4465)
-    norm_std = (0.2023, 0.1994, 0.2010)
     transform_train = transforms.Compose([
                         transforms.Resize((224, 224)),
                         transforms.RandomHorizontalFlip(),
                         transforms.RandomRotation(degrees=60),
                         transforms.ToTensor(),
-                        transforms.Normalize(norm_mean, norm_std),
+                        transforms.Normalize(mean, std),
                         ])
     transform_test = transforms.Compose([
                         transforms.Resize((224, 224)),
                         transforms.ToTensor(),
-                        transforms.Normalize(norm_mean, norm_std),
+                        transforms.Normalize(mean, std),
                         ])
     return transform_train, transform_test
 
@@ -198,52 +206,43 @@ class LazyImageFolderDataset(Dataset):
 
 
 if __name__ == '__main__':
-    federated_dataset = load_ham10k_federated()
+    import pytorch_lightning as pl
+    from torch import optim
+
+    federated_dataset = load_ham10k_federated(partitions=27)
+
     dataloader = federated_dataset.train_data_local_dict[0]
-    resnet18 = models.resnet18(pretrained=True)
-    print(resnet18)
-    for x, y in dataloader:
-        logits = resnet18(x)
-        pass
-    pass
-    """
-    labels = FloatTensor([
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-                1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                 1, 1, 1, 1, 1,
-                 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-                 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-                 3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-                 4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,
-                 5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,
-                 6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,
-                 7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,
-                 8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
-                 9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
-                 9, 9, 9, 9, 9, 9, 9, 9, 9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
-                 10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,
-                 ])
-    dataset = Ham10kDataset(labels, labels)
-    partition_ham10k_dataset(dataset, 20)
-    """
+    optimizer_args = OptimizerArgs(optim.SGD, lr=0.01)
+    server = MobileNetV2Lightning(num_classes=7, optimizer_args=optimizer_args, participant_name='1',
+                         weights=(1, 1, 1, 1, 1, 1, 1))
+
+    models = []
+    for k, dl in federated_dataset.train_data_local_dict.items():
+        labels = torch.LongTensor([])
+        for _, y in dl:
+            labels = torch.cat((labels, y))
+        counts = np.unique(labels.numpy(), return_counts=True)
+
+        labels = torch.LongTensor([])
+        for _, y in dl:
+            labels = torch.cat((labels, y))
+        weight = torch.ones((7,))
+        label, counts = torch.unique(labels, return_counts=True)
+        weight[label] = weight - counts / torch.sum(counts)
+
+        model = MobileNetV2Lightning(num_classes=7, optimizer_args=optimizer_args, participant_name='1',
+                             weights=weight)
+        trainer = pl.Trainer(enable_logging=False, max_epochs=1)
+        trainer.fit(model, dl)
+        models.append(model)
+
+    from mlmi.clustering import flatten_model_parameter
+
+    model_states = [m.state_dict() for m in models]
+    keys = list(model_states[0].keys())
+    model_parameter = np.array([flatten_model_parameter(m, keys).numpy() for m in model_states], dtype=float)
+
+    global_parameter = flatten_model_parameter(server.state_dict(), keys).cpu().numpy()
+    euclidean_dist = np.array([((model_parameter[participant_id] - global_parameter) ** 2).sum(axis=0)
+                               for participant_id in range(len(models))])
+    print(euclidean_dist)
