@@ -67,7 +67,7 @@ def default_configuration():
     rp_adam_betas = (0.9, 0.999)  # Used only if sgd = False
     rp_meta_batch_size = 5
     rp_num_meta_steps = 2000
-    rp_meta_learning_rate_initial = 1
+    rp_meta_learning_rate_initial = 5
     rp_meta_learning_rate_final = 0.5
     rp_eval_interval = 20
     rp_inner_learning_rate = 0.05

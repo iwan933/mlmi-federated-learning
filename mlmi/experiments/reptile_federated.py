@@ -45,7 +45,7 @@ def femnist():
     meta_learning_rate_final = 1.5
 
     eval_interval = 25
-    num_eval_clients_training = -1
+    num_eval_clients_training = 10
     do_final_evaluation = True
     num_eval_clients_final = -1
 
