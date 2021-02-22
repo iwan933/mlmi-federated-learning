@@ -138,6 +138,7 @@ def run_fedavg(
         server: Optional['FedAvgServer'] = None,
         start_round=0,
         restore_state=False,
+        evaluate_rounds=True,
         after_aggregation: Optional[List[Callable]] = None,
         after_round_evaluation: Optional[List[Callable]] = None,
         initialize_clients_fn=DEFAULT_CLIENT_INIT_FN
@@ -173,13 +174,14 @@ def run_fedavg(
             for c in after_aggregation:
                 c(server, clients, i)
         # test over all clients
-        result = evaluate_global_model(global_model_participant=server, participants=clients)
-        loss, acc = result.get('test/loss'), result.get('test/acc')
-        if after_round_evaluation is not None:
-            for c in after_round_evaluation:
-                c(loss, acc, i)
-        logger.info(
-            f'... finished training round (mean loss: {torch.mean(loss):.2f}, mean acc: {torch.mean(acc):.2f})')
+        if evaluate_rounds:
+            result = evaluate_global_model(global_model_participant=server, participants=clients)
+            loss, acc = result.get('test/loss'), result.get('test/acc')
+            if after_round_evaluation is not None:
+                for c in after_round_evaluation:
+                    c(loss, acc, i)
+            logger.info(
+                f'... finished training round (mean loss: {torch.mean(loss):.2f}, mean acc: {torch.mean(acc):.2f})')
         # log and save
         if save_states:
             save_fedavg_state(context, i + 1, server.model.state_dict())
