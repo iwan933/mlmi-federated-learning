@@ -15,7 +15,8 @@ from mlmi.log import getLogger
 from mlmi.sampling import sample_randomly_by_fraction
 from mlmi.settings import REPO_ROOT
 from mlmi.structs import TrainArgs
-from mlmi.utils import evaluate_global_model, overwrite_participants_models, overwrite_participants_optimizers
+from mlmi.utils import evaluate_global_model, evaluate_local_models, overwrite_participants_models, \
+    overwrite_participants_optimizers
 
 logger = getLogger(__name__)
 
@@ -172,13 +173,17 @@ def save_fedavg_state(experiment_context: 'FedAvgExperimentContext', fl_round: i
 
 
 def evaluate_cluster_models(cluster_server_dic: Dict[str, 'BaseAggregatorParticipant'],
-                            cluster_clients_dic: Dict[str, List['BaseTrainingParticipant']])\
+                            cluster_clients_dic: Dict[str, List['BaseTrainingParticipant']],
+                            evaluate_local=False)\
         -> Tuple[Tensor, Tensor]:
     global_losses = None
     global_acc = None
     for cluster_id, cluster_clients in cluster_clients_dic.items():
         cluster_server = cluster_server_dic[cluster_id]
-        result = evaluate_global_model(global_model_participant=cluster_server, participants=cluster_clients)
+        if not evaluate_local:
+            result = evaluate_global_model(global_model_participant=cluster_server, participants=cluster_clients)
+        else:
+            result = evaluate_local_models(participants=cluster_clients)
         if global_losses is None:
             global_losses = result.get('test/loss')
             global_acc = result.get('test/acc')
