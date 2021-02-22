@@ -30,8 +30,8 @@ def load_ham10k_federated(
         partitions=20,
         test_size=0.15,
         batch_size=32,
-        mean = (0.485, 0.456, 0.406),
-        std = (0.229, 0.224, 0.225)
+        mean=(0.485, 0.456, 0.406),
+        std=(0.229, 0.224, 0.225)
 ) -> FederatedDatasetData:
     dataset = load_ham10k()
     subsets = partition_ham10k_dataset(dataset, partitions=partitions)
@@ -143,7 +143,7 @@ def partition_ham10k_dataset(
                                                   replace=False)
     for i in range(partitions):
         nv_label_partition_indices_ = nv_label_partition_indices[i]
-        fraction = np.random.randint(2, size=1)
+        fraction = np.random.randint(1, 2, size=1)
         nv_label_partition_indices_ = nv_label_partition_indices_[:int(len(nv_label_partition_indices_)/fraction)-1]
         partition_indices[i] = np.concatenate((partition_indices[i], nv_label_partition_indices_)).astype(int)
 
@@ -214,10 +214,10 @@ if __name__ == '__main__':
     dataloader = federated_dataset.train_data_local_dict[0]
     optimizer_args = OptimizerArgs(optim.SGD, lr=0.01)
     server = MobileNetV2Lightning(num_classes=7, optimizer_args=optimizer_args, participant_name='1',
-                         weights=(1, 1, 1, 1, 1, 1, 1))
+                         weights=torch.FloatTensor([1, 1, 1, 1, 1, 1, 1]))
 
     models = []
-    for k, dl in federated_dataset.train_data_local_dict.items():
+    for k, dl in list(federated_dataset.train_data_local_dict.items())[:3]:
         labels = torch.LongTensor([])
         for _, y in dl:
             labels = torch.cat((labels, y))
@@ -228,11 +228,11 @@ if __name__ == '__main__':
             labels = torch.cat((labels, y))
         weight = torch.ones((7,))
         label, counts = torch.unique(labels, return_counts=True)
-        weight[label] = weight - counts / torch.sum(counts)
+        weight[label] = weight[label] - counts / torch.sum(counts)
 
         model = MobileNetV2Lightning(num_classes=7, optimizer_args=optimizer_args, participant_name='1',
                              weights=weight)
-        trainer = pl.Trainer(enable_logging=False, max_epochs=1)
+        trainer = pl.Trainer(max_epochs=3)
         trainer.fit(model, dl)
         models.append(model)
 

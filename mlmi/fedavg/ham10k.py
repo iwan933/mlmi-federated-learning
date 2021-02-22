@@ -14,7 +14,7 @@ logger = getLogger(__name__)
 def estimate_weights(labels):
     weight = torch.ones((7,))
     label, counts = torch.unique(labels, return_counts=True)
-    weight[label] = weight - counts / torch.sum(counts)
+    weight[label] = weight[label] - counts / torch.sum(counts)
     return weight
 
 

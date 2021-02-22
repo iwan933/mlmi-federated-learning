@@ -17,7 +17,7 @@ import scipy.cluster.hierarchy as hac
 
 
 def flatten_model_parameter(state_dict: Dict[str, Tensor], sorted_keys: List[str]) -> Tensor:
-    model_state_layer_flatten = torch.cat([torch.flatten(state_dict[k]) for k in sorted_keys])
+    model_state_layer_flatten = torch.cat([torch.flatten(state_dict[k]) for k in sorted_keys if k != 'criterion.weight'])
     return model_state_layer_flatten
 
 
