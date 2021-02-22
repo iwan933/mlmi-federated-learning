@@ -60,6 +60,7 @@ def overwrite_participants_optimizers(optimizer_state: Dict[str, Tensor], partic
 def _evaluate_model(participants: List['BaseTrainingParticipant'], model):
     test_losses = []
     test_acc = []
+    test_acc_weighted = []
     num_participants = len(participants)
     num_samples_list = []
     logger.debug('testing model ...')
@@ -76,11 +77,14 @@ def _evaluate_model(participants: List['BaseTrainingParticipant'], model):
                 if key.startswith('test/loss'):
                     test_losses.append(result.get(key))
                 elif key.startswith('test/acc'):
-                    test_acc.append(result.get(key) * num_samples)
+                    test_acc.append(result.get(key))
+                    test_acc_weighted.append(result.get(key) * num_samples)
     num_samples_total = sum(num_samples_list)
     losses = torch.squeeze(torch.FloatTensor(test_losses)).cpu()
     acc = torch.squeeze(torch.FloatTensor(test_acc)).cpu()
-    weighted_acc = torch.sum(torch.FloatTensor(test_acc) / num_samples_total).cpu()
+    weighted_acc = torch.sum(
+        torch.FloatTensor(test_acc_weighted) / num_samples_total
+    ).cpu()
     return losses, acc, weighted_acc, num_samples_total
 
 
