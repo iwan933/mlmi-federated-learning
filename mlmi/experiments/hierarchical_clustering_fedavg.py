@@ -6,15 +6,18 @@ from functools import partial
 import torch
 from torch import Tensor, optim
 
-from mlmi.clustering import DatadependentPartitioner, ModelFlattenWeightsPartitioner, AlternativePartitioner, \
+from mlmi.clustering import DatadependentPartitioner, FixedAlternativePartitioner, ModelFlattenWeightsPartitioner, \
+    AlternativePartitioner, \
     RandomClusterPartitioner
+from mlmi.datasets.ham10k import load_ham10k_federated
 from mlmi.experiments.log import log_goal_test_acc, log_loss_and_acc
 from mlmi.fedavg.data import load_n_of_each_class, scratch_labels
 from mlmi.fedavg.femnist import load_femnist_colored_dataset, load_femnist_dataset
+from mlmi.fedavg.ham10k import initialize_ham10k_clients
 from mlmi.fedavg.model import CNNLightning, CNNMnistLightning, FedAvgServer
-from mlmi.fedavg.run import run_fedavg
+from mlmi.fedavg.run import DEFAULT_CLIENT_INIT_FN, run_fedavg
 from mlmi.fedavg.structs import FedAvgExperimentContext
-from mlmi.fedavg.util import load_fedavg_state, run_fedavg_round, run_fedavg_train_round
+from mlmi.fedavg.util import evaluate_cluster_models, load_fedavg_state, run_fedavg_round, run_fedavg_train_round
 from mlmi.hierarchical.run import run_fedavg_hierarchical
 from mlmi.participant import BaseParticipant, BaseTrainingParticipant
 from mlmi.plot import generate_client_label_heatmap, generate_data_label_heatmap
@@ -83,7 +86,7 @@ def fedavg_hierachCluster_color():
 
 @ex.named_config
 def color_and_pattern():
-    local_evaluation_steps = 70
+    local_evaluation_steps = 14
     seed = 123123123
     lr = [6.50E-02]
     name = 'color_and_pattern'
@@ -107,6 +110,36 @@ def color_and_pattern():
     threshold_min_client_cluster = 40
     use_colored_images = True
     use_pattern = True
+
+
+@ex.named_config
+def ham10k():
+    local_evaluation_steps = -1
+    seed = 123123123
+    lr = [0.01]
+    name = 'ham10k'
+    total_fedavg_rounds = 75
+    cluster_initialization_rounds = [8]
+    client_fraction = [0.3]
+    local_epochs = 1
+    batch_size = 16
+    num_clients = 27
+    sample_threshold = -1  # we need clients with at least 250 samples to make sure all labels are present
+    num_label_limit = -1
+    num_classes = 7
+    train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
+    dataset = 'ham10k'
+    partitioner_class = FixedAlternativePartitioner
+    linkage_mech = 'ward'
+    criterion = 'distance'
+    dis_metric = 'euclidean'
+    max_value_criterion = [6.00]
+    reallocate_clients = False
+    threshold_min_client_cluster = -1
+    use_colored_images = False
+    use_pattern = False
+    mean = (0.485, 0.456, 0.406)
+    std = (0.229, 0.224, 0.225)
 
 
 @ex.named_config
@@ -221,21 +254,11 @@ def log_personalized_global_cluster_performance(
         step: int
 ):
     train_args = TrainArgs(max_steps=max_train_steps, progress_bar_refresh_rate=0)
-    acc_list = []
-    loss_list = []
-    num_total_samples = 0
     for cluster_id in cluster_clients_dic.keys():
         server = cluster_server_dic[cluster_id]
         clients = cluster_clients_dic[cluster_id]
         run_fedavg_train_round(server.model.state_dict(), clients, train_args)
-        result = evaluate_local_models(participants=clients)
-        loss, acc, num_samples = result.get('test/loss'), result.get('test/acc'), result.get('num_samples')
-        acc *= num_samples
-        num_total_samples += num_samples
-        acc_list.append(acc)
-        loss_list.append(loss.mean())
-    loss = torch.squeeze(torch.FloatTensor(loss_list)).cpu()
-    acc = torch.sum(torch.FloatTensor(acc_list) / num_total_samples).cpu()
+    loss, acc = evaluate_cluster_models(cluster_server_dic, cluster_clients_dic, evaluate_local=True)
     log_after_round_evaluation(experiment_logger, tag, loss, acc, step)
 
 
@@ -302,12 +325,14 @@ def run_hierarchical_clustering(
         threshold_min_client_cluster,
         use_colored_images,
         use_pattern,
-        train_cluster_args=None
+        train_cluster_args=None,
+        mean=None,
+        std=None
 ):
     fix_random_seeds(seed)
     global_tag = 'global_performance'
     global_tag_local = 'global_performance_personalized'
-
+    initialize_clients_fn = DEFAULT_CLIENT_INIT_FN
     if dataset == 'femnist':
         if use_colored_images:
             fed_dataset = load_femnist_colored_dataset(str((REPO_ROOT / 'data').absolute()),
@@ -320,6 +345,9 @@ def run_hierarchical_clustering(
                                                sample_threshold=sample_threshold)
         if num_label_limit != -1:
             fed_dataset = scratch_labels(fed_dataset, num_label_limit)
+    elif dataset == 'ham10k':
+        fed_dataset = load_ham10k_federated(partitions=num_clients, batch_size=batch_size, mean=mean, std=std)
+        initialize_clients_fn = initialize_ham10k_clients
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
 
@@ -355,7 +383,8 @@ def run_hierarchical_clustering(
             server, clients = run_fedavg(context=fedavg_context, num_rounds=total_fedavg_rounds, dataset=fed_dataset,
                                          save_states=True, restore_state=True,
                                          after_round_evaluation=log_after_round_evaluation_fns,
-                                         after_aggregation=log_after_aggregation)
+                                         after_aggregation=log_after_aggregation,
+                                         initialize_clients_fn=initialize_clients_fn)
 
             for init_rounds, max_value in generate_configuration(cluster_initialization_rounds, max_value_criterion):
                 # load the model state
