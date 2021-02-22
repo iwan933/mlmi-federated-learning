@@ -109,7 +109,7 @@ def log_after_round_evaluation(
             experiment_logger,
             step
         )
-        log_goal_test_acc(f'{tag}test_test/80', acc_test_test, experiment_logger, step)
+        log_goal_test_acc(f'{tag}test-test', acc_test_test, experiment_logger, step)
 
 
 def log_dataset_distribution(experiment_logger, tag: str, dataset: FederatedDatasetData):
