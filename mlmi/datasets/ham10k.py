@@ -25,10 +25,16 @@ def collate_different_sizes(batch):
     return [data, target]
 
 
-def load_ham10k_federated(partitions=20, test_size=0.15, batch_size=32) -> FederatedDatasetData:
+def load_ham10k_federated(
+        partitions=20,
+        test_size=0.15,
+        batch_size=32,
+        mean = (0.485, 0.456, 0.406),
+        std = (0.229, 0.224, 0.225)
+) -> FederatedDatasetData:
     dataset = load_ham10k()
     subsets = partition_ham10k_dataset(dataset, partitions=partitions)
-    train_transformations, test_transformations = get_transformations()
+    train_transformations, test_transformations = get_transformations(mean, std)
     lazy_datasets = []
     for subset in subsets:
         test_split = int(len(subset) * (1 - test_size))
@@ -144,21 +150,19 @@ def partition_ham10k_dataset(
     return data_subsets
 
 
-def get_transformations() -> Tuple[any, any]:
+def get_transformations(mean, std) -> Tuple[any, any]:
     # normalization values for pretrained resnet on Imagenet
-    norm_mean = (0.485, 0.456, 0.406)
-    norm_std = (0.229, 0.224, 0.225)
     transform_train = transforms.Compose([
                         transforms.Resize((224, 224)),
                         transforms.RandomHorizontalFlip(),
                         transforms.RandomRotation(degrees=60),
                         transforms.ToTensor(),
-                        transforms.Normalize(norm_mean, norm_std),
+                        transforms.Normalize(mean, std),
                         ])
     transform_test = transforms.Compose([
                         transforms.Resize((224, 224)),
                         transforms.ToTensor(),
-                        transforms.Normalize(norm_mean, norm_std),
+                        transforms.Normalize(mean, std),
                         ])
     return transform_train, transform_test
 

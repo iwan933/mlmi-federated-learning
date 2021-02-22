@@ -27,6 +27,8 @@ ex = Experiment('fedavg')
 
 @ex.config
 def femnist():
+    mean = None
+    std = None
     seed = 123123123
     lr = 0.1
     name = 'femnist'
@@ -70,6 +72,8 @@ def ham10k_IDA_configuration():
     batch_size = 16  # original: 32
     num_clients = 11
     num_classes = 7
+    mean = (0.485, 0.456, 0.406)
+    std = (0.229, 0.224, 0.225)
     optimizer_args = OptimizerArgs(optim.SGD, lr=lr)
     train_args = TrainArgs(max_epochs=local_epochs,
                            min_epochs=local_epochs,
@@ -85,6 +89,8 @@ def ham10k_MobileNetV2():
     name = 'ham10k_mobilenet'
     total_fedavg_rounds = 10
     client_fraction = [0.3]
+    mean = (0.485, 0.456, 0.406)
+    std = (0.229, 0.224, 0.225)
     local_epochs = 1
     batch_size = 16  # original: 32 but requires 8gb gpu
     num_clients = 11
@@ -128,6 +134,8 @@ def run_fedavg_experiment(
         train_args,
         model_args,
         dataset,
+        mean,
+        std
 ):
     fix_random_seeds(seed)
     initialize_clients_fn = DEFAULT_CLIENT_INIT_FN
@@ -139,7 +147,7 @@ def run_fedavg_experiment(
         fed_dataset = load_mnist_dataset(str((REPO_ROOT / 'data').absolute()),
                                          num_clients=num_clients, batch_size=batch_size)
     elif dataset == 'ham10k':
-        fed_dataset = load_ham10k_federated(partitions=num_clients, batch_size=batch_size)
+        fed_dataset = load_ham10k_federated(partitions=num_clients, batch_size=batch_size, mean=mean, std=std)
         initialize_clients_fn = initialize_ham10k_clients
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
