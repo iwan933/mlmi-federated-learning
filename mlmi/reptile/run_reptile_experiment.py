@@ -134,8 +134,6 @@ def run_reptile(context: ReptileExperimentContext,
                     result = evaluate_local_models(participants=clients)
                     losses.append(result.get('test/loss'))
                     accs.append(result.get('test/acc'))
-                    print(result.get('test/loss'))
-                    print(result.get('test/acc'))
                 else:
                     losses.append(None)
                     accs.append(None)
