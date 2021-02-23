@@ -154,7 +154,7 @@ def ham10k_nopretrain():
     lr = [0.01]
     name = 'ham10k_nopretrain'
     total_fedavg_rounds = 150
-    cluster_initialization_rounds = [20]
+    cluster_initialization_rounds = [10]
     client_fraction = [0.3]
     local_epochs = 1
     batch_size = 16
@@ -258,53 +258,64 @@ def briggs():
 
 def log_after_round_evaluation(
         experiment_logger,
-        tag: str,
+        tags,
         loss: Tensor,
         acc: Tensor,
         step: int
 ):
+    if type(tags) is not list:
+        tags = [tags]
     try:
         global_confusion_matrix = GlobalConfusionMatrix()
         if global_confusion_matrix.has_data:
             matrix = global_confusion_matrix.compute()
-            image = generate_confusion_matrix_heatmap(matrix, title=tag)
-            experiment_logger.experiment.add_image(tag, image.numpy(), step)
+            for tag in tags:
+                image = generate_confusion_matrix_heatmap(matrix, title=tag)
+                experiment_logger.experiment.add_image(tag, image.numpy(), step)
     except Exception as e:
         logger.error('failed to log confusion matrix', e)
-    log_loss_and_acc(tag, loss, acc, experiment_logger, step)
-    log_goal_test_acc(tag, acc, experiment_logger, step)
+
+    for tag in tags:
+        log_loss_and_acc(tag, loss, acc, experiment_logger, step)
+        log_goal_test_acc(tag, acc, experiment_logger, step)
 
 
 def log_personalized_performance(
         experiment_logger,
-        tag: str,
+        tags,
         max_train_steps: int,
         server: BaseParticipant,
         clients,
         step: int
 ):
+    if type(tags) is not list:
+        tags = [tags]
     train_args = TrainArgs(max_steps=max_train_steps, progress_bar_refresh_rate=0)
     run_fedavg_train_round(server.model.state_dict(), clients, train_args)
     result = evaluate_local_models(participants=clients)
     loss, acc = result.get('test/loss'), result.get('test/acc')
-    log_after_round_evaluation(experiment_logger, tag, loss, acc, step)
+    for tag in tags:
+        log_after_round_evaluation(experiment_logger, tag, loss, acc, step)
 
 
 def log_personalized_global_cluster_performance(
         experiment_logger,
-        tag: str,
+        tags,
         max_train_steps: int,
         cluster_server_dic,
         cluster_clients_dic,
         step: int
 ):
+    if type(tags) is not list:
+        tags = [tags]
     train_args = TrainArgs(max_steps=max_train_steps, progress_bar_refresh_rate=0)
     for cluster_id in cluster_clients_dic.keys():
         server = cluster_server_dic[cluster_id]
         clients = cluster_clients_dic[cluster_id]
         run_fedavg_train_round(server.model.state_dict(), clients, train_args)
     loss, acc = evaluate_cluster_models(cluster_server_dic, cluster_clients_dic, evaluate_local=True)
-    log_after_round_evaluation(experiment_logger, tag, loss, acc, step)
+    for tag in tags:
+        log_after_round_evaluation(experiment_logger, tag, loss, acc, step)
 
 
 def log_cluster_distribution(
@@ -423,12 +434,11 @@ def run_hierarchical_clustering(
                 data_distribution_logged = True
 
             log_after_round_evaluation_fns = [
-                partial(log_after_round_evaluation, experiment_logger, 'fedavg'),
-                partial(log_after_round_evaluation, experiment_logger, global_tag)
+                partial(log_after_round_evaluation, experiment_logger, ['fedavg', global_tag])
             ]
             log_after_aggregation = [
-                partial(log_personalized_performance, experiment_logger, 'fedavg_personalized', local_evaluation_steps),
-                partial(log_personalized_performance, experiment_logger, global_tag_local, local_evaluation_steps)
+                partial(log_personalized_performance, experiment_logger, ['fedavg_personalized', global_tag_local],
+                        local_evaluation_steps)
             ]
             server, clients = run_fedavg(context=fedavg_context, num_rounds=total_fedavg_rounds, dataset=fed_dataset,
                                          save_states=True, restore_state=True,
@@ -481,8 +491,7 @@ def run_hierarchical_clustering(
                     partial(log_after_round_evaluation, experiment_logger)
                 ]
                 after_federated_round_evaluation = [
-                    partial(log_after_round_evaluation, experiment_logger, 'final hierarchical'),
-                    partial(log_after_round_evaluation, experiment_logger, global_tag)
+                    partial(log_after_round_evaluation, experiment_logger, ['final hierarchical', global_tag])
                 ]
                 after_clustering_fn = [
                     partial(log_cluster_distribution, experiment_logger, num_classes=fed_dataset.class_num),
@@ -490,9 +499,7 @@ def run_hierarchical_clustering(
                 ]
                 after_federated_round_fn = [
                     partial(log_personalized_global_cluster_performance, experiment_logger,
-                            'final hierarchical personalized', local_evaluation_steps),
-                    partial(log_personalized_global_cluster_performance, experiment_logger,
-                            global_tag_local, local_evaluation_steps)
+                            ['final hierarchical personalized', global_tag_local], local_evaluation_steps)
                 ]
                 run_fedavg_hierarchical(server, clients, cluster_args,
                                         initial_train_fn,

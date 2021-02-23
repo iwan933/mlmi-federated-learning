@@ -53,7 +53,6 @@ class ResNet18Lightning(BaseParticipantModel, pl.LightningModule):
         super().__init__(*args, model=model, **kwargs)
         self.model = model
         self.accuracy = Accuracy()
-        self.confusion_matrix = ConfusionMatrix(num_classes)
         self.train_accuracy = Accuracy()
         self.criterion = CrossEntropyLoss(weight=weights)
 
@@ -74,7 +73,6 @@ class ResNet18Lightning(BaseParticipantModel, pl.LightningModule):
         loss = self.criterion(logits, y)
         preds = torch.argmax(logits, dim=1)
         self.accuracy.update(preds, y)
-        self.confusion_matrix.update(preds, y)
         GlobalConfusionMatrix().update(preds, y)
         return {'loss': loss}
 
@@ -83,10 +81,6 @@ class ResNet18Lightning(BaseParticipantModel, pl.LightningModule):
     ) -> None:
         loss_list = [o['loss'] for o in outputs]
         loss = torch.stack(loss_list)
-
-        image = generate_confusion_matrix_heatmap(self.confusion_matrix.compute().cpu(), title=self.participant_name)
-        self.logger.experiment.add_image('test results', image.numpy())
-
         self.log(f'sample_num', self.accuracy.total.item())
         self.log(f'test/acc/{self.participant_name}', self.accuracy.compute())
         self.log(f'test/loss/{self.participant_name}', loss.mean().item())
@@ -100,7 +94,6 @@ class Densenet121Lightning(BaseParticipantModel, pl.LightningModule):
         super().__init__(*args, model=model, **kwargs)
         self.model = model
         self.accuracy = Accuracy()
-        self.confusion_matrix = ConfusionMatrix(num_classes)
         self.train_accuracy = Accuracy()
         self.criterion = CrossEntropyLoss(weight=weights)
 
@@ -121,7 +114,6 @@ class Densenet121Lightning(BaseParticipantModel, pl.LightningModule):
         loss = self.criterion(logits, y)
         preds = torch.argmax(logits, dim=1)
         self.accuracy.update(preds, y)
-        self.confusion_matrix.update(preds, y)
         GlobalConfusionMatrix().update(preds, y)
         return {'loss': loss}
 
@@ -130,10 +122,6 @@ class Densenet121Lightning(BaseParticipantModel, pl.LightningModule):
     ) -> None:
         loss_list = [o['loss'] for o in outputs]
         loss = torch.stack(loss_list)
-
-        image = generate_confusion_matrix_heatmap(self.confusion_matrix.compute().cpu(), title=self.participant_name)
-        self.logger.experiment.add_image('test results', image.numpy())
-
         self.log(f'sample_num', self.accuracy.total.item())
         self.log(f'test/acc/{self.participant_name}', self.accuracy.compute())
         self.log(f'test/loss/{self.participant_name}', loss.mean().item())
@@ -149,11 +137,9 @@ class MobileNetV2Lightning(BaseParticipantModel, pl.LightningModule):
         )
         super().__init__(*args, model=model, **kwargs)
         self.model = model
-        self.confusion_matrix = ConfusionMatrix(num_classes)
         self.accuracy = Accuracy()
         self.train_accuracy = Accuracy()
         self.criterion = CrossEntropyLoss(weight=weights)
-        self.test_step_number = 0
 
     def training_step(self, train_batch, batch_idx):
         x, y = train_batch
@@ -172,7 +158,6 @@ class MobileNetV2Lightning(BaseParticipantModel, pl.LightningModule):
         loss = self.criterion(logits, y)
         preds = torch.argmax(logits, dim=1)
         self.accuracy.update(preds, y)
-        self.confusion_matrix.update(preds, y)
         GlobalConfusionMatrix().update(preds, y)
         return {'loss': loss}
 
@@ -181,11 +166,6 @@ class MobileNetV2Lightning(BaseParticipantModel, pl.LightningModule):
     ) -> None:
         loss_list = [o['loss'] for o in outputs]
         loss = torch.stack(loss_list)
-
-        image = generate_confusion_matrix_heatmap(self.confusion_matrix.compute().cpu(), title=self.participant_name)
-        self.logger.experiment.add_image(f'test/results/{self.participant_name}', image.numpy(), self.test_step_number)
-        self.test_step_number += 1
-
         self.log(f'sample_num', self.accuracy.total.item())
         self.log(f'test/acc/{self.participant_name}', self.accuracy.compute())
         self.log(f'test/loss/{self.participant_name}', loss.mean().item())
