@@ -59,6 +59,7 @@ def default_configuration():
     max_value_criterion = 6.5
     reallocate_clients = False
     threshold_min_client_cluster = 80
+    pretrain = True
 
 
 @ex.named_config
@@ -144,6 +145,38 @@ def ham10k():
     use_pattern = False
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
+
+
+@ex.named_config
+def ham10k_nopretrain():
+    local_evaluation_steps = 7
+    seed = 123123123
+    lr = [0.01]
+    name = 'ham10k_nopretrain'
+    total_fedavg_rounds = 150
+    cluster_initialization_rounds = [20]
+    client_fraction = [0.3]
+    local_epochs = 1
+    batch_size = 16
+    num_clients = 27
+    sample_threshold = -1  # we need clients with at least 250 samples to make sure all labels are present
+    num_label_limit = -1
+    num_classes = 7
+    train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
+    train_cluster_args = TrainArgs(max_epochs=3, min_epochs=3, progress_bar_refresh_rate=0)
+    dataset = 'ham10k'
+    partitioner_class = FixedAlternativePartitioner
+    linkage_mech = 'ward'
+    criterion = 'distance'
+    dis_metric = 'euclidean'
+    max_value_criterion = [300.00]
+    reallocate_clients = False
+    threshold_min_client_cluster = -1
+    use_colored_images = False
+    use_pattern = False
+    mean = (0.485, 0.456, 0.406)
+    std = (0.229, 0.224, 0.225)
+    pretrain = False
 
 
 @ex.named_config
@@ -337,6 +370,7 @@ def run_hierarchical_clustering(
         threshold_min_client_cluster,
         use_colored_images,
         use_pattern,
+        pretrain,
         train_cluster_args=None,
         mean=None,
         std=None
@@ -375,7 +409,8 @@ def run_hierarchical_clustering(
             model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args,
                                    input_channels=input_channels, only_digits=False)
             if dataset == 'ham10k':
-                model_args = ModelArgs(MobileNetV2Lightning, optimizer_args=optimizer_args, num_classes=7)
+                model_args = ModelArgs(MobileNetV2Lightning, optimizer_args=optimizer_args, num_classes=7,
+                                       pretrain=pretrain)
             fedavg_context = FedAvgExperimentContext(name=name, client_fraction=cf, local_epochs=local_epochs,
                                                      lr=lr_i, batch_size=batch_size, optimizer_args=optimizer_args,
                                                      model_args=model_args, train_args=train_args,

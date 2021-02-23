@@ -141,8 +141,8 @@ class Densenet121Lightning(BaseParticipantModel, pl.LightningModule):
 
 class MobileNetV2Lightning(BaseParticipantModel, pl.LightningModule):
 
-    def __init__(self, num_classes, *args, weights=None, **kwargs):
-        model = torchvision.models.mobilenet_v2(pretrained=True)
+    def __init__(self, num_classes, *args, weights=None, pretrain=True, **kwargs):
+        model = torchvision.models.mobilenet_v2(pretrained=pretrain)
         model.classifier = Sequential(
             Dropout(p=0.2, inplace=False),
             Linear(in_features=1280, out_features=num_classes, bias=True)
