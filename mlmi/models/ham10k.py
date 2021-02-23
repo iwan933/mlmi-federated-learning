@@ -150,8 +150,8 @@ class MobileNetV2Lightning(BaseParticipantModel, pl.LightningModule):
         super().__init__(*args, model=model, **kwargs)
         self.model = model
         self.confusion_matrix = ConfusionMatrix(num_classes)
-        self.accuracy = BalancedAccuracy()
-        self.train_accuracy = BalancedAccuracy()
+        self.accuracy = Accuracy()
+        self.train_accuracy = Accuracy()
         self.criterion = CrossEntropyLoss(weight=weights)
         self.test_step_number = 0
 
