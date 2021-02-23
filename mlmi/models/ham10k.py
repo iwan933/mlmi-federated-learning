@@ -3,11 +3,46 @@ from typing import Any, List
 import pytorch_lightning as pl
 import torchvision
 import torch
+from torch import Tensor
 from torch.nn import CrossEntropyLoss, Dropout, Linear, Sequential, functional as F
 from pytorch_lightning.metrics import Accuracy, ConfusionMatrix
 
 from mlmi.participant import BaseParticipantModel
 from mlmi.plot import generate_confusion_matrix_heatmap
+
+
+class GlobalConfusionMatrix(object):
+    class __GlobalConfusionMatrix:
+        def __init__(self):
+            self.confusion_matrix = ConfusionMatrix(7)
+            self.has_data = False
+            self.is_logging = False
+
+        def enable_logging(self):
+            self.is_logging = True
+
+        def disable_logging(self):
+            self.is_logging = False
+
+        def update(self, predictions: Tensor, targets: Tensor):
+            if not self.is_logging:
+                return
+            self.has_data = True
+            preds, y = predictions.cpu(), targets.cpu()
+            self.confusion_matrix.update(preds, y)
+
+        def compute(self):
+            self.has_data = False
+            return self.confusion_matrix.compute()
+
+    instance = None
+
+    def __init__(self):
+        if not GlobalConfusionMatrix.instance:
+            GlobalConfusionMatrix.instance = GlobalConfusionMatrix.__GlobalConfusionMatrix()
+
+    def __getattr__(self, name):
+        return getattr(self.instance, name)
 
 
 class ResNet18Lightning(BaseParticipantModel, pl.LightningModule):
@@ -40,6 +75,7 @@ class ResNet18Lightning(BaseParticipantModel, pl.LightningModule):
         preds = torch.argmax(logits, dim=1)
         self.accuracy.update(preds, y)
         self.confusion_matrix.update(preds, y)
+        GlobalConfusionMatrix().update(preds, y)
         return {'loss': loss}
 
     def test_epoch_end(
@@ -86,6 +122,7 @@ class Densenet121Lightning(BaseParticipantModel, pl.LightningModule):
         preds = torch.argmax(logits, dim=1)
         self.accuracy.update(preds, y)
         self.confusion_matrix.update(preds, y)
+        GlobalConfusionMatrix().update(preds, y)
         return {'loss': loss}
 
     def test_epoch_end(
@@ -113,8 +150,8 @@ class MobileNetV2Lightning(BaseParticipantModel, pl.LightningModule):
         super().__init__(*args, model=model, **kwargs)
         self.model = model
         self.confusion_matrix = ConfusionMatrix(num_classes)
-        self.accuracy = Accuracy()
-        self.train_accuracy = Accuracy()
+        self.accuracy = BalancedAccuracy()
+        self.train_accuracy = BalancedAccuracy()
         self.criterion = CrossEntropyLoss(weight=weights)
         self.test_step_number = 0
 
@@ -136,6 +173,7 @@ class MobileNetV2Lightning(BaseParticipantModel, pl.LightningModule):
         preds = torch.argmax(logits, dim=1)
         self.accuracy.update(preds, y)
         self.confusion_matrix.update(preds, y)
+        GlobalConfusionMatrix().update(preds, y)
         return {'loss': loss}
 
     def test_epoch_end(

@@ -49,7 +49,7 @@ def generate_confusion_matrix_heatmap(confusion_matrix, title=''):
                          columns=[i for i in ['akiec', 'bcc', 'bkl', 'df', 'mel', 'nv', 'vasc']])
     # draw heatmap
     fig, ax = plt.subplots(nrows=1, ncols=1)
-    sns.heatmap(df_cm, ax=ax)
+    sns.heatmap(df_cm, ax=ax, annot=True, fmt="d")
     ax.set_title(title)
     # write to buffer
     buf = io.BytesIO()

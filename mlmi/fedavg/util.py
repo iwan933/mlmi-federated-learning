@@ -6,6 +6,7 @@ import torch
 from torch import Tensor
 
 from mlmi.fedavg.structs import FedAvgExperimentContext
+from mlmi.models.ham10k import GlobalConfusionMatrix
 from mlmi.participant import (
     BaseTrainingParticipant, BaseAggregatorParticipant,
 )
@@ -15,7 +16,7 @@ from mlmi.log import getLogger
 from mlmi.sampling import sample_randomly_by_fraction
 from mlmi.settings import REPO_ROOT
 from mlmi.structs import TrainArgs
-from mlmi.utils import evaluate_global_model, evaluate_local_models, overwrite_participants_models, \
+from mlmi.utils import _evaluate_model, evaluate_global_model, evaluate_local_models, overwrite_participants_models, \
     overwrite_participants_optimizers
 
 logger = getLogger(__name__)
@@ -176,30 +177,33 @@ def evaluate_cluster_models(cluster_server_dic: Dict[str, 'BaseAggregatorPartici
                             cluster_clients_dic: Dict[str, List['BaseTrainingParticipant']],
                             evaluate_local=False)\
         -> Tuple[Tensor, Tensor]:
+    global_confusion_matrix = GlobalConfusionMatrix()
+    global_confusion_matrix.enable_logging()
     global_losses = None
     global_acc = None
     for cluster_id, cluster_clients in cluster_clients_dic.items():
         cluster_server = cluster_server_dic[cluster_id]
         if not evaluate_local:
-            result = evaluate_global_model(global_model_participant=cluster_server, participants=cluster_clients)
+            losses, acc, weighted_acc, num_samples = _evaluate_model(cluster_clients, cluster_server.model)
         else:
-            result = evaluate_local_models(participants=cluster_clients)
+            losses, acc, weighted_acc, num_samples = _evaluate_model(cluster_clients, None)
         if global_losses is None:
-            global_losses = result.get('test/loss')
-            global_acc = result.get('test/acc')
+            global_losses = losses
+            global_acc = acc
         else:
             if global_losses.dim() == 0:
                 global_losses = torch.tensor([global_losses])
             if global_acc.dim() == 0:
                 global_acc = torch.tensor([global_acc])
-            if result.get('test/loss').dim() == 0:
-                loss_test = torch.tensor([result.get('test/loss')])
+            if losses.dim() == 0:
+                loss_test = torch.tensor([losses])
                 global_losses = torch.cat((global_losses, loss_test), dim=0)
             else:
-                global_losses = torch.cat((global_losses, result.get('test/loss')), dim=0)
-            if result.get('test/acc').dim() == 0:
-                acc_test = torch.tensor([result.get('test/acc')])
+                global_losses = torch.cat((global_losses, losses), dim=0)
+            if acc.dim() == 0:
+                acc_test = torch.tensor([acc])
                 global_acc = torch.cat((global_acc, acc_test), dim=0)
             else:
-                global_acc = torch.cat((global_acc, result.get('test/acc')), dim=0)
+                global_acc = torch.cat((global_acc, acc), dim=0)
+    global_confusion_matrix.disable_logging()
     return global_losses, global_acc

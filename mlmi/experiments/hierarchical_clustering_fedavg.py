@@ -10,6 +10,7 @@ from mlmi.clustering import DatadependentPartitioner, FixedAlternativePartitione
     AlternativePartitioner, \
     RandomClusterPartitioner
 from mlmi.datasets.ham10k import load_ham10k_federated
+from mlmi.log import getLogger
 from mlmi.experiments.log import log_goal_test_acc, log_loss_and_acc
 from mlmi.fedavg.data import load_n_of_each_class, scratch_labels
 from mlmi.fedavg.femnist import load_femnist_colored_dataset, load_femnist_dataset
@@ -19,14 +20,15 @@ from mlmi.fedavg.run import DEFAULT_CLIENT_INIT_FN, run_fedavg
 from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.fedavg.util import evaluate_cluster_models, load_fedavg_state, run_fedavg_round, run_fedavg_train_round
 from mlmi.hierarchical.run import run_fedavg_hierarchical
-from mlmi.models.ham10k import MobileNetV2Lightning
+from mlmi.models.ham10k import GlobalConfusionMatrix, MobileNetV2Lightning
 from mlmi.participant import BaseParticipant, BaseTrainingParticipant
-from mlmi.plot import generate_client_label_heatmap, generate_data_label_heatmap
+from mlmi.plot import generate_client_label_heatmap, generate_confusion_matrix_heatmap, generate_data_label_heatmap
 from mlmi.settings import REPO_ROOT
 from mlmi.structs import ClusterArgs, FederatedDatasetData, ModelArgs, OptimizerArgs, TrainArgs
 from mlmi.utils import create_tensorboard_logger, evaluate_local_models, fix_random_seeds, overwrite_participants_models
 
 
+logger = getLogger(__name__)
 ex = Experiment('hierachical_clustering')
 
 
@@ -228,6 +230,14 @@ def log_after_round_evaluation(
         acc: Tensor,
         step: int
 ):
+    try:
+        global_confusion_matrix = GlobalConfusionMatrix()
+        if global_confusion_matrix.has_data:
+            matrix = global_confusion_matrix.compute()
+            image = generate_confusion_matrix_heatmap(matrix, title=tag)
+            experiment_logger.experiment.add_image(tag, image.numpy(), step)
+    except Exception as e:
+        logger.error('failed to log confusion matrix', e)
     log_loss_and_acc(tag, loss, acc, experiment_logger, step)
     log_goal_test_acc(tag, acc, experiment_logger, step)
 
