@@ -143,7 +143,7 @@ def partition_ham10k_dataset(
                                                   replace=False)
     for i in range(partitions):
         nv_label_partition_indices_ = nv_label_partition_indices[i]
-        fraction = np.random.randint(1, 2, size=1)
+        fraction = np.random.randint(1, 5, size=1)
         nv_label_partition_indices_ = nv_label_partition_indices_[:int(len(nv_label_partition_indices_)/fraction)-1]
         partition_indices[i] = np.concatenate((partition_indices[i], nv_label_partition_indices_)).astype(int)
 

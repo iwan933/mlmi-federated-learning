@@ -19,9 +19,9 @@ def run_fedavg_hierarchical(
         initial_train_fn: Callable[[List['BaseParticipant']], List['BaseParticipant']],
         federated_round_fn: Callable[['BaseAggregatorParticipant', List['BaseTrainingParticipant']], any],
         create_aggregator_fn: Callable[[str], 'BaseAggregatorParticipant'],
-        after_post_clustering_evaluation: Optional[List[Callable[[Tensor, Tensor, int], None]]] = None,
-        after_clustering_round_evaluation: Optional[List[Callable[[str, Tensor, Tensor, int], None]]] = None,
-        after_federated_round_evaluation: Optional[List[Callable[[Tensor, Tensor, int], None]]] = None,
+        after_post_clustering_evaluation: Optional[List[Callable]] = None,
+        after_clustering_round_evaluation: Optional[List[Callable]] = None,
+        after_federated_round_evaluation: Optional[List[Callable]] = None,
         after_clustering: Optional[List[Callable[[Dict[str, List['BaseTrainingParticipant']]], None]]] = None,
         after_cluster_aggregation: Optional[List[Callable]] = None,
         after_federated_round: Optional[List[Callable]] = None

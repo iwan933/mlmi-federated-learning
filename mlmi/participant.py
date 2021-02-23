@@ -129,11 +129,8 @@ class BaseTrainingParticipant(BaseParticipant):
         :return: a pytorch lightning trainer instance
         """
         _kwargs = kwargs.copy()
-        if enable_logging:
-            _kwargs['logger'] = self.logger
-        else:
-            _kwargs['checkpoint_callback'] = False
-            _kwargs['logger'] = False
+        _kwargs['logger'] = self.logger
+        _kwargs['checkpoint_callback'] = False
         if torch.cuda.is_available():
             _kwargs['gpus'] = 1
         return pl.Trainer(callbacks=self._callbacks, limit_val_batches=0.0, **_kwargs)

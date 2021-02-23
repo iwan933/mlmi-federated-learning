@@ -19,6 +19,7 @@ from mlmi.fedavg.run import DEFAULT_CLIENT_INIT_FN, run_fedavg
 from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.fedavg.util import evaluate_cluster_models, load_fedavg_state, run_fedavg_round, run_fedavg_train_round
 from mlmi.hierarchical.run import run_fedavg_hierarchical
+from mlmi.models.ham10k import MobileNetV2Lightning
 from mlmi.participant import BaseParticipant, BaseTrainingParticipant
 from mlmi.plot import generate_client_label_heatmap, generate_data_label_heatmap
 from mlmi.settings import REPO_ROOT
@@ -114,12 +115,12 @@ def color_and_pattern():
 
 @ex.named_config
 def ham10k():
-    local_evaluation_steps = -1
+    local_evaluation_steps = 7
     seed = 123123123
     lr = [0.01]
     name = 'ham10k'
-    total_fedavg_rounds = 75
-    cluster_initialization_rounds = [8]
+    total_fedavg_rounds = 150
+    cluster_initialization_rounds = [20]
     client_fraction = [0.3]
     local_epochs = 1
     batch_size = 16
@@ -128,12 +129,13 @@ def ham10k():
     num_label_limit = -1
     num_classes = 7
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
+    train_cluster_args = TrainArgs(max_epochs=3, min_epochs=3, progress_bar_refresh_rate=0)
     dataset = 'ham10k'
     partitioner_class = FixedAlternativePartitioner
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = [6.00]
+    max_value_criterion = [200.00]
     reallocate_clients = False
     threshold_min_client_cluster = -1
     use_colored_images = False
@@ -362,12 +364,15 @@ def run_hierarchical_clustering(
             optimizer_args = OptimizerArgs(optim.SGD, lr=lr_i)
             model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args,
                                    input_channels=input_channels, only_digits=False)
+            if dataset == 'ham10k':
+                model_args = ModelArgs(MobileNetV2Lightning, optimizer_args=optimizer_args, num_classes=7)
             fedavg_context = FedAvgExperimentContext(name=name, client_fraction=cf, local_epochs=local_epochs,
                                                      lr=lr_i, batch_size=batch_size, optimizer_args=optimizer_args,
                                                      model_args=model_args, train_args=train_args,
                                                      dataset_name=dataset)
             experiment_specification = f'{fedavg_context}'
             experiment_logger = create_tensorboard_logger(fedavg_context.name, experiment_specification)
+            fedavg_context.experiment_logger = experiment_logger
             if not data_distribution_logged:
                 log_dataset_distribution(experiment_logger, 'full dataset', fed_dataset)
                 data_distribution_logged = True
