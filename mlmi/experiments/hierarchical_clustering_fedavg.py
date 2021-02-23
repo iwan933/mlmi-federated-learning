@@ -20,7 +20,7 @@ from mlmi.fedavg.run import DEFAULT_CLIENT_INIT_FN, run_fedavg
 from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.fedavg.util import evaluate_cluster_models, load_fedavg_state, run_fedavg_round, run_fedavg_train_round
 from mlmi.hierarchical.run import run_fedavg_hierarchical
-from mlmi.models.ham10k import GlobalConfusionMatrix, MobileNetV2Lightning
+from mlmi.models.ham10k import Densenet121Lightning, GlobalConfusionMatrix, MobileNetV2Lightning
 from mlmi.participant import BaseParticipant, BaseTrainingParticipant
 from mlmi.plot import generate_client_label_heatmap, generate_confusion_matrix_heatmap, generate_data_label_heatmap
 from mlmi.settings import REPO_ROOT
@@ -60,6 +60,7 @@ def default_configuration():
     reallocate_clients = False
     threshold_min_client_cluster = 80
     pretrain = True
+    model_class = CNNLightning
 
 
 @ex.named_config
@@ -120,7 +121,7 @@ def color_and_pattern():
 def ham10k():
     local_evaluation_steps = 7
     seed = 123123123
-    lr = [0.01]
+    lr = [0.007]
     name = 'ham10k'
     total_fedavg_rounds = 150
     cluster_initialization_rounds = [20]
@@ -145,16 +146,18 @@ def ham10k():
     use_pattern = False
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
+    pretrain = True
+    model_class = MobileNetV2Lightning
 
 
 @ex.named_config
 def ham10k_nopretrain():
     local_evaluation_steps = 7
     seed = 123123123
-    lr = [0.01]
+    lr = [0.0055, 0.007, 0.0085]
     name = 'ham10k_nopretrain'
     total_fedavg_rounds = 150
-    cluster_initialization_rounds = [10]
+    cluster_initialization_rounds = [10, 20]
     client_fraction = [0.3]
     local_epochs = 1
     batch_size = 16
@@ -164,6 +167,40 @@ def ham10k_nopretrain():
     num_classes = 7
     train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
     train_cluster_args = TrainArgs(max_epochs=3, min_epochs=3, progress_bar_refresh_rate=0)
+    dataset = 'ham10k'
+    partitioner_class = FixedAlternativePartitioner
+    linkage_mech = 'ward'
+    criterion = 'distance'
+    dis_metric = 'euclidean'
+    max_value_criterion = [200.00, 300.00]
+    reallocate_clients = False
+    threshold_min_client_cluster = -1
+    use_colored_images = False
+    use_pattern = False
+    mean = (0.485, 0.456, 0.406)
+    std = (0.229, 0.224, 0.225)
+    pretrain = False
+    model_class = MobileNetV2Lightning
+
+
+@ex.named_config
+def ham10k_nopretrain_ida():
+    local_evaluation_steps = 7
+    seed = 123123123
+    lr = [0.007]
+    name = 'ham10k_nopretrain'
+    total_fedavg_rounds = 3
+    cluster_initialization_rounds = [2]
+    client_fraction = [0.3]
+    local_epochs = 1
+    batch_size = 16
+    num_clients = 27
+    sample_threshold = -1  # we need clients with at least 250 samples to make sure all labels are present
+    num_label_limit = -1
+    num_classes = 7
+    train_args = TrainArgs(max_epochs=local_epochs, min_epochs=local_epochs, progress_bar_refresh_rate=0)
+    train_cluster_args = TrainArgs(max_epochs=3, min_epochs=3, progress_bar_refresh_rate=0)
+    model_class = Densenet121Lightning
     dataset = 'ham10k'
     partitioner_class = FixedAlternativePartitioner
     linkage_mech = 'ward'
@@ -382,6 +419,7 @@ def run_hierarchical_clustering(
         use_colored_images,
         use_pattern,
         pretrain,
+        model_class,
         train_cluster_args=None,
         mean=None,
         std=None
@@ -417,10 +455,10 @@ def run_hierarchical_clustering(
     for cf in client_fraction:
         for lr_i in lr:
             optimizer_args = OptimizerArgs(optim.SGD, lr=lr_i)
-            model_args = ModelArgs(CNNLightning, optimizer_args=optimizer_args,
+            model_args = ModelArgs(model_class, optimizer_args=optimizer_args,
                                    input_channels=input_channels, only_digits=False)
             if dataset == 'ham10k':
-                model_args = ModelArgs(MobileNetV2Lightning, optimizer_args=optimizer_args, num_classes=7,
+                model_args = ModelArgs(model_class, optimizer_args=optimizer_args, num_classes=7,
                                        pretrain=pretrain)
             fedavg_context = FedAvgExperimentContext(name=name, client_fraction=cf, local_epochs=local_epochs,
                                                      lr=lr_i, batch_size=batch_size, optimizer_args=optimizer_args,

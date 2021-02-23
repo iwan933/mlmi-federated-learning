@@ -32,7 +32,7 @@ logger = getLogger(__name__)
 ex = Experiment('hierachical_clustering')
 
 
-@ex.named_config
+@ex.config
 def ham10k():
     local_evaluation_steps = 7
     seed = 123123123

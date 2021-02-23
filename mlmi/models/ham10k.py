@@ -47,8 +47,8 @@ class GlobalConfusionMatrix(object):
 
 class ResNet18Lightning(BaseParticipantModel, pl.LightningModule):
 
-    def __init__(self, num_classes, *args, weights=None, **kwargs):
-        model = torchvision.models.resnet18(pretrained=True)
+    def __init__(self, num_classes, *args, weights=None, pretrain=True, **kwargs):
+        model = torchvision.models.resnet18(pretrained=pretrain)
         model.fc = Linear(in_features=512, out_features=num_classes, bias=True)
         super().__init__(*args, model=model, **kwargs)
         self.model = model
@@ -88,8 +88,8 @@ class ResNet18Lightning(BaseParticipantModel, pl.LightningModule):
 
 class Densenet121Lightning(BaseParticipantModel, pl.LightningModule):
 
-    def __init__(self, num_classes, *args, weights=None, **kwargs):
-        model = torchvision.models.densenet121(pretrained=True)
+    def __init__(self, num_classes, *args, weights=None, pretrain=True, **kwargs):
+        model = torchvision.models.densenet121(pretrained=pretrain)
         model.classifier = Linear(in_features=1024, out_features=num_classes, bias=True)
         super().__init__(*args, model=model, **kwargs)
         self.model = model
