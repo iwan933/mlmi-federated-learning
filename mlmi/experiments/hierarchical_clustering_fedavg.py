@@ -346,7 +346,7 @@ def log_personalized_global_cluster_performance(
         cluster_clients_dic,
         step: int
 ):
-    if type(tags) is not list:
+    """if type(tags) is not list:
         tags = [tags]
     train_args = TrainArgs(max_steps=max_train_steps, progress_bar_refresh_rate=0)
     for cluster_id in cluster_clients_dic.keys():
@@ -355,7 +355,7 @@ def log_personalized_global_cluster_performance(
         run_fedavg_train_round(server.model.state_dict(), clients, train_args)
     loss, acc = evaluate_cluster_models(cluster_server_dic, cluster_clients_dic, evaluate_local=True)
     for tag in tags:
-        log_after_round_evaluation(experiment_logger, tag, loss, acc, step)
+        log_after_round_evaluation(experiment_logger, tag, loss, acc, step)"""
 
 
 def log_cluster_distribution(
