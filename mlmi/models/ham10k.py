@@ -3,16 +3,52 @@ from typing import Any, List
 import pytorch_lightning as pl
 import torchvision
 import torch
+from torch import Tensor
 from torch.nn import CrossEntropyLoss, Dropout, Linear, Sequential, functional as F
-from pytorch_lightning.metrics import Accuracy
+from pytorch_lightning.metrics import Accuracy, ConfusionMatrix
 
 from mlmi.participant import BaseParticipantModel
+from mlmi.plot import generate_confusion_matrix_heatmap
+
+
+class GlobalConfusionMatrix(object):
+    class __GlobalConfusionMatrix:
+        def __init__(self):
+            self.confusion_matrix = ConfusionMatrix(7)
+            self.has_data = False
+            self.is_logging = False
+
+        def enable_logging(self):
+            self.is_logging = True
+
+        def disable_logging(self):
+            self.is_logging = False
+
+        def update(self, predictions: Tensor, targets: Tensor):
+            if not self.is_logging:
+                return
+            self.has_data = True
+            preds, y = predictions.cpu(), targets.cpu()
+            self.confusion_matrix.update(preds, y)
+
+        def compute(self):
+            self.has_data = False
+            return self.confusion_matrix.compute()
+
+    instance = None
+
+    def __init__(self):
+        if not GlobalConfusionMatrix.instance:
+            GlobalConfusionMatrix.instance = GlobalConfusionMatrix.__GlobalConfusionMatrix()
+
+    def __getattr__(self, name):
+        return getattr(self.instance, name)
 
 
 class ResNet18Lightning(BaseParticipantModel, pl.LightningModule):
 
-    def __init__(self, num_classes, *args, weights=None, **kwargs):
-        model = torchvision.models.resnet18(pretrained=True)
+    def __init__(self, num_classes, *args, weights=None, pretrain=True, **kwargs):
+        model = torchvision.models.resnet18(pretrained=pretrain)
         model.fc = Linear(in_features=512, out_features=num_classes, bias=True)
         super().__init__(*args, model=model, **kwargs)
         self.model = model
@@ -37,6 +73,7 @@ class ResNet18Lightning(BaseParticipantModel, pl.LightningModule):
         loss = self.criterion(logits, y)
         preds = torch.argmax(logits, dim=1)
         self.accuracy.update(preds, y)
+        GlobalConfusionMatrix().update(preds, y)
         return {'loss': loss}
 
     def test_epoch_end(
@@ -51,8 +88,8 @@ class ResNet18Lightning(BaseParticipantModel, pl.LightningModule):
 
 class Densenet121Lightning(BaseParticipantModel, pl.LightningModule):
 
-    def __init__(self, num_classes, *args, weights=None, **kwargs):
-        model = torchvision.models.densenet121(pretrained=True)
+    def __init__(self, num_classes, *args, weights=None, pretrain=True, **kwargs):
+        model = torchvision.models.densenet121(pretrained=pretrain)
         model.classifier = Linear(in_features=1024, out_features=num_classes, bias=True)
         super().__init__(*args, model=model, **kwargs)
         self.model = model
@@ -77,6 +114,7 @@ class Densenet121Lightning(BaseParticipantModel, pl.LightningModule):
         loss = self.criterion(logits, y)
         preds = torch.argmax(logits, dim=1)
         self.accuracy.update(preds, y)
+        GlobalConfusionMatrix().update(preds, y)
         return {'loss': loss}
 
     def test_epoch_end(
@@ -91,8 +129,8 @@ class Densenet121Lightning(BaseParticipantModel, pl.LightningModule):
 
 class MobileNetV2Lightning(BaseParticipantModel, pl.LightningModule):
 
-    def __init__(self, num_classes, *args, weights=None, **kwargs):
-        model = torchvision.models.mobilenet_v2(pretrained=True)
+    def __init__(self, num_classes, *args, weights=None, pretrain=True, **kwargs):
+        model = torchvision.models.mobilenet_v2(pretrained=pretrain)
         model.classifier = Sequential(
             Dropout(p=0.2, inplace=False),
             Linear(in_features=1280, out_features=num_classes, bias=True)
@@ -120,6 +158,7 @@ class MobileNetV2Lightning(BaseParticipantModel, pl.LightningModule):
         loss = self.criterion(logits, y)
         preds = torch.argmax(logits, dim=1)
         self.accuracy.update(preds, y)
+        GlobalConfusionMatrix().update(preds, y)
         return {'loss': loss}
 
     def test_epoch_end(

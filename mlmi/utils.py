@@ -4,6 +4,7 @@ import torch
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch import Tensor
 
+from mlmi.models.ham10k import GlobalConfusionMatrix
 from mlmi.participant import BaseParticipant, BaseTrainingParticipant
 from mlmi.settings import RUN_DIR
 from mlmi.log import getLogger
@@ -89,7 +90,10 @@ def _evaluate_model(participants: List['BaseTrainingParticipant'], model):
 
 
 def evaluate_local_models(participants: List['BaseTrainingParticipant']):
+    global_confusion_matrix = GlobalConfusionMatrix()
+    global_confusion_matrix.enable_logging()
     losses, acc, weighted_acc, num_samples = _evaluate_model(participants, None)
+    global_confusion_matrix.disable_logging()
     return {
         'test/loss': losses,
         'test/acc': acc,
@@ -99,7 +103,10 @@ def evaluate_local_models(participants: List['BaseTrainingParticipant']):
 
 
 def evaluate_global_model(global_model_participant: 'BaseParticipant', participants: List['BaseTrainingParticipant']):
+    global_confusion_matrix = GlobalConfusionMatrix()
+    global_confusion_matrix.enable_logging()
     losses, acc, weighted_acc, num_samples = _evaluate_model(participants, global_model_participant.model)
+    global_confusion_matrix.disable_logging()
     return {
         'test/loss': losses,
         'test/acc': acc,

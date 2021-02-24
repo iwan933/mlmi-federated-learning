@@ -38,5 +38,28 @@ def generate_data_label_heatmap(title: str, dataloaders: List[data.DataLoader], 
     # decode to tensor
     image = Image.open(buf)
     image = functional.to_tensor(image)
+    plt.close(fig)
     return image
 
+
+def generate_confusion_matrix_heatmap(confusion_matrix, title=''):
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import torch
+    pct_matrix = confusion_matrix / torch.sum(confusion_matrix, dim=0)
+    df_cm = pd.DataFrame(pct_matrix.numpy(),
+                         index=[i for i in ['akiec', 'bcc', 'bkl', 'df', 'mel', 'nv', 'vasc']],
+                         columns=[i for i in ['akiec', 'bcc', 'bkl', 'df', 'mel', 'nv', 'vasc']])
+    # draw heatmap
+    fig, ax = plt.subplots(nrows=1, ncols=1)
+    sns.heatmap(df_cm, ax=ax, annot=True, fmt=".2f")
+    ax.set_title(title)
+    # write to buffer
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png')
+    buf.seek(0)
+    # decode to tensor
+    image = Image.open(buf)
+    image = functional.to_tensor(image)
+    plt.close(fig)
+    return image
