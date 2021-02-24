@@ -1,3 +1,6 @@
+import sys
+sys.path.append('C:/Users/Richard/Desktop/Informatik/Semester_5/MLMI/git/mlmi-federated-learning')
+
 from typing import Callable, Dict, List, Optional
 
 from sacred import Experiment
@@ -30,12 +33,12 @@ ex = Experiment('hierachical_clustering')
 def default_configuration():
     local_evaluation_steps = 1
     seed = 123123123
-    lr = 0.068
+    lr = 0.065
     name = 'default_hierarchical_fedavg'
-    total_fedavg_rounds = 10
-    cluster_initialization_rounds = [3, 5, 10]
+    total_fedavg_rounds = 1000
+    cluster_initialization_rounds = [8]
     client_fraction = [0.1]
-    local_epochs = 1
+    local_epochs = 3
     batch_size = 10
     num_clients = 367
     sample_threshold = -1
@@ -50,7 +53,7 @@ def default_configuration():
     linkage_mech = 'ward'
     criterion = 'distance'
     dis_metric = 'euclidean'
-    max_value_criterion = 6.5
+    max_value_criterion = 6.0
     reallocate_clients = False
     threshold_min_client_cluster = 80
 

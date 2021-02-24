@@ -334,8 +334,11 @@ def run_hierarchical_clustering_reptile(
                             )
                         )
 
-                        # Evaluation on train and test clients
-                        if i % reptile_context.eval_interval == 0:
+                    # Evaluation on train and test clients
+                    if i % reptile_context.eval_interval == 0:
+                        global_loss, global_acc = [], []
+
+                        for cluster_id, participants in cluster_clients_dic.items():
                             # Test on all clients inside clusters
                             reptile_train_step(
                                 aggregator=cluster_server_dic[cluster_id],
@@ -351,6 +354,11 @@ def run_hierarchical_clustering_reptile(
                             if after_round_evaluation is not None:
                                 for c in after_round_evaluation:
                                     c(experiment_logger, f'cluster_{cluster_id}', loss, acc, i)
+
+                            global_loss.extend(loss.tolist())
+                            global_acc.extend(acc.tolist())
+                        log_loss_and_acc('overall_mean', Tensor(global_loss),
+                                         Tensor(global_acc), experiment_logger, 0)
 
                     logger.info(f'Finished Reptile training round {i}')
 
@@ -381,4 +389,4 @@ def run_hierarchical_clustering_reptile(
                             for c in after_round_evaluation:
                                 c(experiment_logger, f'cluster_{cluster_id}', loss, acc, reptile_context.num_meta_steps)
 
-                    log_loss_and_acc('final_overall_mean', Tensor(global_loss), Tensor(global_acc), experiment_logger, 0)
+                    log_loss_and_acc('overall_mean', Tensor(global_loss), Tensor(global_acc), experiment_logger, 0)
