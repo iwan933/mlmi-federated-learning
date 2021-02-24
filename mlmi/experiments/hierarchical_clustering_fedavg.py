@@ -41,7 +41,7 @@ def default_configuration():
     seed = 123123123
     lr = 0.065
     name = 'default_hierarchical_fedavg'
-    total_fedavg_rounds = 1000
+    total_fedavg_rounds = 900
     cluster_initialization_rounds = [8]
     client_fraction = [0.1]
     local_epochs = 3
