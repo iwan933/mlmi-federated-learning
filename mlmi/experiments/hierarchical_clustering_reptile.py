@@ -357,8 +357,9 @@ def run_hierarchical_clustering_reptile(
 
                             global_loss.extend(loss.tolist())
                             global_acc.extend(acc.tolist())
-                        log_loss_and_acc('overall_mean', Tensor(global_loss),
-                                         Tensor(global_acc), experiment_logger, 0)
+                        if after_round_evaluation is not None:
+                            for c in after_round_evaluation:
+                                c(experiment_logger, 'mean_over_all_clients', Tensor(global_loss), Tensor(global_acc), i)
 
                     logger.info(f'Finished Reptile training round {i}')
 
