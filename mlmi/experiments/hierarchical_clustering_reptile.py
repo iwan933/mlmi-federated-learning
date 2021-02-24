@@ -246,7 +246,7 @@ def run_hierarchical_clustering_reptile(
             ]
             server, clients = run_fedavg(
                 context=fedavg_context,
-                num_rounds=75,  # max(hc_cluster_initialization_rounds),
+                num_rounds= max(hc_cluster_initialization_rounds),
                 dataset=fed_dataset,
                 save_states=True,
                 restore_state=True,
