@@ -67,10 +67,10 @@ def plot_confusion_matrix(confusion_matrix, title):
 
 def plot_performance_graphs(data: List[Tuple[str, str, str, pd.Series]]):
     fig, ax = plt.subplots(nrows=1, ncols=1, facecolor=bg_color)
-    # ax.set_ylim([0.0, 1.0])
+    ax.set_ylim([0.0, 1.0])
     set_plot_theme(ax)
     for title, color, linestyle, series in data:
         ax.plot(series.index, series, label=title, color=color, linestyle=linestyle)
-        plt.axvline(x=20, color=second_color)
+        #plt.axvline(x=8, color=second_color)
     ax.legend()
     fig.show()

@@ -106,21 +106,46 @@ graph_fileexports = [
     ('Reptile Pretrained', GREEN, NORMAL, 'run-ham10kreptile_ham10k_seed123123123_trainc27testc0_sgd_is32ilr0007ib16_ms1000mlri1mlrf0mb5_isev32ect-1ecf-1_default_version_0-tag-train-test_acc_test_mean.csv')
 ]
 
+richard_graph_fileexports = [
+    ('Reptile', GREEN, NORMAL, 'run-reptile_femnist_seed123123123_trainc367testc0_sgd_is7ilr005ib100_ms1000mlri3mlrf0mb5_isev7ect-1ecf-1_default_version_0-tag-train-test_acc_test_mean.csv'),
+    ('FL+HC Reptile', YELLOW, NORMAL, 'run-hierarchical_reptile_femnist_default_version_2-tag-mean_over_all_clients_acc_test_mean.csv'),
+    ('FedAvg', BLUE, NORMAL, 'full_run-default_hierarchical_fedavg_femnist_bs10lr6.50E-02cf0.10e3_optSGD_rgb_default_version_0-tag-global_performance_acc_test_mean.csv'),
+    ('FL+HC FedAvg', RED, NORMAL, 'run-default_hierarchical_fedavg_femnist_bs10lr6.50E-02cf0.10e3_optSGD_rgb_w_dist_eu6.00ri8rc892_default_version_0-tag-global_performance_acc_test_mean.csv')
+]
+
+richard_client_accuracy = [
+    ('Reptile', GREEN, NORMAL, 'run-reptile_femnist_seed123123123_trainc367testc0_sgd_is7ilr005ib100_ms1000mlri3mlrf0mb5_isev7ect-1ecf-1_default_version_0-tag-train-test_80_test.csv'),
+    ('FL+HC Reptile', YELLOW, NORMAL, 'run-hierarchical_reptile_femnist_default_version_2-tag-mean_over_all_clients_80_test.csv'),
+    ('FedAvg', BLUE, NORMAL, 'full_run-default_hierarchical_fedavg_femnist_bs10lr6.50E-02cf0.10e3_optSGD_rgb_default_version_0-tag-global_performance_80_test.csv'),
+    ('FL+HC FedAvg', RED, NORMAL, 'run-default_hierarchical_fedavg_femnist_bs10lr6.50E-02cf0.10e3_optSGD_rgb_w_dist_eu6.00ri8rc892_default_version_0-tag-global_performance_80_test.csv')
+]
+
 
 if __name__ == '__main__':
     from mlmi.settings import REPO_ROOT
     export_dir = REPO_ROOT / 'data' / 'tensorboard_exports'
-    graph_exports_dict = {}
-    for title, color, linestyle, filename in graph_fileexports:
+    richard_graph_fileexports_dict = {}
+    for title, color, linestyle, filename in richard_graph_fileexports:
         filepath = str((export_dir / filename).absolute())
         df = pd.read_csv(filepath, sep=',', index_col='Step')
         # apply exponential smoothing
         df['Value'] = df['Value'].ewm(alpha=0.2).mean()
-        graph_exports_dict[title] = (title, color, linestyle, df['Value'])
+        richard_graph_fileexports_dict[title] = (title, color, linestyle, df['Value'])
+
+    richard_client_accuracy_dict = {}
+    for title, color, linestyle, filename in richard_client_accuracy:
+        filepath = str((export_dir / filename).absolute())
+        df = pd.read_csv(filepath, sep=',', index_col='Step')
+        # apply exponential smoothing
+        df['Value'] = df['Value'].ewm(alpha=0.2).mean()
+        richard_client_accuracy_dict[title] = (title, color, linestyle, df['Value'])
 
 
-    plot_performance_graphs([graph_exports_dict[key] for key in
-                             ['FedAvg Pretrained', 'FL+HC Pretrained', 'FedAvg', 'FL+HC']])
+    plot_performance_graphs([richard_graph_fileexports_dict[key] for key in
+                             ['FedAvg']])
+
+    plot_performance_graphs([richard_client_accuracy_dict[key] for key in
+                             ['FedAvg']])
 
 
     #plot_label_counts(label_counts)
