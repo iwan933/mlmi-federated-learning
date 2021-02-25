@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 from collections import OrderedDict
 import copy
 
@@ -50,7 +50,25 @@ def subtract_model_states(minuend: Dict[str, Tensor],
     return result_state
 
 
+def estimate_weights(labels):
+    weight = torch.ones((7,))
+    label, counts = torch.unique(labels, return_counts=True)
+    weight[label] = weight[label] - counts / torch.sum(counts)
+    return weight
+
+
 class ReptileClient(BaseTrainingParticipant):
+
+    def get_model_kwargs(self) -> Optional[Dict]:
+        labels = torch.LongTensor([])
+        for _, y in self.train_data_loader:
+            labels = torch.cat((labels, y))
+        for _, y in self.test_data_loader:
+            labels = torch.cat((labels, y))
+        weights = estimate_weights(labels)
+        return {
+            'weights': weights
+        }
 
     def create_trainer(self, enable_logging=True, **kwargs) -> pl.Trainer:
         """
@@ -75,7 +93,7 @@ class ReptileClient(BaseTrainingParticipant):
         Loads the model state into the current model instance
         :param model_state: The model state to load
         """
-        self.model.load_state_dict(copy.deepcopy(model_state))
+        self.model.load_state_dict(copy.deepcopy(model_state), strict=False)
 
     def save_model_state(self):
         """

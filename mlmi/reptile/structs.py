@@ -69,6 +69,12 @@ class ReptileExperimentContext(object):
                 optimizer_args=inner_optimizer_args,
                 num_classes=self.num_classes_per_client
             )
+        elif self.dataset_name == 'ham10k':
+            self.inner_model_args = ModelArgs(
+                model_class=self.model_class,
+                optimizer_args=inner_optimizer_args,
+                num_classes=7
+            )
         else:
             self.inner_model_args = ModelArgs(
                 model_class=self.model_class,
@@ -87,6 +93,14 @@ class ReptileExperimentContext(object):
                     optimizer_class=torch.optim.SGD
                 ),
                 num_classes=self.num_classes_per_client
+            )
+        elif self.dataset_name == 'ham10k':
+            self.meta_model_args = ModelArgs(
+                model_class=self.model_class,
+                optimizer_args=OptimizerArgs(  # Dummy optimizer args
+                    optimizer_class=torch.optim.SGD
+                ),
+                num_classes=7
             )
         else:
             self.meta_model_args = ModelArgs(
