@@ -336,6 +336,7 @@ def run_hierarchical_clustering_reptile(
 
                     # Evaluation on train and test clients
                     if i % reptile_context.eval_interval == 0:
+                        global_step = init_rounds + i
                         global_loss, global_acc = [], []
 
                         for cluster_id, participants in cluster_clients_dic.items():
@@ -353,13 +354,15 @@ def run_hierarchical_clustering_reptile(
                             # Log
                             if after_round_evaluation is not None:
                                 for c in after_round_evaluation:
-                                    c(experiment_logger, f'cluster_{cluster_id}', loss, acc, i)
+                                    c(experiment_logger, f'cluster_{cluster_id}', loss, acc, global_step)
+                            loss_list = loss.tolist()
+                            acc_list = acc.tolist()
+                            global_loss.extend(loss_list if isinstance(loss_list, list) else [loss_list])
+                            global_acc.extend(acc_list if isinstance(acc_list, list) else [acc_list])
 
-                            global_loss.extend(loss.tolist())
-                            global_acc.extend(acc.tolist())
                         if after_round_evaluation is not None:
                             for c in after_round_evaluation:
-                                c(experiment_logger, 'mean_over_all_clients', Tensor(global_loss), Tensor(global_acc), i)
+                                c(experiment_logger, 'mean_over_all_clients', Tensor(global_loss), Tensor(global_acc), global_step)
 
                     logger.info(f'Finished Reptile training round {i}')
 
@@ -382,8 +385,10 @@ def run_hierarchical_clustering_reptile(
                         acc = result.get('test/acc')
                         print(f'Cluster {cluster_id} ({len(participants)} part.): loss = {loss}, acc = {acc}')
 
-                        global_loss.extend(loss.tolist())
-                        global_acc.extend(acc.tolist())
+                        loss_list = loss.tolist()
+                        acc_list = acc.tolist()
+                        global_loss.extend(loss_list if isinstance(loss_list, list) else [loss_list])
+                        global_acc.extend(acc_list if isinstance(acc_list, list) else [acc_list])
 
                         # Log
                         if after_round_evaluation is not None:
