@@ -1,4 +1,8 @@
 import sys
+
+from mlmi.datasets.ham10k import load_ham10k_federated
+from mlmi.fedavg.ham10k import initialize_ham10k_clients
+
 sys.path.append('C:/Users/Richard/Desktop/Informatik/Semester_5/MLMI/git/mlmi-federated-learning')
 
 
@@ -11,13 +15,14 @@ from functools import partial
 import torch
 from torch import Tensor, optim
 
-from mlmi.clustering import DatadependentPartitioner, ModelFlattenWeightsPartitioner, AlternativePartitioner, \
+from mlmi.clustering import DatadependentPartitioner, FixedAlternativePartitioner, ModelFlattenWeightsPartitioner, \
+    AlternativePartitioner, \
     RandomClusterPartitioner
 from mlmi.experiments.log import log_goal_test_acc, log_loss_and_acc
 from mlmi.fedavg.data import load_n_of_each_class, scratch_labels
 from mlmi.fedavg.femnist import load_femnist_colored_dataset, load_femnist_dataset
 from mlmi.fedavg.model import CNNLightning, CNNMnistLightning, FedAvgServer
-from mlmi.fedavg.run import run_fedavg
+from mlmi.fedavg.run import DEFAULT_CLIENT_INIT_FN, run_fedavg
 from mlmi.fedavg.structs import FedAvgExperimentContext
 from mlmi.fedavg.util import load_fedavg_state, run_fedavg_round, run_fedavg_train_round
 from mlmi.hierarchical.run import run_fedavg_hierarchical
@@ -68,6 +73,45 @@ def default_configuration():
     rp_meta_batch_size = 5
     rp_num_meta_steps = 2000
     rp_meta_learning_rate_initial = 3
+    rp_meta_learning_rate_final = 0
+    rp_eval_interval = 20
+    rp_inner_learning_rate = 0.05
+    rp_num_inner_steps = 70
+    rp_num_inner_steps_eval = 70
+
+
+@ex.named_config
+def ham10k():
+    seed = 123123123
+    name = 'ham10k'
+    dataset = 'ham10k'
+    num_clients = 27
+    batch_size = 16
+    num_label_limit = -1
+    use_colored_images = False
+    sample_threshold = -1
+    mean = (0.485, 0.456, 0.406)
+    std = (0.229, 0.224, 0.225)
+
+    hc_lr = 0.007
+    hc_cluster_initialization_rounds = [20]
+    hc_client_fraction = [0.3]
+    hc_local_epochs = 1
+    hc_train_args = TrainArgs(max_epochs=hc_local_epochs, min_epochs=hc_local_epochs, progress_bar_refresh_rate=0)
+    hc_train_cluster_args = TrainArgs(max_epochs=3, min_epochs=3, progress_bar_refresh_rate=0)
+    hc_partitioner_class = FixedAlternativePartitioner
+    hc_linkage_mech = 'ward'
+    hc_criterion = 'distance'
+    hc_dis_metric = 'euclidean'
+    hc_max_value_criterion = 300.00
+    hc_reallocate_clients = False
+    hc_threshold_min_client_cluster = 1
+
+    rp_sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
+    rp_adam_betas = (0.9, 0.999)  # Used only if sgd = False
+    rp_meta_batch_size = 5
+    rp_num_meta_steps = 2000
+    rp_meta_learning_rate_initial = 1
     rp_meta_learning_rate_final = 0
     rp_eval_interval = 20
     rp_inner_learning_rate = 0.05
@@ -157,10 +201,13 @@ def run_hierarchical_clustering_reptile(
         rp_eval_interval,
         rp_inner_learning_rate,
         rp_num_inner_steps,
-        rp_num_inner_steps_eval
+        rp_num_inner_steps_eval,
+        mean=None,
+        std=None
 ):
     fix_random_seeds(seed)
     global_tag = 'global_performance'
+    initialize_clients_fn = DEFAULT_CLIENT_INIT_FN
 
     if dataset == 'femnist':
         if use_colored_images:
@@ -179,6 +226,9 @@ def run_hierarchical_clustering_reptile(
             )
         if num_label_limit != -1:
             fed_dataset = scratch_labels(fed_dataset, num_label_limit)
+    elif dataset == 'ham10k':
+        fed_dataset = load_ham10k_federated(partitions=num_clients, batch_size=batch_size, mean=mean, std=std)
+        initialize_clients_fn = initialize_ham10k_clients
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
 
@@ -250,7 +300,8 @@ def run_hierarchical_clustering_reptile(
                 dataset=fed_dataset,
                 save_states=True,
                 restore_state=True,
-                after_round_evaluation=log_after_round_evaluation_fns
+                after_round_evaluation=log_after_round_evaluation_fns,
+                initialize_clients_fn=initialize_clients_fn
             )
 
             for init_rounds, max_value in generate_configuration(hc_cluster_initialization_rounds, hc_max_value_criterion):

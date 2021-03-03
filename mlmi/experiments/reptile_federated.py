@@ -84,9 +84,9 @@ def ham10k():
     do_final_evaluation = True
     num_eval_clients_final = -1
 
-    inner_batch_size = 16
+    inner_batch_size = 8
     inner_learning_rate = [0.007]
-    num_inner_steps = [32]
+    num_inner_steps = [5]
     num_inner_steps_eval = 32
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)

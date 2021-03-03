@@ -68,6 +68,55 @@ def load_ham10k_federated(
     )
 
 
+def load_ham10k_few_big_many_small_federated(
+        num_big_clients=20,
+        num_small_clients=80,
+        num_small_tripples_per_client=10,
+        test_fraction=0.2,
+        batch_size=32,
+        min_big_tripple=75,
+        mean=(0.485, 0.456, 0.406),
+        std=(0.229, 0.224, 0.225)
+):
+    dataset = load_ham10k()
+    train_subsets, test_subsets = partition_ham10k_few_big_many_small_dataset(dataset, test_fraction=test_fraction,
+                                                                              num_big_clients=num_big_clients,
+                                                                              num_small_clients=num_small_clients,
+                                                                              num_small_tripples_per_client=
+                                                                              num_small_tripples_per_client,
+                                                                              min_big_tripple=min_big_tripple)
+    train_transformations, test_transformations = get_transformations(mean, std)
+    lazy_datasets = []
+    for train_subset, test_subset in zip(train_subsets, test_subsets):
+        train_set = LazyImageFolderDataset(train_subset, train_transformations)
+        test_set = LazyImageFolderDataset(test_subset, test_transformations)
+        lazy_datasets.append((train_set, test_set))
+
+    data_local_test_num_dict = {}
+    data_local_train_num_dict = {}
+    train_data_local_dict = {}
+    test_data_local_dict = {}
+
+    for idx, (lazy_train_dataset, lazy_test_dataset) in enumerate(lazy_datasets):
+        train_data_local_dict[idx] = data.DataLoader(lazy_train_dataset, batch_size=batch_size, drop_last=False)
+        test_data_local_dict[idx] = data.DataLoader(lazy_test_dataset, batch_size=batch_size, drop_last=False)
+        data_local_train_num_dict[idx] = len(lazy_train_dataset)
+        data_local_test_num_dict[idx] = len(lazy_test_dataset)
+    return FederatedDatasetData(
+        client_num=num_big_clients + num_small_clients,
+        train_data_global=None,
+        test_data_global=None,
+        data_local_num_dict=None,
+        data_local_test_num_dict=data_local_test_num_dict,
+        data_local_train_num_dict=data_local_train_num_dict,
+        class_num=7,
+        train_data_local_dict=train_data_local_dict,
+        test_data_local_dict=test_data_local_dict,
+        name='ham10k',
+        batch_size=batch_size
+    )
+
+
 def load_ham10k() -> 'datasets.ImageFolder':
     data_dir = REPO_ROOT / 'data'
     ham10k_dir = data_dir / 'ham10k'
@@ -154,6 +203,52 @@ def partition_ham10k_dataset(
     return data_subsets
 
 
+def partition_ham10k_few_big_many_small_dataset(
+        dataset: 'datasets.ImageFolder',
+        num_big_clients,
+        num_small_clients,
+        num_small_tripples_per_client,
+        test_fraction,
+        min_big_tripple
+) -> Tuple[List['ImageFolderSubset'], List['ImageFolderSubset']]:
+    train_data_subsets = []
+    test_data_subsets = []
+
+    unique_label, unique_inverse, unique_counts = np.unique(dataset.targets,
+                                                            return_inverse=True, return_counts=True)
+    tripples_list = []
+    for label in unique_label:
+        label_indices = np.where(unique_inverse == label)[0]
+        label_indices = label_indices[:(len(label_indices) - (len(label_indices) % 3))]
+        label_tripples = label_indices.reshape((-1, 3))
+        tripples_list.append(label_tripples)
+    tripples = np.concatenate(tripples_list, axis=0)
+
+    small_choices = np.random.choice(np.arange(len(tripples)), size=(num_small_clients, num_small_tripples_per_client),
+                                     replace=False)
+    for choices in small_choices:
+        train_indices = np.transpose(np.transpose(tripples[choices])[:2]).reshape(-1)
+        test_indices = np.transpose(np.transpose(tripples[choices])[2:]).reshape(-1)
+        train_data_subsets.append(ImageFolderSubset(dataset, train_indices.astype(int)))
+        test_data_subsets.append(ImageFolderSubset(dataset, test_indices.astype(int)))
+    remaining_tripples = np.delete(tripples, small_choices.reshape(-1), axis=0)
+
+
+    for i in range(num_big_clients):
+        max_big_tripple = len(remaining_tripples) / (num_big_clients - i)
+        num_choices = np.random.randint(min_big_tripple, max_big_tripple + 1)
+        choices = np.random.choice(np.arange(len(remaining_tripples)), size=num_choices, replace=False)
+        selected_indices = remaining_tripples[choices].reshape(-1)
+        np.random.shuffle(selected_indices)
+        train_indices = selected_indices[:int(len(selected_indices) * (1 - test_fraction))]
+        test_indices = selected_indices[int(len(selected_indices) * (1 - test_fraction)):]
+        remaining_tripples = np.delete(remaining_tripples, choices, axis=0)
+        train_data_subsets.append(ImageFolderSubset(dataset, train_indices.astype(int)))
+        test_data_subsets.append(ImageFolderSubset(dataset, test_indices.astype(int)))
+
+    return train_data_subsets, test_data_subsets
+
+
 def get_transformations(mean, std) -> Tuple[any, any]:
     # normalization values for pretrained resnet on Imagenet
     transform_train = transforms.Compose([
@@ -206,6 +301,9 @@ class LazyImageFolderDataset(Dataset):
 
 
 if __name__ == '__main__':
+    federated_dataset = load_ham10k_few_big_many_small_federated()
+    print('')
+    """
     import pytorch_lightning as pl
     from torch import optim
 
@@ -246,3 +344,4 @@ if __name__ == '__main__':
     euclidean_dist = np.array([((model_parameter[participant_id] - global_parameter) ** 2).sum(axis=0)
                                for participant_id in range(len(models))])
     print(euclidean_dist)
+    """
