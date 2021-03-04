@@ -30,8 +30,8 @@ class ReptileExperimentContext(object):
                  num_eval_clients_final: int,
                  inner_batch_size: int,
                  inner_learning_rate: float,
-                 num_inner_steps: int,
-                 num_inner_steps_eval: int):
+                 num_inner_epochs: int,
+                 num_inner_epochs_eval: int):
         self.name = name
         self.seed = seed
 
@@ -49,7 +49,7 @@ class ReptileExperimentContext(object):
         self.adam_betas = adam_betas
 
         # Arguments for inner training
-        self.num_inner_steps = num_inner_steps
+        self.num_inner_epochs = num_inner_epochs
         self.inner_learning_rate = inner_learning_rate
         self.inner_batch_size = inner_batch_size
         if self.sgd:
@@ -111,7 +111,7 @@ class ReptileExperimentContext(object):
             )
 
         # Arguments for evaluation
-        self.num_inner_steps_eval = num_inner_steps_eval
+        self.num_inner_epochs_eval = num_inner_epochs_eval
         self.eval_interval = eval_interval
         self.num_eval_clients_training = num_eval_clients_training
         if num_eval_clients_training > num_clients_train or \
@@ -156,8 +156,8 @@ class ReptileExperimentContext(object):
         Return TrainArgs for inner training (training on task level)
         """
         inner_training_args = TrainArgs(
-            min_steps=self.num_inner_steps if not eval else self.num_inner_steps_eval,
-            max_steps=self.num_inner_steps if not eval else self.num_inner_steps_eval,
+            min_epochs=self.num_inner_epochs if not eval else self.num_inner_epochs_eval,
+            max_epochs=self.num_inner_epochs if not eval else self.num_inner_epochs_eval,
             weights_summary=None,  # Do not show model summary
             progress_bar_refresh_rate=0  # Do not show training progress bar
         )
@@ -195,7 +195,7 @@ class ReptileExperimentContext(object):
         )
         model_string = f"{'sgd' if self.sgd else 'adam'}"
         inner_learning_string = (
-            f"is{self.num_inner_steps}"
+            f"ie{self.num_inner_epochs}"
             f"ilr{str(self.inner_learning_rate).replace('.', '')}"
             f"ib{self.inner_batch_size}"
         )
@@ -206,7 +206,7 @@ class ReptileExperimentContext(object):
             f"mb{self.meta_batch_size}"
         )
         evaluation_string = (
-            f"isev{self.num_inner_steps_eval}"
+            f"ieev{self.num_inner_epochs_eval}"
             f"ect{self.num_eval_clients_training}"
             f"ecf{self.num_eval_clients_final if self.do_final_evaluation else 'N'}"
         )

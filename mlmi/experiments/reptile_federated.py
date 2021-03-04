@@ -54,8 +54,8 @@ def femnist():
 
     inner_batch_size = 100
     inner_learning_rate = [0.05]
-    num_inner_steps = [7]
-    num_inner_steps_eval = 7
+    num_inner_epochs = [7]
+    num_inner_epochs_eval = 7
 
 
 @ex.named_config
@@ -85,8 +85,8 @@ def ham10k():
 
     inner_batch_size = 8
     inner_learning_rate = [0.007]
-    num_inner_steps = [5]
-    num_inner_steps_eval = 32
+    num_inner_epochs = [1]
+    num_inner_epochs_eval = [3, 5]
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
 
@@ -118,8 +118,8 @@ def omniglot():
 
     inner_batch_size = 16
     inner_learning_rate = [0.001]
-    num_inner_steps = 5
-    num_inner_steps_eval = 50
+    num_inner_epochs = [5]
+    num_inner_epochs_eval = 50
 
 def log_after_round_evaluation(
         experiment_logger,
@@ -178,8 +178,8 @@ def run_reptile_experiment(
     num_eval_clients_final,
     inner_batch_size,
     inner_learning_rate,
-    num_inner_steps,
-    num_inner_steps_eval,
+    num_inner_epochs,
+    num_inner_epochs_eval,
     mean=None,
     std=None
 ):
@@ -203,17 +203,17 @@ def run_reptile_experiment(
             random_seed=seed
         )
     elif dataset == 'ham10k':
-        fed_dataset_train = load_ham10k_few_big_many_small_federated(batch_size=inner_batch_size, mean=mean, std=std)
+        fed_dataset_train, fed_dataset_test = load_ham10k_few_big_many_small_federated(batch_size=inner_batch_size, mean=mean, std=std)
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
 
     if not hasattr(inner_learning_rate, '__iter__'):
         inner_learning_rate = [inner_learning_rate]
-    if not hasattr(num_inner_steps, '__iter__'):
-        num_inner_steps = [num_inner_steps]
+    if not hasattr(num_inner_epochs, '__iter__'):
+        num_inner_epochs = [num_inner_epochs]
     #data_distribution_logged = False
     for lr in inner_learning_rate:
-        for _is in num_inner_steps:
+        for _is in num_inner_epochs:
             reptile_context = ReptileExperimentContext(
                 name=name,
                 dataset_name=dataset,
@@ -236,8 +236,8 @@ def run_reptile_experiment(
                 num_eval_clients_final=num_eval_clients_final,
                 inner_batch_size=inner_batch_size,
                 inner_learning_rate=lr,
-                num_inner_steps=_is,
-                num_inner_steps_eval=_is
+                num_inner_epochs=_is,
+                num_inner_epochs_eval=num_inner_epochs_eval
             )
 
             experiment_specification = f'{reptile_context}'
