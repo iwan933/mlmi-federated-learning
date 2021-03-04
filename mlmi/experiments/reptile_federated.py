@@ -1,9 +1,8 @@
-import sys
+#import sys
+#sys.path.append('C:/Users/Richard/Desktop/Informatik/Semester_5/MLMI/git/mlmi-federated-learning')
 
 from mlmi.datasets.ham10k import load_ham10k_federated
 from mlmi.models.ham10k import MobileNetV2Lightning
-
-sys.path.append('C:/Users/Richard/Desktop/Informatik/Semester_5/MLMI/git/mlmi-federated-learning')
 
 from typing import Callable, Dict, List, Optional
 
@@ -208,6 +207,10 @@ def run_reptile_experiment(
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
 
+    if not hasattr(inner_learning_rate, '__iter__'):
+        inner_learning_rate = [inner_learning_rate]
+    if not hasattr(num_inner_steps, '__iter__'):
+        num_inner_steps = [num_inner_steps]
     #data_distribution_logged = False
     for lr in inner_learning_rate:
         for _is in num_inner_steps:

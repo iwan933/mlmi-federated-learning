@@ -72,7 +72,10 @@ def _evaluate_model(participants: List['BaseTrainingParticipant'], model):
             results = participant.test(model)
         logger.debug(f'... tested model on {i+1:<4}/{num_participants} participants')
         for result in results:
-            num_samples = result.get('sample_num')
+            # TODO: For some reason, result.get('sample_num') returns None when
+            #       used with Omniglot. The hack below 'or 1' is a quick fix and
+            #       should be revised
+            num_samples = result.get('sample_num') or 1
             num_samples_list.append(num_samples)
             for key in result.keys():
                 if key.startswith('test/loss'):
