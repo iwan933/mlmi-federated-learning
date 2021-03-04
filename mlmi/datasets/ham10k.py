@@ -233,7 +233,6 @@ def partition_ham10k_few_big_many_small_dataset(
         test_data_subsets.append(ImageFolderSubset(dataset, test_indices.astype(int)))
     remaining_tripples = np.delete(tripples, small_choices.reshape(-1), axis=0)
 
-
     for i in range(num_big_clients):
         max_big_tripple = len(remaining_tripples) / (num_big_clients - i)
         num_choices = np.random.randint(min_big_tripple, max_big_tripple + 1)
