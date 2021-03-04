@@ -28,37 +28,6 @@ ex = Experiment('reptile')
 
 
 @ex.config
-def femnist():
-    name = 'reptile'
-    dataset = 'femnist'  # Options: 'omniglot', 'femnist'
-    swap_labels = False  # Only used with dataset='femnist'
-    classes = 0  # Only used with dataset='omniglot'
-    shots = 0  # Only used with dataset='omniglot'
-    seed = 123123123
-
-    model_class = CNNLightning
-    sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
-    adam_betas = (0.9, 0.999)  # Used only if sgd = False
-
-    num_clients_train = 367
-    num_clients_test = 0  # Used only with dataset='omniglot'
-    meta_batch_size = 5
-    num_meta_steps = 1000
-    meta_learning_rate_initial = 3
-    meta_learning_rate_final = 0
-
-    eval_interval = 25
-    num_eval_clients_training = -1
-    do_final_evaluation = True
-    num_eval_clients_final = -1
-
-    inner_batch_size = 100
-    inner_learning_rate = [0.05]
-    num_inner_epochs = [7]
-    num_inner_epochs_eval = 7
-
-
-@ex.named_config
 def ham10k():
     name = 'ham10kreptile'
     dataset = 'ham10k'  # Options: 'omniglot', 'femnist'
@@ -71,55 +40,25 @@ def ham10k():
     sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
     adam_betas = (0.9, 0.999)  # Used only if sgd = False
 
-    num_clients_train = 27
-    num_clients_test = 0  # Used only with dataset='omniglot'
+    num_clients_train = 0 # Not used here
+    num_clients_test = 0  # Not used here
     meta_batch_size = 5
-    num_meta_steps = 1000
+    num_meta_steps = 250
     meta_learning_rate_initial = 1
     meta_learning_rate_final = 0
 
-    eval_interval = 20
+    eval_interval = 10
     num_eval_clients_training = -1
     do_final_evaluation = True
     num_eval_clients_final = -1
 
     inner_batch_size = 8
-    inner_learning_rate = [0.007]
-    num_inner_epochs = [1]
+    inner_learning_rate = [0.007, 0.001, 0.01]
+    num_inner_epochs = [1, 3, 5]
     num_inner_epochs_eval = [3, 5]
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
 
-
-@ex.named_config
-def omniglot():
-    name = 'reptile'
-    dataset = 'omniglot'  # Options: 'omniglot', 'femnist'
-    swap_labels = False
-    classes = 5  # Only used with dataset='omniglot'
-    shots = 5  # Only used with dataset='omniglot'
-    seed = 0
-
-    model_class = OmniglotLightning
-    sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
-    adam_betas = None  # Used only if sgd = False
-
-    num_clients_train = 10000
-    num_clients_test = 1000  # Used only with dataset='omniglot'
-    meta_batch_size = 5
-    num_meta_steps = 100000
-    meta_learning_rate_initial = 1
-    meta_learning_rate_final = 0
-
-    eval_interval = 10
-    num_eval_clients_training = 1
-    do_final_evaluation = True
-    num_eval_clients_final = 1000  # Applies only when do_final_evaluation=True
-
-    inner_batch_size = 16
-    inner_learning_rate = [0.001]
-    num_inner_epochs = [5]
-    num_inner_epochs_eval = 50
 
 def log_after_round_evaluation(
         experiment_logger,
