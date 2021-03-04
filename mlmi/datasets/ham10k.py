@@ -89,14 +89,14 @@ def load_ham10k_few_big_many_small_federated(
     train_transformations, test_transformations = get_transformations(mean, std)
     large_lazy_datasets = []
     for train_subset, test_subset in zip(large_train_subsets, large_test_subsets):
-        train_set = LazyImageFolderDataset(train_subset, train_transformations)
-        test_set = LazyImageFolderDataset(test_subset, test_transformations)
+        train_set = LazyImageFolderDataset(train_subset[:], train_transformations)
+        test_set = LazyImageFolderDataset(test_subset[:], test_transformations)
         large_lazy_datasets.append((train_set, test_set))
 
     small_lazy_datasets = []
     for train_subset, test_subset in zip(small_train_subsets, small_test_subsets):
-        train_set = LazyImageFolderDataset(train_subset, train_transformations)
-        test_set = LazyImageFolderDataset(test_subset, test_transformations)
+        train_set = LazyImageFolderDataset(train_subset[:], train_transformations)
+        test_set = LazyImageFolderDataset(test_subset[:], test_transformations)
         small_lazy_datasets.append((train_set, test_set))
 
     data_local_test_num_dict = {}
@@ -337,11 +337,9 @@ class LazyImageFolderDataset(Dataset):
         self.transform = transform
 
     def __getitem__(self, index):
+        x, y = self.dataset[index][0], self.dataset[index][1]
         if self.transform:
-            x = self.transform(self.dataset[index][0])
-        else:
-            x = self.dataset[index][0]
-        y = self.dataset[index][1]
+            x = self.transform(x)
         return x, y
 
     def __len__(self):
@@ -349,7 +347,8 @@ class LazyImageFolderDataset(Dataset):
 
 
 if __name__ == '__main__':
-    federated_dataset, fed_test_dataset = load_ham10k_few_big_many_small_federated()
+    fed_test_dataset = load_ham10k_federated()
+    federated_dataset, fed_test_dataset_2 = load_ham10k_few_big_many_small_federated()
     print('')
     """
     import pytorch_lightning as pl

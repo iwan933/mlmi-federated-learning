@@ -150,48 +150,51 @@ def run_reptile_experiment(
         inner_learning_rate = [inner_learning_rate]
     if not hasattr(num_inner_epochs, '__iter__'):
         num_inner_epochs = [num_inner_epochs]
+    if not hasattr(num_inner_epochs_eval, '__iter__'):
+        num_inner_epochs = [num_inner_epochs_eval]
     #data_distribution_logged = False
     for lr in inner_learning_rate:
         for _is in num_inner_epochs:
-            reptile_context = ReptileExperimentContext(
-                name=name,
-                dataset_name=dataset,
-                swap_labels=swap_labels,
-                num_classes_per_client=classes,
-                num_shots_per_class=shots,
-                seed=seed,
-                model_class=model_class,
-                sgd=sgd,
-                adam_betas=adam_betas,
-                num_clients_train=num_clients_train,
-                num_clients_test=num_clients_test,
-                meta_batch_size=meta_batch_size,
-                num_meta_steps=num_meta_steps,
-                meta_learning_rate_initial=meta_learning_rate_initial,
-                meta_learning_rate_final=meta_learning_rate_final,
-                eval_interval=eval_interval,
-                num_eval_clients_training=num_eval_clients_training,
-                do_final_evaluation=do_final_evaluation,
-                num_eval_clients_final=num_eval_clients_final,
-                inner_batch_size=inner_batch_size,
-                inner_learning_rate=lr,
-                num_inner_epochs=_is,
-                num_inner_epochs_eval=num_inner_epochs_eval
-            )
+            for _ieev in num_inner_epochs_eval:
+                reptile_context = ReptileExperimentContext(
+                    name=name,
+                    dataset_name=dataset,
+                    swap_labels=swap_labels,
+                    num_classes_per_client=classes,
+                    num_shots_per_class=shots,
+                    seed=seed,
+                    model_class=model_class,
+                    sgd=sgd,
+                    adam_betas=adam_betas,
+                    num_clients_train=num_clients_train,
+                    num_clients_test=num_clients_test,
+                    meta_batch_size=meta_batch_size,
+                    num_meta_steps=num_meta_steps,
+                    meta_learning_rate_initial=meta_learning_rate_initial,
+                    meta_learning_rate_final=meta_learning_rate_final,
+                    eval_interval=eval_interval,
+                    num_eval_clients_training=num_eval_clients_training,
+                    do_final_evaluation=do_final_evaluation,
+                    num_eval_clients_final=num_eval_clients_final,
+                    inner_batch_size=inner_batch_size,
+                    inner_learning_rate=lr,
+                    num_inner_epochs=_is,
+                    num_inner_epochs_eval=_ieev
+                )
 
-            experiment_specification = f'{reptile_context}'
-            experiment_logger = create_tensorboard_logger(
-                reptile_context.name, experiment_specification
-            )
-            reptile_context.experiment_logger = experiment_logger
+                experiment_specification = f'{reptile_context}'
+                experiment_logger = create_tensorboard_logger(
+                    reptile_context.name, experiment_specification
+                )
+                reptile_context.experiment_logger = experiment_logger
 
-            log_after_round_evaluation_fns = [
-                partial(log_after_round_evaluation, experiment_logger)
-            ]
-            run_reptile(
-                context=reptile_context,
-                dataset_train=fed_dataset_train,
-                dataset_test=fed_dataset_test,
-                initial_model_state=None,
-                after_round_evaluation=log_after_round_evaluation_fns
-            )
+                log_after_round_evaluation_fns = [
+                    partial(log_after_round_evaluation, experiment_logger)
+                ]
+                run_reptile(
+                    context=reptile_context,
+                    dataset_train=fed_dataset_train,
+                    dataset_test=fed_dataset_test,
+                    initial_model_state=None,
+                    after_round_evaluation=log_after_round_evaluation_fns
+                )
