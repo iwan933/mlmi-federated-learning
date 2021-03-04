@@ -192,7 +192,9 @@ class OmniglotLightning(BaseParticipantModel, pl.LightningModule):
     """
     A model for Omniglot classification - PyTorch implementation.
     """
-    def __init__(self, num_classes: int, *args, **kwargs):
+    def __init__(self, num_classes: int, weights=None, *args, **kwargs):
+        # Added parameter weights as a hack so ReptileClient.get_model_args()
+        # does not have to be adapted
         super().__init__(
             model=OmniglotModel(num_classes=num_classes),
             *args,

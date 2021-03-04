@@ -73,6 +73,7 @@ def run_reptile(context: ReptileExperimentContext,
         context=context.name,
         experiment_logger=context.experiment_logger
     )
+    test_clients = None
     if dataset_test is not None:
         test_clients = initialize_clients(
             dataset=dataset_test,
@@ -80,8 +81,6 @@ def run_reptile(context: ReptileExperimentContext,
             context=context.name,
             experiment_logger=context.experiment_logger
         )
-    else:
-        test_clients = None
 
     # Set up server
     server = ReptileServer(
