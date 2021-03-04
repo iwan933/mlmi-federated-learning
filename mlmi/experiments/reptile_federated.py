@@ -1,6 +1,6 @@
 import sys
 
-from mlmi.datasets.ham10k import load_ham10k_federated
+from mlmi.datasets.ham10k import load_ham10k_federated, load_ham10k_few_big_many_small_federated
 from mlmi.models.ham10k import MobileNetV2Lightning
 
 sys.path.append('C:/Users/Richard/Desktop/Informatik/Semester_5/MLMI/git/mlmi-federated-learning')
@@ -204,7 +204,7 @@ def run_reptile_experiment(
             random_seed=seed
         )
     elif dataset == 'ham10k':
-        fed_dataset_train = load_ham10k_federated(partitions=num_clients_train, batch_size=inner_batch_size, mean=mean, std=std)
+        fed_dataset_train = load_ham10k_few_big_many_small_federated(batch_size=inner_batch_size, mean=mean, std=std)
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
 
