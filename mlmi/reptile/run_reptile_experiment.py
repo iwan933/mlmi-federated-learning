@@ -1,10 +1,12 @@
 import sys
+
+from mlmi.models.ham10k import GlobalConfusionMatrix, GlobalTestTestConfusionMatrix, GlobalTrainTestConfusionMatrix
+
 sys.path.append('C:/Users/Richard/Desktop/Informatik/Semester_5/MLMI/git/mlmi-federated-learning')
 
 from mlmi.structs import FederatedDatasetData, ModelArgs
 
 import random
-
 from mlmi.log import getLogger
 from mlmi.reptile.model import ReptileClient, ReptileServer
 from mlmi.reptile.util import reptile_train_step
@@ -115,7 +117,7 @@ def run_reptile(context: ReptileExperimentContext,
         # Evaluation on train and test clients
         if i % context.eval_interval == 0:
             # Pick train / test clients at random and test on them
-            losses, accs = [], []
+            losses, accs, balanced_accs = [], [], []
             for client_set in [train_clients, test_clients]:
                 if client_set:
                     if context.num_eval_clients_training == -1:
@@ -133,20 +135,23 @@ def run_reptile(context: ReptileExperimentContext,
                     result = evaluate_local_models(participants=clients)
                     losses.append(result.get('test/loss'))
                     accs.append(result.get('test/acc'))
+                    balanced_accs.append(result.get('test/balanced_acc'))
                 else:
                     losses.append(None)
                     accs.append(None)
+                    balanced_accs.append(None)
 
             # Log
             if after_round_evaluation is not None:
                 for c in after_round_evaluation:
-                    c('', losses[0], accs[0], losses[1], accs[1], i)
+                    c('', losses[0], accs[0], balanced_accs[0], losses[1], accs[1], balanced_accs[1], i)
 
         logger.info('finished training round')
 
     if context.do_final_evaluation:
         # Final evaluation on subsample of train / test clients
-        losses, accs = [], []
+        losses, accs, balanced_accs = [], [], []
+        is_train_client_set = True
         for client_set in [train_clients, test_clients]:
             if client_set:
                 if context.num_eval_clients_final == -1:
@@ -161,14 +166,25 @@ def run_reptile(context: ReptileExperimentContext,
                     inner_training_args=context.get_inner_training_args(eval=True),
                     evaluation_mode=True
                 )
+                if is_train_client_set:
+                    GlobalTrainTestConfusionMatrix().enable_logging()
+                else:
+                    GlobalTestTestConfusionMatrix().enable_logging()
                 result = evaluate_local_models(participants=eval_clients)
+                if is_train_client_set:
+                    GlobalTrainTestConfusionMatrix().disable_logging()
+                else:
+                    GlobalTestTestConfusionMatrix().disable_logging()
                 losses.append(result.get('test/loss'))
                 accs.append(result.get('test/acc'))
+                balanced_accs.append(result.get('test/balanced_acc'))
             else:
                 losses.append(None)
                 accs.append(None)
+                balanced_accs.append(None)
+            is_train_client_set = False
 
         # Log
         if after_round_evaluation is not None:
             for c in after_round_evaluation:
-                c('final_', losses[0], accs[0], losses[1], accs[1], 0)
+                c('final_', losses[0], accs[0], balanced_accs[0], losses[1], accs[1], balanced_accs[1], 0)

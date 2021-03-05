@@ -61,7 +61,7 @@ def overwrite_participants_optimizers(optimizer_state: Dict[str, Tensor], partic
 def _evaluate_model(participants: List['BaseTrainingParticipant'], model):
     test_losses = []
     test_acc = []
-    test_acc_weighted = []
+    test_balanced_acc = []
     num_participants = len(participants)
     num_samples_list = []
     logger.debug('testing model ...')
@@ -82,25 +82,24 @@ def _evaluate_model(participants: List['BaseTrainingParticipant'], model):
                     test_losses.append(result.get(key))
                 elif key.startswith('test/acc'):
                     test_acc.append(result.get(key))
-                    test_acc_weighted.append(result.get(key) * num_samples)
+                elif key.startswith('test/balanced_acc'):
+                    test_balanced_acc.append(result.get(key))
     num_samples_total = sum(num_samples_list)
     losses = torch.squeeze(torch.FloatTensor(test_losses)).cpu()
     acc = torch.squeeze(torch.FloatTensor(test_acc)).cpu()
-    weighted_acc = torch.sum(
-        torch.FloatTensor(test_acc_weighted) / num_samples_total
-    ).cpu()
-    return losses, acc, weighted_acc, num_samples_total
+    balanced_acc = torch.squeeze(torch.FloatTensor(test_balanced_acc)).cpu()
+    return losses, acc, balanced_acc, num_samples_total
 
 
 def evaluate_local_models(participants: List['BaseTrainingParticipant']):
     global_confusion_matrix = GlobalConfusionMatrix()
     global_confusion_matrix.enable_logging()
-    losses, acc, weighted_acc, num_samples = _evaluate_model(participants, None)
+    losses, acc, balanced_acc, num_samples = _evaluate_model(participants, None)
     global_confusion_matrix.disable_logging()
     return {
         'test/loss': losses,
         'test/acc': acc,
-        'test/weighted_acc': weighted_acc,
+        'test/balanced_acc': balanced_acc,
         'num_samples': num_samples
     }
 
@@ -108,12 +107,12 @@ def evaluate_local_models(participants: List['BaseTrainingParticipant']):
 def evaluate_global_model(global_model_participant: 'BaseParticipant', participants: List['BaseTrainingParticipant']):
     global_confusion_matrix = GlobalConfusionMatrix()
     global_confusion_matrix.enable_logging()
-    losses, acc, weighted_acc, num_samples = _evaluate_model(participants, global_model_participant.model)
+    losses, acc, balanced_acc, num_samples = _evaluate_model(participants, global_model_participant.model)
     global_confusion_matrix.disable_logging()
     return {
         'test/loss': losses,
         'test/acc': acc,
-        'test/weighted_acc': weighted_acc,
+        'test/balanced_acc': balanced_acc,
         'num_samples': num_samples
     }
 

@@ -62,7 +62,7 @@ def reptile_train_step(aggregator: ReptileServer,
     # Aggregate only when not in evaluation mode
     if not evaluation_mode:
         assert meta_training_args is not None, ('Argument meta_training_args '
-            'must not be None when not in evaluation_mode')
+                                                'must not be None when not in evaluation_mode')
         logger.debug(
             (f"Starting aggregation: num_participants={len(participants)}, "
              f"meta_learning_rate={meta_training_args.kwargs['meta_learning_rate']}")

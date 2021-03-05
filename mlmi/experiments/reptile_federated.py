@@ -1,8 +1,7 @@
-#import sys
-#sys.path.append('C:/Users/Richard/Desktop/Informatik/Semester_5/MLMI/git/mlmi-federated-learning')
 
 from mlmi.datasets.ham10k import load_ham10k_federated, load_ham10k_few_big_many_small_federated
-from mlmi.models.ham10k import MobileNetV2Lightning
+from mlmi.models.ham10k import GlobalConfusionMatrix, GlobalTestTestConfusionMatrix, GlobalTrainTestConfusionMatrix, \
+    MobileNetV2Lightning
 
 from typing import Callable, Dict, List, Optional
 
@@ -19,7 +18,7 @@ from mlmi.reptile.model import OmniglotLightning
 from mlmi.reptile.structs import ReptileExperimentContext
 from mlmi.reptile.run_reptile_experiment import run_reptile
 
-from mlmi.plot import generate_data_label_heatmap
+from mlmi.plot import generate_confusion_matrix_heatmap, generate_data_label_heatmap
 from mlmi.settings import REPO_ROOT
 from mlmi.structs import FederatedDatasetData
 from mlmi.utils import create_tensorboard_logger, fix_random_seeds
@@ -47,7 +46,7 @@ def ham10k():
     meta_learning_rate_initial = 1
     meta_learning_rate_final = 0
 
-    eval_interval = 10
+    eval_interval = 1
     num_eval_clients_training = -1
     do_final_evaluation = True
     num_eval_clients_final = -1
@@ -65,10 +64,39 @@ def log_after_round_evaluation(
         tag: str,
         loss_train_test: Tensor,
         acc_train_test: Tensor,
+        balanced_acc_train_test: Tensor,
         loss_test_test: Tensor,
         acc_test_test: Tensor,
+        balanced_acc_test_test: Tensor,
         step: int
     ):
+    try:
+        global_confusion_matrix = GlobalConfusionMatrix()
+        if global_confusion_matrix.has_data:
+            matrix = global_confusion_matrix.compute()
+            image = generate_confusion_matrix_heatmap(matrix, title=tag)
+            experiment_logger.experiment.add_image(tag, image.numpy(), step)
+    except Exception as e:
+        print('failed to log confusion matrix (global)', e)
+
+    try:
+        global_confusion_matrix = GlobalTestTestConfusionMatrix()
+        if global_confusion_matrix.has_data:
+            matrix = global_confusion_matrix.compute()
+            image = generate_confusion_matrix_heatmap(matrix, title=tag)
+            experiment_logger.experiment.add_image(tag, image.numpy(), step)
+    except Exception as e:
+        print('failed to log confusion matrix (test-test)', e)
+
+    try:
+        global_confusion_matrix = GlobalTrainTestConfusionMatrix()
+        if global_confusion_matrix.has_data:
+            matrix = global_confusion_matrix.compute()
+            image = generate_confusion_matrix_heatmap(matrix, title=tag)
+            experiment_logger.experiment.add_image(tag, image.numpy(), step)
+    except Exception as e:
+        print('failed to log confusion matrix (train-test)', e)
+
     log_loss_and_acc(
         f'{tag}train-test',
         loss_train_test,
@@ -76,7 +104,15 @@ def log_after_round_evaluation(
         experiment_logger,
         step
     )
+    log_loss_and_acc(
+        f'{tag}balanced-train-test',
+        loss_test_test,
+        balanced_acc_test_test,
+        experiment_logger,
+        step
+    )
     log_goal_test_acc(f'{tag}train-test', acc_train_test, experiment_logger, step)
+    log_goal_test_acc(f'{tag}balanced-train-test', balanced_acc_train_test, experiment_logger, step)
     if loss_test_test is not None and acc_test_test is not None:
         log_loss_and_acc(
             f'{tag}test-test',
@@ -85,7 +121,15 @@ def log_after_round_evaluation(
             experiment_logger,
             step
         )
+        log_loss_and_acc(
+            f'{tag}balanced-test-test',
+            loss_test_test,
+            balanced_acc_test_test,
+            experiment_logger,
+            step
+        )
         log_goal_test_acc(f'{tag}test-test', acc_test_test, experiment_logger, step)
+        log_goal_test_acc(f'{tag}balanced-test-test', balanced_acc_test_test, experiment_logger, step)
 
 
 def log_dataset_distribution(experiment_logger, tag: str, dataset: FederatedDatasetData):
