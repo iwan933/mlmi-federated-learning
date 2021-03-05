@@ -42,17 +42,17 @@ def ham10k():
     num_clients_train = 0 # Not used here
     num_clients_test = 0  # Not used here
     meta_batch_size = 5
-    num_meta_steps = 250
+    num_meta_steps = 5000
     meta_learning_rate_initial = 1
     meta_learning_rate_final = 0
 
-    eval_interval = 1
+    eval_interval = 20
     num_eval_clients_training = -1
     do_final_evaluation = True
     num_eval_clients_final = -1
 
     inner_batch_size = 8
-    inner_learning_rate = [0.001, 0.006, 0.01]
+    inner_learning_rate = [0.006]
     num_inner_epochs = [1]
     num_inner_epochs_eval = [5]
     mean = (0.485, 0.456, 0.406)
