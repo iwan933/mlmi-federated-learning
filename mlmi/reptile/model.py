@@ -175,25 +175,6 @@ class ReptileServer(BaseAggregatorParticipant):
             new_model_state[key] = w + learning_rate * gradient[key]
         self.model.load_state_dict(new_model_state)
 
-    def get_checkpoint_path(self, suffix: Union[str, None] = None) -> Path:
-        """
-        Constructs a checkpoint path based on
-        :return:
-        """
-        str_suffix = '' if suffix is None else '_' + suffix
-        filename = (self._name + str_suffix + '.ckpt')
-        return CHECKPOINT_DIR / str(self._experiment_context) / filename
-
-    def save_model_state(self, suffix: Union[str, None] = None):
-        """
-        Saves the model state of the aggregated model
-        :param target_path: The path to save the model at
-        :return:
-        """
-        path = self.get_checkpoint_path(suffix)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        torch.save(self._model.state_dict(), path)
-
 
 def apply_same_padding(x, kernel_size, stride):
     if x.shape[2] % stride == 0:  # input image width % stride

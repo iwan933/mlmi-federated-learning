@@ -27,6 +27,11 @@ def cyclerange(start, interval, total_len):
         return list(range(start, total_len)) + list(range(0, (start + interval) % total_len))
     return list(range(start, start + interval))
 
+def save_reptile_state(reptile_context: 'RepitleExperimentContext', meta_step: int, model_state: Dict[str, Tensor]):
+    path = REPO_ROOT / 'run' / 'states' / 'reptile_federated' / f'{reptile_context}r{meta_step}.mdl'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(model_state, path)
+
 def initialize_clients(dataset: FederatedDatasetData,
                        model_args: ModelArgs,
                        context,
@@ -117,7 +122,7 @@ def run_reptile(context: ReptileExperimentContext,
         # Evaluation on train and test clients
         if i % context.eval_interval == 0:
             # Save server model state
-            server.save_model_state(suffix=f'step{i}')
+            save_reptile_state(context, i, server.model.load_state_dict())
             # Pick train / test clients at random and test on them
             losses, accs, balanced_accs = [], [], []
             is_train_client_set = True
