@@ -42,9 +42,9 @@ def ham10k():
     num_clients_train = 0 # Not used here
     num_clients_test = 0  # Not used here
     meta_batch_size = 5
-    num_meta_steps = 5000
+    num_meta_steps = 1000
     meta_learning_rate_initial = 1
-    meta_learning_rate_final = 0
+    meta_learning_rate_final = 0.8
 
     eval_interval = 20
     num_eval_clients_training = -1
@@ -52,7 +52,7 @@ def ham10k():
     num_eval_clients_final = -1
 
     inner_batch_size = 8
-    inner_learning_rate = [0.006]
+    inner_learning_rate = [0.001, 0.002, 0.004]
     num_inner_epochs = [1]
     num_inner_epochs_eval = [5]
     mean = (0.485, 0.456, 0.406)
@@ -71,31 +71,16 @@ def log_after_round_evaluation(
         step: int
     ):
     try:
-        global_confusion_matrix = GlobalConfusionMatrix()
-        if global_confusion_matrix.has_data:
-            matrix = global_confusion_matrix.compute()
-            image = generate_confusion_matrix_heatmap(matrix, title=tag)
-            experiment_logger.experiment.add_image(tag, image.numpy(), step)
+        global_confusion_matrices = [GlobalConfusionMatrix(),
+                                     GlobalTrainTestConfusionMatrix(),
+                                     GlobalTestTestConfusionMatrix()]
+        for global_confusion_matrix in global_confusion_matrices:
+            if global_confusion_matrix.has_data:
+                matrix = global_confusion_matrix.compute()
+                image = generate_confusion_matrix_heatmap(matrix, title=tag)
+                experiment_logger.experiment.add_image(tag, image.numpy(), step)
     except Exception as e:
         print('failed to log confusion matrix (global)', e)
-
-    try:
-        global_confusion_matrix = GlobalTestTestConfusionMatrix()
-        if global_confusion_matrix.has_data:
-            matrix = global_confusion_matrix.compute()
-            image = generate_confusion_matrix_heatmap(matrix, title=tag)
-            experiment_logger.experiment.add_image(tag, image.numpy(), step)
-    except Exception as e:
-        print('failed to log confusion matrix (test-test)', e)
-
-    try:
-        global_confusion_matrix = GlobalTrainTestConfusionMatrix()
-        if global_confusion_matrix.has_data:
-            matrix = global_confusion_matrix.compute()
-            image = generate_confusion_matrix_heatmap(matrix, title=tag)
-            experiment_logger.experiment.add_image(tag, image.numpy(), step)
-    except Exception as e:
-        print('failed to log confusion matrix (train-test)', e)
 
     log_loss_and_acc(
         f'{tag}train-test',
