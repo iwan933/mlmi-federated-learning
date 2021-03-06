@@ -52,9 +52,9 @@ def ham10k():
     num_eval_clients_final = -1
 
     inner_batch_size = 8
-    inner_learning_rate = [0.001]
+    inner_learning_rate = [0.001, 0.002]
     num_inner_epochs = [1]
-    num_inner_epochs_eval = [1, 2, 3]
+    num_inner_epochs_eval = [3]
     do_balancing = [False]
 
     mean = (0.485, 0.456, 0.406)
