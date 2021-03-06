@@ -92,7 +92,7 @@ def log_after_round_evaluation(
     log_loss_and_acc(
         f'{tag}balanced-train-test',
         loss_test_test,
-        balanced_acc_test_test,
+        balanced_acc_train_test,
         experiment_logger,
         step
     )
