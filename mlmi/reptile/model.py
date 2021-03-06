@@ -60,9 +60,13 @@ def estimate_weights(labels):
 
 class ReptileClient(BaseTrainingParticipant):
 
+    def __init__(self, do_balancing, **kwargs):
+        self.do_balancing = do_balancing
+        super().__init__(**kwargs)
+
     def get_model_kwargs(self) -> Optional[Dict]:
-        return None
-        """
+        if not self.do_balancing:
+            return None
         labels = torch.LongTensor([])
         for _, y in self.train_data_loader:
             labels = torch.cat((labels, y))
@@ -72,7 +76,6 @@ class ReptileClient(BaseTrainingParticipant):
         return {
             'weights': weights
         }
-        """
 
     def create_trainer(self, enable_logging=True, **kwargs) -> pl.Trainer:
         """

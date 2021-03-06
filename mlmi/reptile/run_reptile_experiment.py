@@ -41,7 +41,8 @@ def save_reptile_state(reptile_context: 'RepitleExperimentContext', meta_step: i
 def initialize_clients(dataset: FederatedDatasetData,
                        model_args: ModelArgs,
                        context,
-                       experiment_logger):
+                       experiment_logger,
+                       do_balancing):
     clients = []
     for c in dataset.train_data_local_dict.keys():
         client = ReptileClient(
@@ -52,7 +53,8 @@ def initialize_clients(dataset: FederatedDatasetData,
             num_train_samples=dataset.data_local_train_num_dict[c],
             test_dataloader=dataset.test_data_local_dict[c],
             num_test_samples=dataset.data_local_test_num_dict[c],
-            lightning_logger=experiment_logger
+            lightning_logger=experiment_logger,
+            do_balancing=do_balancing
         )
         clients.append(client)
     return clients
@@ -84,7 +86,8 @@ def run_reptile(context: ReptileExperimentContext,
         dataset=dataset_train,
         model_args=context.inner_model_args,
         context=context.name,
-        experiment_logger=context.experiment_logger
+        experiment_logger=context.experiment_logger,
+        do_balancing=context.do_balancing
     )
     test_clients = None
     if dataset_test is not None:
@@ -92,7 +95,8 @@ def run_reptile(context: ReptileExperimentContext,
             dataset=dataset_test,
             model_args=context.inner_model_args,
             context=context.name,
-            experiment_logger=context.experiment_logger
+            experiment_logger=context.experiment_logger,
+            do_balancing=context.do_balancing
         )
 
     # Set up server

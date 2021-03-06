@@ -42,19 +42,21 @@ def ham10k():
     num_clients_train = 0 # Not used here
     num_clients_test = 0  # Not used here
     meta_batch_size = 5
-    num_meta_steps = 1000
+    num_meta_steps = 3000
     meta_learning_rate_initial = 1
-    meta_learning_rate_final = 0.8
+    meta_learning_rate_final = 0.6
 
-    eval_interval = 50
+    eval_interval = 250
     num_eval_clients_training = -1
     do_final_evaluation = True
     num_eval_clients_final = -1
 
     inner_batch_size = 8
-    inner_learning_rate = [0.001, 0.002, 0.004]
+    inner_learning_rate = [0.001]
     num_inner_epochs = [1]
-    num_inner_epochs_eval = [5]
+    num_inner_epochs_eval = [1, 2, 3]
+    do_balancing = [False]
+
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
 
@@ -148,8 +150,9 @@ def run_reptile_experiment(
     inner_learning_rate,
     num_inner_epochs,
     num_inner_epochs_eval,
+    do_balancing,
     mean=None,
-    std=None
+    std=None,
 ):
     fix_random_seeds(seed)
     fed_dataset_test = None
@@ -185,45 +188,47 @@ def run_reptile_experiment(
     for lr in inner_learning_rate:
         for _is in num_inner_epochs:
             for _ieev in num_inner_epochs_eval:
-                reptile_context = ReptileExperimentContext(
-                    name=name,
-                    dataset_name=dataset,
-                    swap_labels=swap_labels,
-                    num_classes_per_client=classes,
-                    num_shots_per_class=shots,
-                    seed=seed,
-                    model_class=model_class,
-                    sgd=sgd,
-                    adam_betas=adam_betas,
-                    num_clients_train=num_clients_train,
-                    num_clients_test=num_clients_test,
-                    meta_batch_size=meta_batch_size,
-                    num_meta_steps=num_meta_steps,
-                    meta_learning_rate_initial=meta_learning_rate_initial,
-                    meta_learning_rate_final=meta_learning_rate_final,
-                    eval_interval=eval_interval,
-                    num_eval_clients_training=num_eval_clients_training,
-                    do_final_evaluation=do_final_evaluation,
-                    num_eval_clients_final=num_eval_clients_final,
-                    inner_batch_size=inner_batch_size,
-                    inner_learning_rate=lr,
-                    num_inner_epochs=_is,
-                    num_inner_epochs_eval=_ieev
-                )
+                for _do_balancing in do_balancing:
+                    reptile_context = ReptileExperimentContext(
+                        name=name,
+                        dataset_name=dataset,
+                        swap_labels=swap_labels,
+                        num_classes_per_client=classes,
+                        num_shots_per_class=shots,
+                        seed=seed,
+                        model_class=model_class,
+                        sgd=sgd,
+                        adam_betas=adam_betas,
+                        num_clients_train=num_clients_train,
+                        num_clients_test=num_clients_test,
+                        meta_batch_size=meta_batch_size,
+                        num_meta_steps=num_meta_steps,
+                        meta_learning_rate_initial=meta_learning_rate_initial,
+                        meta_learning_rate_final=meta_learning_rate_final,
+                        eval_interval=eval_interval,
+                        num_eval_clients_training=num_eval_clients_training,
+                        do_final_evaluation=do_final_evaluation,
+                        num_eval_clients_final=num_eval_clients_final,
+                        inner_batch_size=inner_batch_size,
+                        inner_learning_rate=lr,
+                        num_inner_epochs=_is,
+                        num_inner_epochs_eval=_ieev,
+                        do_balancing=_do_balancing
+                    )
 
-                experiment_specification = f'{reptile_context}'
-                experiment_logger = create_tensorboard_logger(
-                    reptile_context.name, experiment_specification
-                )
-                reptile_context.experiment_logger = experiment_logger
+                    experiment_specification = f'{reptile_context}'
+                    experiment_logger = create_tensorboard_logger(
+                        reptile_context.name, experiment_specification
+                    )
+                    reptile_context.experiment_logger = experiment_logger
 
-                log_after_round_evaluation_fns = [
-                    partial(log_after_round_evaluation, experiment_logger)
-                ]
-                run_reptile(
-                    context=reptile_context,
-                    dataset_train=fed_dataset_train,
-                    dataset_test=fed_dataset_test,
-                    initial_model_state=None,
-                    after_round_evaluation=log_after_round_evaluation_fns
-                )
+                    log_after_round_evaluation_fns = [
+                        partial(log_after_round_evaluation, experiment_logger)
+                    ]
+                    run_reptile(
+                        context=reptile_context,
+                        dataset_train=fed_dataset_train,
+                        dataset_test=fed_dataset_test,
+                        initial_model_state=None,
+                        after_round_evaluation=log_after_round_evaluation_fns
+                    )

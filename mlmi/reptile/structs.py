@@ -31,8 +31,10 @@ class ReptileExperimentContext(object):
                  inner_batch_size: int,
                  inner_learning_rate: float,
                  num_inner_epochs: int,
-                 num_inner_epochs_eval: int):
+                 num_inner_epochs_eval: int,
+                 do_balancing: bool):
         self.name = name
+        self.do_balancing = do_balancing
         self.seed = seed
 
         # Arguments pertaining to data set
@@ -194,10 +196,11 @@ class ReptileExperimentContext(object):
             f"testc{self.num_clients_test}"
         )
         model_string = f"{'sgd' if self.sgd else 'adam'}"
+        balancing = 'bal' if self.do_balancing else ''
         inner_learning_string = (
             f"ie{self.num_inner_epochs}"
             f"ilr{str(self.inner_learning_rate).replace('.', '')}"
-            f"ib{self.inner_batch_size}"
+            f"ib{self.inner_batch_size}{balancing}"
         )
         meta_learning_string = (
             f"ms{self.num_meta_steps}"
