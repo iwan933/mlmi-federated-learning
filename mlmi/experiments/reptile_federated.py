@@ -46,7 +46,7 @@ def ham10k():
     meta_learning_rate_initial = 1
     meta_learning_rate_final = 0.8
 
-    eval_interval = 20
+    eval_interval = 50
     num_eval_clients_training = -1
     do_final_evaluation = True
     num_eval_clients_final = -1
