@@ -88,7 +88,7 @@ def run_reptile(context: ReptileExperimentContext,
     server = ReptileServer(
         participant_name='initial_server',
         model_args=context.meta_model_args,
-        context=context.name,
+        context=context,
         initial_model_state=initial_model_state
     )
 
@@ -116,6 +116,8 @@ def run_reptile(context: ReptileExperimentContext,
 
         # Evaluation on train and test clients
         if i % context.eval_interval == 0:
+            # Save server model state
+            server.save_model_state(suffix=f'step{i}')
             # Pick train / test clients at random and test on them
             losses, accs, balanced_accs = [], [], []
             for client_set in [train_clients, test_clients]:
