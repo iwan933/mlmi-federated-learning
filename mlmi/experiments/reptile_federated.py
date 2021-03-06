@@ -71,14 +71,14 @@ def log_after_round_evaluation(
         step: int
     ):
     try:
-        global_confusion_matrices = [GlobalConfusionMatrix(),
-                                     GlobalTrainTestConfusionMatrix(),
-                                     GlobalTestTestConfusionMatrix()]
-        for global_confusion_matrix in global_confusion_matrices:
+        global_confusion_matrices = [(GlobalConfusionMatrix(), 'global'),
+                                     (GlobalTrainTestConfusionMatrix(), 'train-test'),
+                                     (GlobalTestTestConfusionMatrix(), 'test-test')]
+        for global_confusion_matrix, matrix_type in global_confusion_matrices:
             if global_confusion_matrix.has_data:
                 matrix = global_confusion_matrix.compute()
                 image = generate_confusion_matrix_heatmap(matrix, title=tag)
-                experiment_logger.experiment.add_image(tag, image.numpy(), step)
+                experiment_logger.experiment.add_image(f'{tag}-{matrix_type}', image.numpy(), step)
     except Exception as e:
         print('failed to log confusion matrix (global)', e)
 
