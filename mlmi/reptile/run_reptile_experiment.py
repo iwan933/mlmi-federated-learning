@@ -118,6 +118,7 @@ def run_reptile(context: ReptileExperimentContext,
         if i % context.eval_interval == 0:
             # Pick train / test clients at random and test on them
             losses, accs, balanced_accs = [], [], []
+            is_train_client_set = True
             for client_set in [train_clients, test_clients]:
                 if client_set:
                     if context.num_eval_clients_training == -1:
@@ -132,7 +133,15 @@ def run_reptile(context: ReptileExperimentContext,
                         inner_training_args=context.get_inner_training_args(eval=True),
                         evaluation_mode=True
                     )
+                    if is_train_client_set:
+                        GlobalTrainTestConfusionMatrix().enable_logging()
+                    else:
+                        GlobalTestTestConfusionMatrix().enable_logging()
                     result = evaluate_local_models(participants=clients)
+                    if is_train_client_set:
+                        GlobalTrainTestConfusionMatrix().disable_logging()
+                    else:
+                        GlobalTestTestConfusionMatrix().disable_logging()
                     losses.append(result.get('test/loss'))
                     accs.append(result.get('test/acc'))
                     balanced_accs.append(result.get('test/balanced_acc'))
@@ -140,6 +149,7 @@ def run_reptile(context: ReptileExperimentContext,
                     losses.append(None)
                     accs.append(None)
                     balanced_accs.append(None)
+                is_train_client_set = False
 
             # Log
             if after_round_evaluation is not None:
