@@ -78,6 +78,24 @@ def load_ham10k_few_big_many_small_federated(
         mean=(0.485, 0.456, 0.406),
         std=(0.229, 0.224, 0.225)
 ):
+    train_client_data, test_client_data = _load_ham10k_few_big_many_small_federated(num_big_clients, num_small_clients,
+                                                                                    num_small_tripples_per_client,
+                                                                                    test_fraction, batch_size,
+                                                                                    min_big_tripple, mean, std)
+    return _create_federated_dataloader(train_client_data, test_client_data, batch_size)
+
+
+def _load_ham10k_few_big_many_small_federated(
+        num_big_clients=20,
+        num_small_clients=80,
+        num_small_tripples_per_client=10,
+        test_fraction=0.2,
+        batch_size=32,
+        min_big_tripple=75,
+        mean=(0.485, 0.456, 0.406),
+        std=(0.229, 0.224, 0.225)
+) -> Tuple[List[Tuple['LazyImageFolderDataset', 'LazyImageFolderDataset']],
+           List[Tuple['LazyImageFolderDataset', 'LazyImageFolderDataset']]]:
     dataset = load_ham10k()
     large_train_subsets, large_test_subsets, small_train_subsets, small_test_subsets = \
         partition_ham10k_few_big_many_small_dataset(dataset, test_fraction=test_fraction,
@@ -99,23 +117,28 @@ def load_ham10k_few_big_many_small_federated(
         test_set = LazyImageFolderDataset(test_subset[:], test_transformations)
         small_lazy_datasets.append((train_set, test_set))
 
+    all_indices = np.arange(len(small_lazy_datasets))
+    test_indices = np.random.choice(all_indices, size=40, replace=False)
+    train_indices = np.delete(all_indices, test_indices)
+
+    train_datasets = large_lazy_datasets
+
+    for train_index in train_indices:
+        train_datasets.append(small_lazy_datasets[train_index])
+
+    test_datasets = []
+    for test_index in test_indices:
+        test_datasets.append(small_lazy_datasets[test_index])
+    return train_datasets, test_datasets
+
+
+def _create_federated_dataloader(train_datasets, test_datasets, batch_size):
     data_local_test_num_dict = {}
     data_local_train_num_dict = {}
     train_data_local_dict = {}
     test_data_local_dict = {}
 
-    all_indices = np.arange(len(small_lazy_datasets))
-    test_indices = np.random.choice(all_indices, size=40, replace=False)
-    train_indices = np.delete(all_indices, test_indices)
-
-    for idx, (lazy_train_dataset, lazy_test_dataset) in enumerate(large_lazy_datasets):
-        train_data_local_dict[idx] = data.DataLoader(lazy_train_dataset, batch_size=batch_size, drop_last=False)
-        test_data_local_dict[idx] = data.DataLoader(lazy_test_dataset, batch_size=batch_size, drop_last=False)
-        data_local_train_num_dict[idx] = len(lazy_train_dataset)
-        data_local_test_num_dict[idx] = len(lazy_test_dataset)
-
-    for idx in range(len(large_lazy_datasets), len(large_lazy_datasets) + len(train_indices)):
-        lazy_train_dataset, lazy_test_dataset = small_lazy_datasets[train_indices[idx - len(large_lazy_datasets)]]
+    for idx, (lazy_train_dataset, lazy_test_dataset) in enumerate(train_datasets):
         train_data_local_dict[idx] = data.DataLoader(lazy_train_dataset, batch_size=batch_size, drop_last=False)
         test_data_local_dict[idx] = data.DataLoader(lazy_test_dataset, batch_size=batch_size, drop_last=False)
         data_local_train_num_dict[idx] = len(lazy_train_dataset)
@@ -126,15 +149,15 @@ def load_ham10k_few_big_many_small_federated(
     test_train_data_local_dict = {}
     test_test_data_local_dict = {}
 
-    for idx in range(len(test_indices)):
-        lazy_train_dataset, lazy_test_dataset = small_lazy_datasets[test_indices[idx]]
+    for idx in range(len(test_datasets)):
+        lazy_train_dataset, lazy_test_dataset = test_datasets[idx]
         test_train_data_local_dict[idx] = data.DataLoader(lazy_train_dataset, batch_size=batch_size, drop_last=False)
         test_test_data_local_dict[idx] = data.DataLoader(lazy_test_dataset, batch_size=batch_size, drop_last=False)
         test_data_local_train_num_dict[idx] = len(lazy_train_dataset)
         test_data_local_test_num_dict[idx] = len(lazy_test_dataset)
 
     train_set_dataset = FederatedDatasetData(
-        client_num=num_big_clients + len(train_indices),
+        client_num=len(train_datasets),
         train_data_global=None,
         test_data_global=None,
         data_local_num_dict=None,
@@ -148,7 +171,7 @@ def load_ham10k_few_big_many_small_federated(
     )
 
     test_set_dataset = FederatedDatasetData(
-        client_num=len(test_indices),
+        client_num=len(test_datasets),
         train_data_global=None,
         test_data_global=None,
         data_local_num_dict=None,
@@ -162,6 +185,33 @@ def load_ham10k_few_big_many_small_federated(
     )
 
     return train_set_dataset, test_set_dataset
+
+
+def load_ham10k_few_big_many_small_federated2fulldataset(
+        num_big_clients=20,
+        num_small_clients=80,
+        num_small_tripples_per_client=10,
+        test_fraction=0.2,
+        batch_size=32,
+        min_big_tripple=75,
+        mean=(0.485, 0.456, 0.406),
+        std=(0.229, 0.224, 0.225)
+):
+    train_client_data, test_client_data = _load_ham10k_few_big_many_small_federated(
+        num_big_clients=num_big_clients,
+        num_small_clients=num_small_clients,
+        num_small_tripples_per_client=num_small_tripples_per_client,
+        test_fraction=test_fraction,
+        batch_size=batch_size,
+        min_big_tripple=min_big_tripple,
+        mean=mean,
+        std=std
+    )
+
+    for train_dataset, test_dataset in [*train_client_data, *test_client_data]:
+        train_dataset
+
+
 
 
 def load_ham10k() -> 'datasets.ImageFolder':
