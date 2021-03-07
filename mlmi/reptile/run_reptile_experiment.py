@@ -64,7 +64,8 @@ def run_reptile(context: ReptileExperimentContext,
                 dataset_train: FederatedDatasetData,
                 dataset_test: FederatedDatasetData,
                 initial_model_state,
-                after_round_evaluation):
+                after_round_evaluation,
+                start_round):
     RANDOM = random.Random(context.seed)
 
     # Randomly swap labels
@@ -108,7 +109,7 @@ def run_reptile(context: ReptileExperimentContext,
     )
 
     # Perform training
-    for i in range(context.num_meta_steps):
+    for i in range(start_round, context.num_meta_steps):
         if context.meta_batch_size == -1:
             meta_batch = train_clients
         else:

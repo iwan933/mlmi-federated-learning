@@ -1,3 +1,6 @@
+from pathlib import Path
+
+import torch
 
 from mlmi.datasets.ham10k import load_ham10k_federated, load_ham10k_few_big_many_small_federated
 from mlmi.models.ham10k import GlobalConfusionMatrix, GlobalTestTestConfusionMatrix, GlobalTrainTestConfusionMatrix, \
@@ -42,7 +45,7 @@ def ham10k():
     num_clients_train = 0 # Not used here
     num_clients_test = 0  # Not used here
     meta_batch_size = 5
-    num_meta_steps = 3000
+    num_meta_steps = 5000
     meta_learning_rate_initial = 1
     meta_learning_rate_final = 0.4
 
@@ -59,6 +62,132 @@ def ham10k():
 
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
+
+    start_round = 0
+    model_state_path = None
+    logger_version = None
+
+
+@ex.automain
+def run_reptile_experiment(
+    name,
+    dataset,
+    swap_labels,
+    classes,
+    shots,
+    seed,
+    model_class,
+    sgd,
+    adam_betas,
+    num_clients_train,
+    num_clients_test,
+    meta_batch_size,
+    num_meta_steps,
+    meta_learning_rate_initial,
+    meta_learning_rate_final,
+    eval_interval,
+    num_eval_clients_training,
+    do_final_evaluation,
+    num_eval_clients_final,
+    inner_batch_size,
+    inner_learning_rate,
+    num_inner_epochs,
+    num_inner_epochs_eval,
+    do_balancing,
+    start_round=0,
+    model_state_path=None,
+    logger_version=None,
+    mean=None,
+    std=None,
+):
+    fix_random_seeds(seed)
+    fed_dataset_test = None
+
+    initial_model_state = None
+    if model_state_path is not None:
+        if Path(model_state_path).exists():
+            initial_model_state = torch.load(model_state_path)
+        else:
+            raise ValueError(f'model state path {model_state_path} does not exist.')
+
+    if dataset == 'femnist':
+        fed_dataset_train = load_femnist_dataset(
+            data_dir=str((REPO_ROOT / 'data').absolute()),
+            num_clients=num_clients_train,
+            batch_size=inner_batch_size,
+            random_seed=seed
+        )
+    elif dataset == 'omniglot':
+        fed_dataset_train, fed_dataset_test = load_omniglot_datasets(
+            data_dir=str((REPO_ROOT / 'data' / 'omniglot').absolute()),
+            num_clients_train=num_clients_train,
+            num_clients_test=num_clients_test,
+            num_classes_per_client=classes,
+            num_shots_per_class=shots,
+            inner_batch_size=inner_batch_size,
+            random_seed=seed
+        )
+    elif dataset == 'ham10k':
+        fed_dataset_train, fed_dataset_test = load_ham10k_few_big_many_small_federated(batch_size=inner_batch_size, mean=mean, std=std)
+    else:
+        raise ValueError(f'dataset "{dataset}" unknown')
+
+    if not hasattr(inner_learning_rate, '__iter__'):
+        inner_learning_rate = [inner_learning_rate]
+    if not hasattr(num_inner_epochs, '__iter__'):
+        num_inner_epochs = [num_inner_epochs]
+    if not hasattr(num_inner_epochs_eval, '__iter__'):
+        num_inner_epochs = [num_inner_epochs_eval]
+    #data_distribution_logged = False
+    for lr in inner_learning_rate:
+        for _is in num_inner_epochs:
+            for _ieev in num_inner_epochs_eval:
+                for _do_balancing in do_balancing:
+                    reptile_context = ReptileExperimentContext(
+                        name=name,
+                        dataset_name=dataset,
+                        swap_labels=swap_labels,
+                        num_classes_per_client=classes,
+                        num_shots_per_class=shots,
+                        seed=seed,
+                        model_class=model_class,
+                        sgd=sgd,
+                        adam_betas=adam_betas,
+                        num_clients_train=num_clients_train,
+                        num_clients_test=num_clients_test,
+                        meta_batch_size=meta_batch_size,
+                        num_meta_steps=num_meta_steps,
+                        meta_learning_rate_initial=meta_learning_rate_initial,
+                        meta_learning_rate_final=meta_learning_rate_final,
+                        eval_interval=eval_interval,
+                        num_eval_clients_training=num_eval_clients_training,
+                        do_final_evaluation=do_final_evaluation,
+                        num_eval_clients_final=num_eval_clients_final,
+                        inner_batch_size=inner_batch_size,
+                        inner_learning_rate=lr,
+                        num_inner_epochs=_is,
+                        num_inner_epochs_eval=_ieev,
+                        do_balancing=_do_balancing
+                    )
+
+                    experiment_specification = f'{reptile_context}'
+                    experiment_logger = create_tensorboard_logger(
+                        reptile_context.name, experiment_specification, version=logger_version
+                    )
+                    reptile_context.experiment_logger = experiment_logger
+
+                    log_after_round_evaluation_fns = [
+                        partial(log_after_round_evaluation, experiment_logger)
+                    ]
+
+                    run_reptile(
+                        context=reptile_context,
+                        dataset_train=fed_dataset_train,
+                        dataset_test=fed_dataset_test,
+                        initial_model_state=initial_model_state,
+                        after_round_evaluation=log_after_round_evaluation_fns,
+                        start_round=start_round
+                    )
 
 
 def log_after_round_evaluation(
@@ -124,111 +253,3 @@ def log_dataset_distribution(experiment_logger, tag: str, dataset: FederatedData
     image = generate_data_label_heatmap(tag, dataloaders, dataset.class_num)
     experiment_logger.experiment.add_image('label distribution', image.numpy())
 
-
-@ex.automain
-def run_reptile_experiment(
-    name,
-    dataset,
-    swap_labels,
-    classes,
-    shots,
-    seed,
-    model_class,
-    sgd,
-    adam_betas,
-    num_clients_train,
-    num_clients_test,
-    meta_batch_size,
-    num_meta_steps,
-    meta_learning_rate_initial,
-    meta_learning_rate_final,
-    eval_interval,
-    num_eval_clients_training,
-    do_final_evaluation,
-    num_eval_clients_final,
-    inner_batch_size,
-    inner_learning_rate,
-    num_inner_epochs,
-    num_inner_epochs_eval,
-    do_balancing,
-    mean=None,
-    std=None,
-):
-    fix_random_seeds(seed)
-    fed_dataset_test = None
-    if dataset == 'femnist':
-        fed_dataset_train = load_femnist_dataset(
-            data_dir=str((REPO_ROOT / 'data').absolute()),
-            num_clients=num_clients_train,
-            batch_size=inner_batch_size,
-            random_seed=seed
-        )
-    elif dataset == 'omniglot':
-        fed_dataset_train, fed_dataset_test = load_omniglot_datasets(
-            data_dir=str((REPO_ROOT / 'data' / 'omniglot').absolute()),
-            num_clients_train=num_clients_train,
-            num_clients_test=num_clients_test,
-            num_classes_per_client=classes,
-            num_shots_per_class=shots,
-            inner_batch_size=inner_batch_size,
-            random_seed=seed
-        )
-    elif dataset == 'ham10k':
-        fed_dataset_train, fed_dataset_test = load_ham10k_few_big_many_small_federated(batch_size=inner_batch_size, mean=mean, std=std)
-    else:
-        raise ValueError(f'dataset "{dataset}" unknown')
-
-    if not hasattr(inner_learning_rate, '__iter__'):
-        inner_learning_rate = [inner_learning_rate]
-    if not hasattr(num_inner_epochs, '__iter__'):
-        num_inner_epochs = [num_inner_epochs]
-    if not hasattr(num_inner_epochs_eval, '__iter__'):
-        num_inner_epochs = [num_inner_epochs_eval]
-    #data_distribution_logged = False
-    for lr in inner_learning_rate:
-        for _is in num_inner_epochs:
-            for _ieev in num_inner_epochs_eval:
-                for _do_balancing in do_balancing:
-                    reptile_context = ReptileExperimentContext(
-                        name=name,
-                        dataset_name=dataset,
-                        swap_labels=swap_labels,
-                        num_classes_per_client=classes,
-                        num_shots_per_class=shots,
-                        seed=seed,
-                        model_class=model_class,
-                        sgd=sgd,
-                        adam_betas=adam_betas,
-                        num_clients_train=num_clients_train,
-                        num_clients_test=num_clients_test,
-                        meta_batch_size=meta_batch_size,
-                        num_meta_steps=num_meta_steps,
-                        meta_learning_rate_initial=meta_learning_rate_initial,
-                        meta_learning_rate_final=meta_learning_rate_final,
-                        eval_interval=eval_interval,
-                        num_eval_clients_training=num_eval_clients_training,
-                        do_final_evaluation=do_final_evaluation,
-                        num_eval_clients_final=num_eval_clients_final,
-                        inner_batch_size=inner_batch_size,
-                        inner_learning_rate=lr,
-                        num_inner_epochs=_is,
-                        num_inner_epochs_eval=_ieev,
-                        do_balancing=_do_balancing
-                    )
-
-                    experiment_specification = f'{reptile_context}'
-                    experiment_logger = create_tensorboard_logger(
-                        reptile_context.name, experiment_specification
-                    )
-                    reptile_context.experiment_logger = experiment_logger
-
-                    log_after_round_evaluation_fns = [
-                        partial(log_after_round_evaluation, experiment_logger)
-                    ]
-                    run_reptile(
-                        context=reptile_context,
-                        dataset_train=fed_dataset_train,
-                        dataset_test=fed_dataset_test,
-                        initial_model_state=None,
-                        after_round_evaluation=log_after_round_evaluation_fns
-                    )
