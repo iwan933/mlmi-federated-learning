@@ -55,7 +55,7 @@ def ham10k():
     inner_learning_rate = [0.0012]
     num_inner_epochs = [1]
     num_inner_epochs_eval = [7]
-    do_balancing = [True]
+    do_balancing = [False]
 
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
