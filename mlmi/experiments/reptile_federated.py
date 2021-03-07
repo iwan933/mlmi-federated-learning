@@ -68,6 +68,70 @@ def ham10k():
     logger_version = None
 
 
+def log_after_round_evaluation(
+        experiment_logger,
+        tag: str,
+        loss_train_test: Tensor,
+        acc_train_test: Tensor,
+        balanced_acc_train_test: Tensor,
+        loss_test_test: Tensor,
+        acc_test_test: Tensor,
+        balanced_acc_test_test: Tensor,
+        step: int
+    ):
+    try:
+        global_confusion_matrices = [(GlobalConfusionMatrix(), 'global'),
+                                     (GlobalTrainTestConfusionMatrix(), 'train-test'),
+                                     (GlobalTestTestConfusionMatrix(), 'test-test')]
+        for global_confusion_matrix, matrix_type in global_confusion_matrices:
+            if global_confusion_matrix.has_data:
+                matrix = global_confusion_matrix.compute()
+                image = generate_confusion_matrix_heatmap(matrix, title=tag)
+                experiment_logger.experiment.add_image(f'{tag}-{matrix_type}', image.numpy(), step)
+    except Exception as e:
+        print('failed to log confusion matrix (global)', e)
+
+    log_loss_and_acc(
+        f'{tag}train-test',
+        loss_train_test,
+        acc_train_test,
+        experiment_logger,
+        step
+    )
+    log_loss_and_acc(
+        f'{tag}balanced-train-test',
+        loss_test_test,
+        balanced_acc_train_test,
+        experiment_logger,
+        step
+    )
+    log_goal_test_acc(f'{tag}train-test', acc_train_test, experiment_logger, step)
+    log_goal_test_acc(f'{tag}balanced-train-test', balanced_acc_train_test, experiment_logger, step)
+    if loss_test_test is not None and acc_test_test is not None:
+        log_loss_and_acc(
+            f'{tag}test-test',
+            loss_test_test,
+            acc_test_test,
+            experiment_logger,
+            step
+        )
+        log_loss_and_acc(
+            f'{tag}balanced-test-test',
+            loss_test_test,
+            balanced_acc_test_test,
+            experiment_logger,
+            step
+        )
+        log_goal_test_acc(f'{tag}test-test', acc_test_test, experiment_logger, step)
+        log_goal_test_acc(f'{tag}balanced-test-test', balanced_acc_test_test, experiment_logger, step)
+
+
+def log_dataset_distribution(experiment_logger, tag: str, dataset: FederatedDatasetData):
+    dataloaders = list(dataset.train_data_local_dict.values())
+    image = generate_data_label_heatmap(tag, dataloaders, dataset.class_num)
+    experiment_logger.experiment.add_image('label distribution', image.numpy())
+
+
 @ex.automain
 def run_reptile_experiment(
     name,
@@ -188,68 +252,3 @@ def run_reptile_experiment(
                         after_round_evaluation=log_after_round_evaluation_fns,
                         start_round=start_round
                     )
-
-
-def log_after_round_evaluation(
-        experiment_logger,
-        tag: str,
-        loss_train_test: Tensor,
-        acc_train_test: Tensor,
-        balanced_acc_train_test: Tensor,
-        loss_test_test: Tensor,
-        acc_test_test: Tensor,
-        balanced_acc_test_test: Tensor,
-        step: int
-    ):
-    try:
-        global_confusion_matrices = [(GlobalConfusionMatrix(), 'global'),
-                                     (GlobalTrainTestConfusionMatrix(), 'train-test'),
-                                     (GlobalTestTestConfusionMatrix(), 'test-test')]
-        for global_confusion_matrix, matrix_type in global_confusion_matrices:
-            if global_confusion_matrix.has_data:
-                matrix = global_confusion_matrix.compute()
-                image = generate_confusion_matrix_heatmap(matrix, title=tag)
-                experiment_logger.experiment.add_image(f'{tag}-{matrix_type}', image.numpy(), step)
-    except Exception as e:
-        print('failed to log confusion matrix (global)', e)
-
-    log_loss_and_acc(
-        f'{tag}train-test',
-        loss_train_test,
-        acc_train_test,
-        experiment_logger,
-        step
-    )
-    log_loss_and_acc(
-        f'{tag}balanced-train-test',
-        loss_test_test,
-        balanced_acc_train_test,
-        experiment_logger,
-        step
-    )
-    log_goal_test_acc(f'{tag}train-test', acc_train_test, experiment_logger, step)
-    log_goal_test_acc(f'{tag}balanced-train-test', balanced_acc_train_test, experiment_logger, step)
-    if loss_test_test is not None and acc_test_test is not None:
-        log_loss_and_acc(
-            f'{tag}test-test',
-            loss_test_test,
-            acc_test_test,
-            experiment_logger,
-            step
-        )
-        log_loss_and_acc(
-            f'{tag}balanced-test-test',
-            loss_test_test,
-            balanced_acc_test_test,
-            experiment_logger,
-            step
-        )
-        log_goal_test_acc(f'{tag}test-test', acc_test_test, experiment_logger, step)
-        log_goal_test_acc(f'{tag}balanced-test-test', balanced_acc_test_test, experiment_logger, step)
-
-
-def log_dataset_distribution(experiment_logger, tag: str, dataset: FederatedDatasetData):
-    dataloaders = list(dataset.train_data_local_dict.values())
-    image = generate_data_label_heatmap(tag, dataloaders, dataset.class_num)
-    experiment_logger.experiment.add_image('label distribution', image.numpy())
-
