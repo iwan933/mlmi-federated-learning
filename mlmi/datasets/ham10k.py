@@ -109,14 +109,14 @@ def _load_ham10k_few_big_many_small_federated(
     train_transformations, test_transformations = get_transformations(mean, std)
     large_lazy_datasets = []
     for train_subset, test_subset in zip(large_train_subsets, large_test_subsets):
-        train_set = LazyImageFolderDataset(train_subset[:], train_transformations)
-        test_set = LazyImageFolderDataset(test_subset[:], test_transformations)
+        train_set = LazyImageFolderDataset(train_subset, train_transformations)
+        test_set = LazyImageFolderDataset(test_subset, test_transformations)
         large_lazy_datasets.append((train_set, test_set))
 
     small_lazy_datasets = []
     for train_subset, test_subset in zip(small_train_subsets, small_test_subsets):
-        train_set = LazyImageFolderDataset(train_subset[:], train_transformations)
-        test_set = LazyImageFolderDataset(test_subset[:], test_transformations)
+        train_set = LazyImageFolderDataset(train_subset, train_transformations)
+        test_set = LazyImageFolderDataset(test_subset, test_transformations)
         small_lazy_datasets.append((train_set, test_set))
 
     all_indices = np.arange(len(small_lazy_datasets))
@@ -398,16 +398,17 @@ class LazyImageFolderDataset(Dataset):
 
     def __init__(self, dataset: ImageFolderSubset, transform=None):
         self.dataset = dataset
+        self.data = self.dataset[:]
         self.transform = transform
 
     def __getitem__(self, index):
-        x, y = self.dataset[index][0], self.dataset[index][1]
+        x, y = self.data[index][0], self.data[index][1]
         if self.transform:
             x = self.transform(x)
         return x, y
 
     def __len__(self):
-        return len(self.dataset)
+        return len(self.data)
 
 
 if __name__ == '__main__':
