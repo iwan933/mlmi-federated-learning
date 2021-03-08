@@ -49,7 +49,7 @@ def ham10k():
     meta_learning_rate_initial = 1
     meta_learning_rate_final = 0
 
-    eval_interval = 250
+    eval_interval = 125
     num_eval_clients_training = -1
     do_final_evaluation = True
     num_eval_clients_final = -1
@@ -202,6 +202,7 @@ def run_reptile_experiment(
         num_inner_epochs = [num_inner_epochs]
     if not hasattr(num_inner_epochs_eval, '__iter__'):
         num_inner_epochs = [num_inner_epochs_eval]
+
     #data_distribution_logged = False
     for lr in inner_learning_rate:
         for _is in num_inner_epochs:
@@ -243,6 +244,9 @@ def run_reptile_experiment(
                     log_after_round_evaluation_fns = [
                         partial(log_after_round_evaluation, experiment_logger)
                     ]
+
+                    log_dataset_distribution(experiment_logger, 'train clients', fed_dataset_train)
+                    log_dataset_distribution(experiment_logger, 'test clients', fed_dataset_test)
 
                     run_reptile(
                         context=reptile_context,

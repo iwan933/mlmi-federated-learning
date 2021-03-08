@@ -16,7 +16,7 @@ ex = Experiment('Ham10k full dataset')
 def DefaultConfig():
     lr = 0.001
     batch_size = 8
-    epochs = 150
+    epochs = 840  # 10000 / (60 / 5) + 6
 
 
 @ex.automain
@@ -58,14 +58,14 @@ def run_full_dataset(lr, batch_size, epochs):
     loss = result.get('test/loss/full')
     acc = result.get('test/acc/full')
     balanced_acc = result.get('test/balanced_acc/full')
-    logger.experiment.add_scalar('test/loss', loss, i)
-    logger.experiment.add_scalar('test/acc', acc, i)
-    logger.experiment.add_scalar('test/balance-acc', balanced_acc, i)
+    logger.experiment.add_scalar('test/loss', loss, epochs)
+    logger.experiment.add_scalar('test/acc', acc, epochs)
+    logger.experiment.add_scalar('test/balance-acc', balanced_acc, epochs)
     try:
         global_confusion_matrix = GlobalConfusionMatrix()
         if global_confusion_matrix.has_data:
             matrix = global_confusion_matrix.compute()
             image = generate_confusion_matrix_heatmap(matrix)
-            logger.experiment.add_image('test/confusionmatrix', image.numpy(), i)
+            logger.experiment.add_image('test/confusionmatrix', image.numpy(), epochs)
     except Exception as e:
         print('failed to log confusion matrix (global)', e)
