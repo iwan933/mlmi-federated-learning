@@ -1,12 +1,5 @@
-import sys
-
-from mlmi.models.ham10k import GlobalConfusionMatrix, GlobalTestTestConfusionMatrix, GlobalTrainTestConfusionMatrix
-
-sys.path.append('C:/Users/Richard/Desktop/Informatik/Semester_5/MLMI/git/mlmi-federated-learning')
-
-from mlmi.structs import FederatedDatasetData, ModelArgs
-
 import random
+
 from mlmi.log import getLogger
 from mlmi.reptile.model import ReptileClient, ReptileServer
 from mlmi.reptile.util import reptile_train_step
@@ -14,6 +7,8 @@ from mlmi.reptile.structs import ReptileExperimentContext
 from mlmi.settings import REPO_ROOT
 from mlmi.utils import evaluate_local_models
 from mlmi.fedavg.data import swap_labels
+from mlmi.models.ham10k import GlobalConfusionMatrix, GlobalTestTestConfusionMatrix, GlobalTrainTestConfusionMatrix
+from mlmi.structs import FederatedDatasetData, ModelArgs
 
 
 logger = getLogger(__name__)
