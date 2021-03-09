@@ -1,3 +1,6 @@
+from pathlib import Path
+
+import torch
 
 from mlmi.datasets.ham10k import load_ham10k_federated, load_ham10k_few_big_many_small_federated
 from mlmi.models.ham10k import GlobalConfusionMatrix, GlobalTestTestConfusionMatrix, GlobalTrainTestConfusionMatrix, \
@@ -42,21 +45,27 @@ def ham10k():
     num_clients_train = 0 # Not used here
     num_clients_test = 0  # Not used here
     meta_batch_size = 5
-    num_meta_steps = 1000
+    num_meta_steps = 10000
     meta_learning_rate_initial = 1
-    meta_learning_rate_final = 0.8
+    meta_learning_rate_final = 0
 
-    eval_interval = 50
+    eval_interval = 125
     num_eval_clients_training = -1
     do_final_evaluation = True
     num_eval_clients_final = -1
 
     inner_batch_size = 8
-    inner_learning_rate = [0.001, 0.002, 0.004]
+    inner_learning_rate = [0.0012]
     num_inner_epochs = [1]
-    num_inner_epochs_eval = [5]
+    num_inner_epochs_eval = [7]
+    do_balancing = [False]
+
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
+
+    start_round = 0
+    model_state_path = None
+    logger_version = None
 
 
 def log_after_round_evaluation(
@@ -71,14 +80,14 @@ def log_after_round_evaluation(
         step: int
     ):
     try:
-        global_confusion_matrices = [GlobalConfusionMatrix(),
-                                     GlobalTrainTestConfusionMatrix(),
-                                     GlobalTestTestConfusionMatrix()]
-        for global_confusion_matrix in global_confusion_matrices:
+        global_confusion_matrices = [(GlobalConfusionMatrix(), 'global'),
+                                     (GlobalTrainTestConfusionMatrix(), 'train-test'),
+                                     (GlobalTestTestConfusionMatrix(), 'test-test')]
+        for global_confusion_matrix, matrix_type in global_confusion_matrices:
             if global_confusion_matrix.has_data:
                 matrix = global_confusion_matrix.compute()
                 image = generate_confusion_matrix_heatmap(matrix, title=tag)
-                experiment_logger.experiment.add_image(tag, image.numpy(), step)
+                experiment_logger.experiment.add_image(f'{tag}-{matrix_type}', image.numpy(), step)
     except Exception as e:
         print('failed to log confusion matrix (global)', e)
 
@@ -120,7 +129,7 @@ def log_after_round_evaluation(
 def log_dataset_distribution(experiment_logger, tag: str, dataset: FederatedDatasetData):
     dataloaders = list(dataset.train_data_local_dict.values())
     image = generate_data_label_heatmap(tag, dataloaders, dataset.class_num)
-    experiment_logger.experiment.add_image('label distribution', image.numpy())
+    experiment_logger.experiment.add_image(f'label distribution/{tag}', image.numpy())
 
 
 @ex.automain
@@ -148,11 +157,23 @@ def run_reptile_experiment(
     inner_learning_rate,
     num_inner_epochs,
     num_inner_epochs_eval,
+    do_balancing,
+    start_round=0,
+    model_state_path=None,
+    logger_version=None,
     mean=None,
-    std=None
+    std=None,
 ):
     fix_random_seeds(seed)
     fed_dataset_test = None
+
+    initial_model_state = None
+    if model_state_path is not None:
+        if Path(model_state_path).exists():
+            initial_model_state = torch.load(model_state_path)
+        else:
+            raise ValueError(f'model state path {model_state_path} does not exist.')
+
     if dataset == 'femnist':
         fed_dataset_train = load_femnist_dataset(
             data_dir=str((REPO_ROOT / 'data').absolute()),
@@ -181,49 +202,57 @@ def run_reptile_experiment(
         num_inner_epochs = [num_inner_epochs]
     if not hasattr(num_inner_epochs_eval, '__iter__'):
         num_inner_epochs = [num_inner_epochs_eval]
+
     #data_distribution_logged = False
     for lr in inner_learning_rate:
         for _is in num_inner_epochs:
             for _ieev in num_inner_epochs_eval:
-                reptile_context = ReptileExperimentContext(
-                    name=name,
-                    dataset_name=dataset,
-                    swap_labels=swap_labels,
-                    num_classes_per_client=classes,
-                    num_shots_per_class=shots,
-                    seed=seed,
-                    model_class=model_class,
-                    sgd=sgd,
-                    adam_betas=adam_betas,
-                    num_clients_train=num_clients_train,
-                    num_clients_test=num_clients_test,
-                    meta_batch_size=meta_batch_size,
-                    num_meta_steps=num_meta_steps,
-                    meta_learning_rate_initial=meta_learning_rate_initial,
-                    meta_learning_rate_final=meta_learning_rate_final,
-                    eval_interval=eval_interval,
-                    num_eval_clients_training=num_eval_clients_training,
-                    do_final_evaluation=do_final_evaluation,
-                    num_eval_clients_final=num_eval_clients_final,
-                    inner_batch_size=inner_batch_size,
-                    inner_learning_rate=lr,
-                    num_inner_epochs=_is,
-                    num_inner_epochs_eval=_ieev
-                )
+                for _do_balancing in do_balancing:
+                    reptile_context = ReptileExperimentContext(
+                        name=name,
+                        dataset_name=dataset,
+                        swap_labels=swap_labels,
+                        num_classes_per_client=classes,
+                        num_shots_per_class=shots,
+                        seed=seed,
+                        model_class=model_class,
+                        sgd=sgd,
+                        adam_betas=adam_betas,
+                        num_clients_train=num_clients_train,
+                        num_clients_test=num_clients_test,
+                        meta_batch_size=meta_batch_size,
+                        num_meta_steps=num_meta_steps,
+                        meta_learning_rate_initial=meta_learning_rate_initial,
+                        meta_learning_rate_final=meta_learning_rate_final,
+                        eval_interval=eval_interval,
+                        num_eval_clients_training=num_eval_clients_training,
+                        do_final_evaluation=do_final_evaluation,
+                        num_eval_clients_final=num_eval_clients_final,
+                        inner_batch_size=inner_batch_size,
+                        inner_learning_rate=lr,
+                        num_inner_epochs=_is,
+                        num_inner_epochs_eval=_ieev,
+                        do_balancing=_do_balancing
+                    )
 
-                experiment_specification = f'{reptile_context}'
-                experiment_logger = create_tensorboard_logger(
-                    reptile_context.name, experiment_specification
-                )
-                reptile_context.experiment_logger = experiment_logger
+                    experiment_specification = f'{reptile_context}'
+                    experiment_logger = create_tensorboard_logger(
+                        reptile_context.name, experiment_specification, version=logger_version
+                    )
+                    reptile_context.experiment_logger = experiment_logger
 
-                log_after_round_evaluation_fns = [
-                    partial(log_after_round_evaluation, experiment_logger)
-                ]
-                run_reptile(
-                    context=reptile_context,
-                    dataset_train=fed_dataset_train,
-                    dataset_test=fed_dataset_test,
-                    initial_model_state=None,
-                    after_round_evaluation=log_after_round_evaluation_fns
-                )
+                    log_after_round_evaluation_fns = [
+                        partial(log_after_round_evaluation, experiment_logger)
+                    ]
+
+                    log_dataset_distribution(experiment_logger, 'train clients', fed_dataset_train)
+                    log_dataset_distribution(experiment_logger, 'test clients', fed_dataset_test)
+
+                    run_reptile(
+                        context=reptile_context,
+                        dataset_train=fed_dataset_train,
+                        dataset_test=fed_dataset_test,
+                        initial_model_state=initial_model_state,
+                        after_round_evaluation=log_after_round_evaluation_fns,
+                        start_round=start_round
+                    )
