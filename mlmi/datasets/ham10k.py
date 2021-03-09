@@ -223,8 +223,8 @@ def load_ham10k_few_big_many_small_federated2fulldataset(
     test_subset = ImageFolderSubset(dataset, test_indices.astype(int))
     train_set = LazyImageFolderDataset(train_subset[:], train_transformations)
     test_set = LazyImageFolderDataset(test_subset[:], test_transformations)
-    train_dataloader = data.DataLoader(train_set, batch_size=batch_size, drop_last=False)
-    test_dataloader = data.DataLoader(test_set, batch_size=batch_size, drop_last=False)
+    train_dataloader = data.DataLoader(train_set, batch_size=batch_size, drop_last=False, num_workers=8)
+    test_dataloader = data.DataLoader(test_set, batch_size=batch_size, drop_last=False, num_workers=8)
     return train_dataloader, test_dataloader
 
 
