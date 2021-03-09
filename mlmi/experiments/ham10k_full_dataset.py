@@ -4,6 +4,7 @@ import torch
 from sacred import Experiment
 
 from mlmi.datasets.ham10k import load_ham10k_few_big_many_small_federated2fulldataset
+from mlmi.log import getLogger
 from mlmi.models.ham10k import GlobalConfusionMatrix, MobileNetV2Lightning
 from mlmi.plot import generate_confusion_matrix_heatmap
 from mlmi.settings import REPO_ROOT
@@ -11,6 +12,7 @@ from mlmi.structs import OptimizerArgs
 from mlmi.utils import create_tensorboard_logger
 
 ex = Experiment('Ham10k full dataset')
+log = getLogger(__name__)
 
 
 def save_full_state(model_state, epoch, lr, batch_size):
@@ -37,28 +39,29 @@ def run_full_dataset(lr, batch_size, epochs):
     logger = create_tensorboard_logger('ham10kmobilenetv2')
     test_each_x_epochs = 10
 
-    for i in range(epochs):
-        trainer = pl.Trainer(logger=False, checkpoint_callback=False, gpus=1, min_epochs=1, max_epochs=1)
+    for i in range(0, epochs + 1, 10):
+        trainer = pl.Trainer(logger=False, checkpoint_callback=False, gpus=1, min_epochs=10, max_epochs=10,
+                             progress_bar_refresh_rate=0)
+        log.info(f'starting epoch {i}')
         trainer.fit(model, train_dataloader)
-        if i % test_each_x_epochs == 0:
-            save_full_state(model.state_dict(), i + 1, lr, batch_size)
-            GlobalConfusionMatrix().enable_logging()
-            result = trainer.test(model, test_dataloader)[0]
-            GlobalConfusionMatrix().disable_logging()
-            loss = result.get('test/loss/full')
-            acc = result.get('test/acc/full')
-            balanced_acc = result.get('test/balanced_acc/full')
-            logger.experiment.add_scalar('test/loss', loss, i)
-            logger.experiment.add_scalar('test/acc', acc, i)
-            logger.experiment.add_scalar('test/balance-acc', balanced_acc, i)
-            try:
-                global_confusion_matrix = GlobalConfusionMatrix()
-                if global_confusion_matrix.has_data:
-                    matrix = global_confusion_matrix.compute()
-                    image = generate_confusion_matrix_heatmap(matrix)
-                    logger.experiment.add_image('test/confusionmatrix', image.numpy(), i)
-            except Exception as e:
-                print('failed to log confusion matrix (global)', e)
+        save_full_state(model.state_dict(), i + 1, lr, batch_size)
+        GlobalConfusionMatrix().enable_logging()
+        result = trainer.test(model, test_dataloader)[0]
+        GlobalConfusionMatrix().disable_logging()
+        loss = result.get('test/loss/full')
+        acc = result.get('test/acc/full')
+        balanced_acc = result.get('test/balanced_acc/full')
+        logger.experiment.add_scalar('test/loss', loss, i)
+        logger.experiment.add_scalar('test/acc', acc, i)
+        logger.experiment.add_scalar('test/balance-acc', balanced_acc, i)
+        try:
+            global_confusion_matrix = GlobalConfusionMatrix()
+            if global_confusion_matrix.has_data:
+                matrix = global_confusion_matrix.compute()
+                image = generate_confusion_matrix_heatmap(matrix)
+                logger.experiment.add_image('test/confusionmatrix', image.numpy(), i)
+        except Exception as e:
+            print('failed to log confusion matrix (global)', e)
     GlobalConfusionMatrix().enable_logging()
     trainer = pl.Trainer(logger=False, checkpoint_callback=False, gpus=1, min_epochs=1, max_epochs=1)
     result = trainer.test(model, test_dataloader)[0]
