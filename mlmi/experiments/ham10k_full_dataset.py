@@ -38,7 +38,7 @@ def run_full_dataset(lr, batch_size, epochs):
     test_each_x_epochs = 10
 
     for i in range(epochs):
-        trainer = pl.Trainer(enable_logging=False, gpus=1, min_epochs=1, max_epochs=1)
+        trainer = pl.Trainer(logger=False, checkpoint_callback=False, gpus=1, min_epochs=1, max_epochs=1)
         trainer.fit(model, train_dataloader)
         if i % test_each_x_epochs == 0:
             save_full_state(model.state_dict(), i + 1, lr, batch_size)
@@ -60,7 +60,7 @@ def run_full_dataset(lr, batch_size, epochs):
             except Exception as e:
                 print('failed to log confusion matrix (global)', e)
     GlobalConfusionMatrix().enable_logging()
-    trainer = pl.Trainer(enable_logging=False, gpus=1, min_epochs=1, max_epochs=1)
+    trainer = pl.Trainer(logger=False, checkpoint_callback=False, gpus=1, min_epochs=1, max_epochs=1)
     result = trainer.test(model, test_dataloader)[0]
     GlobalConfusionMatrix().disable_logging()
     loss = result.get('test/loss/full')
