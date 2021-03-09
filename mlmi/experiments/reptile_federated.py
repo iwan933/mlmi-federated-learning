@@ -129,7 +129,7 @@ def log_after_round_evaluation(
 def log_dataset_distribution(experiment_logger, tag: str, dataset: FederatedDatasetData):
     dataloaders = list(dataset.train_data_local_dict.values())
     image = generate_data_label_heatmap(tag, dataloaders, dataset.class_num)
-    experiment_logger.experiment.add_image('label distribution', image.numpy())
+    experiment_logger.experiment.add_image(f'label distribution/{tag}', image.numpy())
 
 
 @ex.automain
