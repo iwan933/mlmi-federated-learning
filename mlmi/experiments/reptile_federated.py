@@ -67,6 +67,43 @@ def ham10k():
     model_state_path = None
     logger_version = None
 
+@ex.named_config
+def ham10k_fedavg():
+    name = 'ham10kfedavg'
+    dataset = 'ham10k'  # Options: 'omniglot', 'femnist'
+    swap_labels = False  # Only used with dataset='femnist'
+    classes = 0  # Only used with dataset='omniglot'
+    shots = 0  # Only used with dataset='omniglot'
+    seed = 123123123
+
+    model_class = MobileNetV2Lightning
+    sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
+    adam_betas = (0.9, 0.999)  # Used only if sgd = False
+
+    num_clients_train = 0  # Not used here
+    num_clients_test = 0  # Not used here
+    meta_batch_size = 5
+    num_meta_steps = 2401  # due to final evaluation we need to add one round to start at 2400 again
+    meta_learning_rate_initial = 1  # Fixed meta_learning_rate = 1 throughout training
+    meta_learning_rate_final = 1    #   -> Reptile becomes identical to FedAvg
+
+    eval_interval = 120  # fitted to full dataset training (10 * 60 / 5)
+    num_eval_clients_training = -1
+    do_final_evaluation = True
+    num_eval_clients_final = -1
+
+    inner_batch_size = 8
+    inner_learning_rate = [0.001]
+    num_inner_epochs = [1]
+    num_inner_epochs_eval = [6]
+    do_balancing = [False]
+
+    mean = (0.485, 0.456, 0.406)
+    std = (0.229, 0.224, 0.225)
+
+    start_round = 0
+    model_state_path = None
+    logger_version = None
 
 def log_after_round_evaluation(
         experiment_logger,

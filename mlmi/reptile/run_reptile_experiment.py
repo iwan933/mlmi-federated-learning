@@ -109,13 +109,7 @@ def run_reptile(context: ReptileExperimentContext,
         if context.meta_batch_size == -1:
             meta_batch = train_clients
         else:
-            meta_batch = [
-                train_clients[k] for k in cyclerange(
-                    start=i*context.meta_batch_size % len(train_clients),
-                    interval=context.meta_batch_size,
-                    total_len=len(train_clients)
-                )
-            ]
+            meta_batch = RANDOM.sample(train_clients, context.meta_batch_size)
         # Meta training step
         reptile_train_step(
             aggregator=server,
