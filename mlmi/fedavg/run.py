@@ -132,7 +132,8 @@ def run_fedavg(
         context: FedAvgExperimentContext,
         num_rounds: int,
         save_states: bool,
-        dataset: 'FederatedDatasetData',
+        dataset_train: 'FederatedDatasetData',
+        dataset_test: 'FederatedDatasetData',
         initial_model_state: Optional[Dict[str, Tensor]] = None,
         clients: Optional[List['FedAvgClient']] = None,
         server: Optional['FedAvgServer'] = None,
@@ -151,7 +152,8 @@ def run_fedavg(
         if initial_model_state is not None:
             server.overwrite_model_state(initial_model_state)
         logger.info('initializing clients ...')
-        clients = initialize_clients_fn(context, dataset, server.model.state_dict())
+        train_clients = initialize_clients_fn(context, dataset_train, server.model.state_dict())
+        test_clients = initialize_clients_fn(context, dataset_test, server.model.state_dict())
 
     if start_round + 1 > num_rounds:
         return server, clients

@@ -7,8 +7,9 @@ class FedAvgExperimentContext(object):
     """
 
     def __init__(self, name: str, client_fraction: float, local_epochs: int, lr: float,
-                 batch_size: int, optimizer_args: 'OptimizerArgs', train_args: 'TrainArgs', model_args: 'ModelArgs',
-                 dataset_name: str):
+                 batch_size: int, optimizer_args: 'OptimizerArgs', train_args: 'TrainArgs',
+                 train_args_eval: 'TrainArgs', model_args: 'ModelArgs',
+                 eval_interval: int, dataset_name: str):
         self.name = name
         self.client_fraction = client_fraction
         self.local_epochs = local_epochs
@@ -16,7 +17,9 @@ class FedAvgExperimentContext(object):
         self.batch_size = batch_size
         self.optimizer_args = optimizer_args
         self.train_args = train_args
+        self.train_args_eval = train_args_eval
         self.model_args = model_args
+        self.eval_interval = eval_interval
         self.dataset_name = dataset_name
         self._experiment_logger = None
 

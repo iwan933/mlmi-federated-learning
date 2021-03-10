@@ -92,6 +92,7 @@ def ham10k_MobileNetV2():
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
     local_epochs = 1
+    local_epochs_eval = 6
     batch_size = 16  # original: 32 but requires 8gb gpu
     num_clients = 11
     num_classes = 7
@@ -99,6 +100,10 @@ def ham10k_MobileNetV2():
     train_args = TrainArgs(max_epochs=local_epochs,
                            min_epochs=local_epochs,
                            progress_bar_refresh_rate=5)
+    train_args_eval = TrainArgs(max_epochs=local_epochs_eval,
+                                min_epochs=local_epochs_eval,
+                                progress_bar_refresh_rate=5)
+    eval_interval = 10
     model_args = ModelArgs(MobileNetV2Lightning, optimizer_args=optimizer_args, num_classes=num_classes)
     dataset = 'ham10k'
 
@@ -128,11 +133,14 @@ def run_fedavg_experiment(
         total_fedavg_rounds,
         client_fraction,
         local_epochs,
+        local_epochs_eval,
         batch_size,
         num_clients,
         optimizer_args,
         train_args,
+        train_args_eval,
         model_args,
+        eval_interval,
         dataset,
         mean,
         std
@@ -147,7 +155,9 @@ def run_fedavg_experiment(
         fed_dataset = load_mnist_dataset(str((REPO_ROOT / 'data').absolute()),
                                          num_clients=num_clients, batch_size=batch_size)
     elif dataset == 'ham10k':
-        fed_dataset = load_ham10k_federated(partitions=num_clients, batch_size=batch_size, mean=mean, std=std)
+        fed_dataset_train, fed_dataset_test = load_ham10k_few_big_many_small_federated(
+            batch_size=inner_batch_size, mean=mean, std=std
+        )
         initialize_clients_fn = initialize_ham10k_clients
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
@@ -157,7 +167,8 @@ def run_fedavg_experiment(
         fedavg_context = FedAvgExperimentContext(name=name, client_fraction=cf, local_epochs=local_epochs,
                                                  lr=lr, batch_size=batch_size, optimizer_args=optimizer_args,
                                                  model_args=model_args, train_args=train_args,
-                                                 dataset_name=dataset)
+                                                 train_args_eval=train_args_eval,
+                                                 dataset_name=dataset, eval_interval=eval_interval)
         experiment_specification = f'{fedavg_context}'
         experiment_logger = create_tensorboard_logger(fedavg_context.name, experiment_specification)
 
