@@ -45,11 +45,11 @@ def ham10k():
     num_clients_train = 0  # Not used here
     num_clients_test = 0  # Not used here
     meta_batch_size = 5
-    num_meta_steps = 2500
+    num_meta_steps = 2401  # due to final evaluation we need to add one round to start at 2400 again
     meta_learning_rate_initial = 1
     meta_learning_rate_final = 0.75
 
-    eval_interval = 125
+    eval_interval = 120  # fitted to full dataset training (10 * 60 / 5)
     num_eval_clients_training = -1
     do_final_evaluation = True
     num_eval_clients_final = -1
