@@ -45,9 +45,9 @@ def ham10k():
     num_clients_train = 0  # Not used here
     num_clients_test = 0  # Not used here
     meta_batch_size = 5
-    num_meta_steps = 10000
+    num_meta_steps = 2500
     meta_learning_rate_initial = 1
-    meta_learning_rate_final = 0
+    meta_learning_rate_final = 0.75
 
     eval_interval = 125
     num_eval_clients_training = -1
