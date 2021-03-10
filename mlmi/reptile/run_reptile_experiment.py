@@ -26,15 +26,18 @@ def cyclerange(start, interval, total_len):
         return list(range(start, total_len)) + list(range(0, (start + interval) % total_len))
     return list(range(start, start + interval))
 
-def save_reptile_state(reptile_context: 'RepitleExperimentContext', meta_step: int, model_state: Dict[str, Tensor]):
+
+def save_reptile_state(reptile_context: 'ReptileExperimentContext', meta_step: int, model_state: Dict[str, Tensor]):
     path = REPO_ROOT / 'run' / 'states' / 'reptile_federated' / f'{reptile_context}r{meta_step}.mdl'
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model_state, path)
 
+
 def initialize_clients(dataset: FederatedDatasetData,
                        model_args: ModelArgs,
                        context,
-                       experiment_logger):
+                       experiment_logger,
+                       do_balancing):
     clients = []
     for c in dataset.train_data_local_dict.keys():
         client = ReptileClient(
@@ -45,7 +48,8 @@ def initialize_clients(dataset: FederatedDatasetData,
             num_train_samples=dataset.data_local_train_num_dict[c],
             test_dataloader=dataset.test_data_local_dict[c],
             num_test_samples=dataset.data_local_test_num_dict[c],
-            lightning_logger=experiment_logger
+            lightning_logger=experiment_logger,
+            do_balancing=do_balancing
         )
         clients.append(client)
     return clients
@@ -55,7 +59,9 @@ def run_reptile(context: ReptileExperimentContext,
                 dataset_train: FederatedDatasetData,
                 dataset_test: FederatedDatasetData,
                 initial_model_state,
-                after_round_evaluation):
+                after_round_evaluation,
+                start_round
+):
     RANDOM = random.Random(context.seed)
 
     # Randomly swap labels
@@ -77,7 +83,8 @@ def run_reptile(context: ReptileExperimentContext,
         dataset=dataset_train,
         model_args=context.inner_model_args,
         context=context.name,
-        experiment_logger=context.experiment_logger
+        experiment_logger=context.experiment_logger,
+        do_balancing=context.do_balancing
     )
     test_clients = None
     if dataset_test is not None:
@@ -85,7 +92,8 @@ def run_reptile(context: ReptileExperimentContext,
             dataset=dataset_test,
             model_args=context.inner_model_args,
             context=context.name,
-            experiment_logger=context.experiment_logger
+            experiment_logger=context.experiment_logger,
+            do_balancing=context.do_balancing
         )
 
     # Set up server
@@ -97,7 +105,7 @@ def run_reptile(context: ReptileExperimentContext,
     )
 
     # Perform training
-    for i in range(context.num_meta_steps):
+    for i in range(start_round, context.num_meta_steps):
         if context.meta_batch_size == -1:
             meta_batch = train_clients
         else:

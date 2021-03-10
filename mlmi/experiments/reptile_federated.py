@@ -42,7 +42,7 @@ def ham10k():
     sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
     adam_betas = (0.9, 0.999)  # Used only if sgd = False
 
-    num_clients_train = 0 # Not used here
+    num_clients_train = 0  # Not used here
     num_clients_test = 0  # Not used here
     meta_batch_size = 5
     num_meta_steps = 10000
@@ -78,7 +78,7 @@ def log_after_round_evaluation(
         acc_test_test: Tensor,
         balanced_acc_test_test: Tensor,
         step: int
-    ):
+):
     try:
         global_confusion_matrices = [(GlobalConfusionMatrix(), 'global'),
                                      (GlobalTrainTestConfusionMatrix(), 'train-test'),
@@ -134,35 +134,35 @@ def log_dataset_distribution(experiment_logger, tag: str, dataset: FederatedData
 
 @ex.automain
 def run_reptile_experiment(
-    name,
-    dataset,
-    swap_labels,
-    classes,
-    shots,
-    seed,
-    model_class,
-    sgd,
-    adam_betas,
-    num_clients_train,
-    num_clients_test,
-    meta_batch_size,
-    num_meta_steps,
-    meta_learning_rate_initial,
-    meta_learning_rate_final,
-    eval_interval,
-    num_eval_clients_training,
-    do_final_evaluation,
-    num_eval_clients_final,
-    inner_batch_size,
-    inner_learning_rate,
-    num_inner_epochs,
-    num_inner_epochs_eval,
-    do_balancing,
-    start_round=0,
-    model_state_path=None,
-    logger_version=None,
-    mean=None,
-    std=None,
+        name,
+        dataset,
+        swap_labels,
+        classes,
+        shots,
+        seed,
+        model_class,
+        sgd,
+        adam_betas,
+        num_clients_train,
+        num_clients_test,
+        meta_batch_size,
+        num_meta_steps,
+        meta_learning_rate_initial,
+        meta_learning_rate_final,
+        eval_interval,
+        num_eval_clients_training,
+        do_final_evaluation,
+        num_eval_clients_final,
+        inner_batch_size,
+        inner_learning_rate,
+        num_inner_epochs,
+        num_inner_epochs_eval,
+        do_balancing,
+        start_round=0,
+        model_state_path=None,
+        logger_version=None,
+        mean=None,
+        std=None,
 ):
     fix_random_seeds(seed)
     fed_dataset_test = None
@@ -192,7 +192,8 @@ def run_reptile_experiment(
             random_seed=seed
         )
     elif dataset == 'ham10k':
-        fed_dataset_train, fed_dataset_test = load_ham10k_few_big_many_small_federated(batch_size=inner_batch_size, mean=mean, std=std)
+        fed_dataset_train, fed_dataset_test = load_ham10k_few_big_many_small_federated(batch_size=inner_batch_size,
+                                                                                       mean=mean, std=std)
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
 
@@ -203,7 +204,7 @@ def run_reptile_experiment(
     if not hasattr(num_inner_epochs_eval, '__iter__'):
         num_inner_epochs = [num_inner_epochs_eval]
 
-    #data_distribution_logged = False
+    # data_distribution_logged = False
     for lr in inner_learning_rate:
         for _is in num_inner_epochs:
             for _ieev in num_inner_epochs_eval:
