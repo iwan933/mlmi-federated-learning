@@ -9,7 +9,7 @@ from mlmi.models.ham10k import GlobalConfusionMatrix, MobileNetV2Lightning
 from mlmi.plot import generate_confusion_matrix_heatmap
 from mlmi.settings import REPO_ROOT
 from mlmi.structs import OptimizerArgs
-from mlmi.utils import create_tensorboard_logger
+from mlmi.utils import create_tensorboard_logger, fix_random_seeds
 
 ex = Experiment('Ham10k full dataset')
 log = getLogger(__name__)
@@ -23,19 +23,22 @@ def save_full_state(model_state, epoch, lr, batch_size):
 
 @ex.config
 def DefaultConfig():
+    seed = 123123123
     lr = 0.001
     batch_size = 8
-    epochs = 840  # 10000 / (60 / 5) + 6
+    epochs = 100  # 210 for 2400, 840 for 10000
 
 
 @ex.automain
-def run_full_dataset(lr, batch_size, epochs):
+def run_full_dataset(seed, lr, batch_size, epochs):
+    fix_random_seeds(seed)
+
     train_dataloader, test_dataloader = load_ham10k_few_big_many_small_federated2fulldataset()
     optimizer_args = OptimizerArgs(
         optimizer_class=torch.optim.SGD,
         lr=lr
     )
-    model = MobileNetV2Lightning(num_classes=7, participant_name='full', optimizer_args=optimizer_args)
+    model = MobileNetV2Lightning(num_classes=7, participant_name='full', optimizer_args=optimizer_args, pretrain=False)
     logger = create_tensorboard_logger('ham10kmobilenetv2')
     test_each_x_epochs = 10
 
