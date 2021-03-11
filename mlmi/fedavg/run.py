@@ -133,9 +133,11 @@ def run_fedavg(
         num_rounds: int,
         save_states: bool,
         dataset_train: 'FederatedDatasetData',
-        dataset_test: 'FederatedDatasetData',
+        eval_interval: Optional[int] = None,
+        dataset_test: Optional['FederatedDatasetData'] = None,
         initial_model_state: Optional[Dict[str, Tensor]] = None,
-        clients: Optional[List['FedAvgClient']] = None,
+        train_clients: Optional[List['FedAvgClient']] = None,
+        test_clients: Optional[List['FedAvgClient']] = None,
         server: Optional['FedAvgServer'] = None,
         start_round=0,
         restore_state=False,
@@ -144,21 +146,24 @@ def run_fedavg(
         after_round_evaluation: Optional[List[Callable]] = None,
         initialize_clients_fn=DEFAULT_CLIENT_INIT_FN
 ):
-    assert (server is None and clients is None) or (server is not None and clients is not None)
+    if test_clients is None:
+        test_clients = []
+    assert (server is None and train_clients is None) or (server is not None and train_clients is not None)
 
-    if clients is None or server is None:
+    if train_clients is None or server is None:
         logger.info('initializing server ...')
         server = FedAvgServer('initial_server', context.model_args, context)
         if initial_model_state is not None:
             server.overwrite_model_state(initial_model_state)
         logger.info('initializing clients ...')
         train_clients = initialize_clients_fn(context, dataset_train, server.model.state_dict())
-        test_clients = initialize_clients_fn(context, dataset_test, server.model.state_dict())
+        if dataset_test is not None:
+            test_clients = initialize_clients_fn(context, dataset_test, server.model.state_dict())
 
     if start_round + 1 > num_rounds:
-        return server, clients
+        return server, train_clients, test_clients
 
-    num_train_samples = [client.num_train_samples for client in clients]
+    num_train_samples = [client.num_train_samples for client in train_clients]
     num_total_samples = sum(num_train_samples)
     logger.info(f'... copied {num_total_samples} data samples in total')
 
@@ -170,24 +175,28 @@ def run_fedavg(
             server.overwrite_model_state(round_model_state)
             continue
         else:
-            run_fedavg_round(server, clients, context.train_args, client_fraction=context.client_fraction)
+            run_fedavg_round(server, train_clients, context.train_args, client_fraction=context.client_fraction)
         # after aggregation callback
         if after_aggregation is not None:
             for c in after_aggregation:
-                c(server, clients, i)
+                c(server, train_clients, i)
         # test over all clients
         if evaluate_rounds:
-            result = evaluate_global_model(global_model_participant=server, participants=clients)
-            loss, acc = result.get('test/loss'), result.get('test/acc')
-            if after_round_evaluation is not None:
-                for c in after_round_evaluation:
-                    c(loss, acc, i)
-            logger.info(
-                f'... finished training round (mean loss: {torch.mean(loss):.2f}, mean acc: {torch.mean(acc):.2f})')
+            if eval_interval is None or i % eval_interval == 0:
+                result = evaluate_global_model(global_model_participant=server,
+                                               participants=[*train_clients, *test_clients])
+                loss, acc = result.get('test/loss'), result.get('test/acc')
+                train_loss, train_acc = loss[:len(train_clients)], acc[:len(train_clients)]
+                test_loss, test_acc = loss[len(train_clients):], acc[len(train_clients):]
+                if after_round_evaluation is not None:
+                    for c in after_round_evaluation:
+                        c(loss, acc, train_loss, train_acc, test_loss, test_acc, i)
+                logger.info(
+                    f'... finished training round (mean loss: {torch.mean(loss):.2f}, mean acc: {torch.mean(acc):.2f})')
         # log and save
         if save_states:
             save_fedavg_state(context, i + 1, server.model.state_dict())
-    return server, clients
+    return server, train_clients, test_clients
 
 
 def create_femnist_experiment_context(name: str, local_epochs: int, batch_size: int, lr: float, client_fraction: float,
