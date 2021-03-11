@@ -2,7 +2,8 @@ import torch
 from pytorch_lightning.loggers import LightningLoggerBase
 
 
-def log_loss_and_acc(model_name: str, loss: torch.Tensor, acc: torch.Tensor, experiment_logger: LightningLoggerBase,
+def log_loss_and_acc(
+        model_name: str, loss: torch.Tensor, acc: torch.Tensor, experiment_logger: LightningLoggerBase,
                      global_step: int):
     """
     Logs the loss and accuracy in an histogram as well as scalar

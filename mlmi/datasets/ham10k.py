@@ -97,8 +97,7 @@ def _load_ham10k_few_big_many_small_federated(
         min_big_tripple=75,
         mean=(0.485, 0.456, 0.406),
         std=(0.229, 0.224, 0.225)
-) -> Tuple[List[Tuple['LazyImageFolderDataset', 'LazyImageFolderDataset']],
-           List[Tuple['LazyImageFolderDataset', 'LazyImageFolderDataset']]]:
+) -> Tuple[List[Tuple['LazyImageFolderDataset', 'LazyImageFolderDataset']], List[Tuple['LazyImageFolderDataset', 'LazyImageFolderDataset']]]:
     large_train_subsets, large_test_subsets, small_train_subsets, small_test_subsets = \
         partition_ham10k_few_big_many_small_dataset(dataset, test_fraction=test_fraction,
                                                                               num_big_clients=num_big_clients,
@@ -228,6 +227,48 @@ def load_ham10k_few_big_many_small_federated2fulldataset(
     return train_dataloader, test_dataloader
 
 
+def load_ham10k_partition_by_two_labels_federated(
+        samples_per_package=50,
+        test_fraction=0.2,
+        batch_size=8,
+        mean=(0.485, 0.456, 0.406),
+        std=(0.229, 0.224, 0.225)
+) -> FederatedDatasetData:
+    dataset = load_ham10k()
+    train_transformations, test_transformations = get_transformations(mean, std)
+    client_folder_subsets = partition_by_two_labels_per_client(
+        dataset, samples_per_package, test_fraction
+    )
+
+    data_local_test_num_dict = {}
+    data_local_train_num_dict = {}
+    train_data_local_dict = {}
+    test_data_local_dict = {}
+
+    for idx, (train_subset, test_subset) in enumerate(client_folder_subsets):
+        train_set = LazyImageFolderDataset(train_subset, train_transformations)
+        test_set = LazyImageFolderDataset(test_subset, test_transformations)
+
+        train_data_local_dict[idx] = data.DataLoader(train_set, batch_size=batch_size, drop_last=False)
+        test_data_local_dict[idx] = data.DataLoader(test_set, batch_size=batch_size, drop_last=False)
+        data_local_train_num_dict[idx] = len(train_set)
+        data_local_test_num_dict[idx] = len(test_set)
+
+    return FederatedDatasetData(
+        client_num=len(client_folder_subsets),
+        train_data_global=None,
+        test_data_global=None,
+        data_local_num_dict=None,
+        data_local_test_num_dict=data_local_test_num_dict,
+        data_local_train_num_dict=data_local_train_num_dict,
+        class_num=7,
+        train_data_local_dict=train_data_local_dict,
+        test_data_local_dict=test_data_local_dict,
+        name='ham10k',
+        batch_size=batch_size
+    )
+
+
 def load_ham10k() -> 'datasets.ImageFolder':
     data_dir = REPO_ROOT / 'data'
     ham10k_dir = data_dir / 'ham10k'
@@ -314,6 +355,40 @@ def partition_ham10k_dataset(
     return data_subsets
 
 
+def partition_by_two_labels_per_client(
+        dataset: 'datasets.ImageFolder',
+        samples_per_package: int = 50,
+        test_fraction: float = 0.2
+) -> List[Tuple['ImageFolderSubset', 'ImageFolderSubset']]:
+    unique_label, unique_inverse, unique_counts = np.unique(dataset.targets,
+                                                            return_inverse=True, return_counts=True)
+    for label in unique_label:
+        label_indices = np.where(unique_inverse == label)[0]
+        np.random.shuffle(label_indices)
+        unique_inverse = np.delete(unique_inverse, label_indices[min(10*samples_per_package, len(label_indices)):])
+    client_indices_list = []
+    while len(unique_label) >= 2:
+        chosen_labels = np.random.choice(unique_label, size=2, replace=False)
+        client_label_indices = np.array([], dtype=int)
+        for label in chosen_labels:
+            label_indices = np.where(unique_inverse == label)[0]
+            chosen_label_indices = np.random.choice(label_indices, size=samples_per_package, replace=False)
+            unique_inverse = np.delete(unique_inverse, chosen_label_indices)
+            client_label_indices = np.append(client_label_indices, chosen_label_indices)
+            if len(np.where(unique_inverse == label)[0]) < samples_per_package:
+                unique_label = np.delete(unique_label, np.where(unique_label == label)[0])
+        client_indices_list.append(client_label_indices)
+    client_folder_subsets = []
+    for client_indices in client_indices_list:
+        np.random.shuffle(client_indices)
+        train_indices = client_indices[:int(len(client_indices) * (1 - test_fraction))]
+        test_indices = client_indices[int(len(client_indices) * (1 - test_fraction)):]
+        train_subset = ImageFolderSubset(dataset, train_indices.astype(int))
+        test_subset = ImageFolderSubset(dataset, test_indices.astype(int))
+        client_folder_subsets.append((train_subset, test_subset))
+    return client_folder_subsets
+
+
 def partition_ham10k_few_big_many_small_dataset(
         dataset: 'datasets.ImageFolder',
         num_big_clients,
@@ -329,6 +404,7 @@ def partition_ham10k_few_big_many_small_dataset(
 
     unique_label, unique_inverse, unique_counts = np.unique(dataset.targets,
                                                             return_inverse=True, return_counts=True)
+
     tripples_list = []
     for label in unique_label:
         label_indices = np.where(unique_inverse == label)[0]

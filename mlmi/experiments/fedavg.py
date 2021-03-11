@@ -177,6 +177,11 @@ def run_fedavg_experiment(
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
 
+    train_train_num = sum([train_num for train_num in fed_dataset.data_local_train_num_dict.values()])
+    test_train_num = sum([train_num for train_num in fed_dataset.data_local_test_num_dict.values()])
+    train_test_num = sum([train_num for train_num in fed_dataset_test.data_local_train_num_dict.values()])
+    test_test_num = sum([train_num for train_num in fed_dataset_test.data_local_test_num_dict.values()])
+
     data_distribution_logged = False
     for cf in client_fraction:
         fedavg_context = FedAvgExperimentContext(name=name, client_fraction=cf, local_epochs=local_epochs,

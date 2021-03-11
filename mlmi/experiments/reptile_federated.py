@@ -2,7 +2,8 @@ from pathlib import Path
 
 import torch
 
-from mlmi.datasets.ham10k import load_ham10k_federated, load_ham10k_few_big_many_small_federated
+from mlmi.datasets.ham10k import load_ham10k_federated, load_ham10k_few_big_many_small_federated, \
+    load_ham10k_partition_by_two_labels_federated
 from mlmi.models.ham10k import GlobalConfusionMatrix, GlobalTestTestConfusionMatrix, GlobalTrainTestConfusionMatrix, \
     MobileNetV2Lightning
 
@@ -50,6 +51,7 @@ def ham10k():
     meta_learning_rate_final = 1.6
 
     eval_interval = 120  # fitted to full dataset training (10 * 60 / 5)
+    personalize_before_eval = True
     num_eval_clients_training = -1
     do_final_evaluation = True
     num_eval_clients_final = -1
@@ -70,7 +72,7 @@ def ham10k():
 @ex.named_config
 def ham10k_fedavg():
     name = 'ham10kfedavg'
-    dataset = 'ham10k'  # Options: 'omniglot', 'femnist'
+    dataset = 'ham10k2label'  # Options: 'omniglot', 'femnist', 'ham10k'
     swap_labels = False  # Only used with dataset='femnist'
     classes = 0  # Only used with dataset='omniglot'
     shots = 0  # Only used with dataset='omniglot'
@@ -85,9 +87,10 @@ def ham10k_fedavg():
     meta_batch_size = 5
     num_meta_steps = 2401  # due to final evaluation we need to add one round to start at 2400 again
     meta_learning_rate_initial = 1  # Fixed meta_learning_rate = 1 throughout training
-    meta_learning_rate_final = 1    #   -> Reptile becomes identical to FedAvg
+    meta_learning_rate_final = 1  # Reptile aggregation becomes identical to FedAvg
 
-    eval_interval = 120  # fitted to full dataset training (10 * 60 / 5)
+    eval_interval = 10  # fitted to full dataset training (10 * 60 / 5)
+    personalize_before_eval = False
     num_eval_clients_training = -1
     do_final_evaluation = True
     num_eval_clients_final = -1
@@ -95,7 +98,7 @@ def ham10k_fedavg():
     inner_batch_size = 8
     inner_learning_rate = [0.001]
     num_inner_epochs = [1]
-    num_inner_epochs_eval = [6]
+    num_inner_epochs_eval = [3]
     do_balancing = [False]
 
     mean = (0.485, 0.456, 0.406)
@@ -137,7 +140,7 @@ def log_after_round_evaluation(
     )
     log_loss_and_acc(
         f'{tag}balanced-train-test',
-        loss_test_test,
+        loss_train_test,
         balanced_acc_train_test,
         experiment_logger,
         step
@@ -188,6 +191,7 @@ def run_reptile_experiment(
         meta_learning_rate_final,
         eval_interval,
         num_eval_clients_training,
+        personalize_before_eval,
         do_final_evaluation,
         num_eval_clients_final,
         inner_batch_size,
@@ -231,6 +235,9 @@ def run_reptile_experiment(
     elif dataset == 'ham10k':
         fed_dataset_train, fed_dataset_test = load_ham10k_few_big_many_small_federated(batch_size=inner_batch_size,
                                                                                        mean=mean, std=std)
+    elif dataset == 'ham10k2label':
+        fed_dataset_train = load_ham10k_partition_by_two_labels_federated(batch_size=inner_batch_size,
+                                                                          mean=mean, std=std)
     else:
         raise ValueError(f'dataset "{dataset}" unknown')
 
@@ -284,7 +291,8 @@ def run_reptile_experiment(
                     ]
 
                     log_dataset_distribution(experiment_logger, 'train clients', fed_dataset_train)
-                    log_dataset_distribution(experiment_logger, 'test clients', fed_dataset_test)
+                    if fed_dataset_test is not None:
+                        log_dataset_distribution(experiment_logger, 'test clients', fed_dataset_test)
 
                     run_reptile(
                         context=reptile_context,
@@ -292,5 +300,6 @@ def run_reptile_experiment(
                         dataset_test=fed_dataset_test,
                         initial_model_state=initial_model_state,
                         after_round_evaluation=log_after_round_evaluation_fns,
-                        start_round=start_round
+                        start_round=start_round,
+                        personalize_before_eval=personalize_before_eval
                     )

@@ -9,7 +9,7 @@ from mlmi.reptile.model import ReptileClient, ReptileServer
 from mlmi.reptile.util import reptile_train_step
 from mlmi.reptile.structs import ReptileExperimentContext
 from mlmi.settings import REPO_ROOT
-from mlmi.utils import evaluate_local_models
+from mlmi.utils import evaluate_global_model, evaluate_local_models
 from mlmi.fedavg.data import swap_labels
 from mlmi.models.ham10k import GlobalConfusionMatrix, GlobalTestTestConfusionMatrix, GlobalTrainTestConfusionMatrix
 from mlmi.structs import FederatedDatasetData, ModelArgs
@@ -60,13 +60,13 @@ def run_reptile(context: ReptileExperimentContext,
                 dataset_test: FederatedDatasetData,
                 initial_model_state,
                 after_round_evaluation,
-                start_round
+                start_round,
+                personalize_before_eval
 ):
     def _evaluate(num_clients: int,
                   tag: str,
                   global_step: int):
         """Evaluate on train and test clients"""
-
         losses, accs, balanced_accs = [], [], []
         is_train_client_set = True
         for client_set in [train_clients, test_clients]:
@@ -77,17 +77,21 @@ def run_reptile(context: ReptileExperimentContext,
                     clients = RANDOM.sample(
                         client_set, context.num_eval_clients_training
                     )
-                reptile_train_step(
-                    aggregator=server,
-                    participants=clients,
-                    inner_training_args=context.get_inner_training_args(eval=True),
-                    evaluation_mode=True
-                )
+                if personalize_before_eval:
+                    reptile_train_step(
+                        aggregator=server,
+                        participants=clients,
+                        inner_training_args=context.get_inner_training_args(eval=True),
+                        evaluation_mode=True
+                    )
                 if is_train_client_set:
                     GlobalTrainTestConfusionMatrix().enable_logging()
                 else:
                     GlobalTestTestConfusionMatrix().enable_logging()
-                result = evaluate_local_models(participants=clients)
+                if personalize_before_eval:
+                    result = evaluate_local_models(participants=clients)
+                else:
+                    result = evaluate_global_model(global_model_participant=server, participants=clients)
                 if is_train_client_set:
                     GlobalTrainTestConfusionMatrix().disable_logging()
                 else:

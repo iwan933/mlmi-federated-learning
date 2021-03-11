@@ -66,18 +66,39 @@ class ReptileExperimentContext(object):
                 betas=self.adam_betas
             )
         if self.dataset_name == 'omniglot':
+            self.meta_model_args = ModelArgs(
+                model_class=self.model_class,
+                optimizer_args=OptimizerArgs(  # Dummy optimizer args
+                    optimizer_class=torch.optim.SGD
+                ),
+                num_classes=self.num_classes_per_client
+            )
             self.inner_model_args = ModelArgs(
                 model_class=self.model_class,
                 optimizer_args=inner_optimizer_args,
                 num_classes=self.num_classes_per_client
             )
-        elif self.dataset_name == 'ham10k':
+        elif self.dataset_name == 'ham10k' or \
+                self.dataset_name == 'ham10k2label':
+            self.meta_model_args = ModelArgs(
+                model_class=self.model_class,
+                optimizer_args=OptimizerArgs(
+                    optimizer_class=torch.optim.SGD
+                ),
+                num_classes=7
+            )
             self.inner_model_args = ModelArgs(
                 model_class=self.model_class,
                 optimizer_args=inner_optimizer_args,
                 num_classes=7
             )
         else:
+            self.meta_model_args = ModelArgs(
+                model_class=self.model_class,
+                optimizer_args=OptimizerArgs(  # Dummy optimizer args
+                    optimizer_class=torch.optim.SGD
+                )
+            )
             self.inner_model_args = ModelArgs(
                 model_class=self.model_class,
                 optimizer_args=inner_optimizer_args,
@@ -88,29 +109,6 @@ class ReptileExperimentContext(object):
         self.meta_learning_rate_initial = meta_learning_rate_initial
         self.meta_learning_rate_final = meta_learning_rate_final
         self.meta_batch_size = meta_batch_size  # number of clients per round
-        if self.dataset_name == 'omniglot':
-            self.meta_model_args = ModelArgs(
-                model_class=self.model_class,
-                optimizer_args=OptimizerArgs(  # Dummy optimizer args
-                    optimizer_class=torch.optim.SGD
-                ),
-                num_classes=self.num_classes_per_client
-            )
-        elif self.dataset_name == 'ham10k':
-            self.meta_model_args = ModelArgs(
-                model_class=self.model_class,
-                optimizer_args=OptimizerArgs(  # Dummy optimizer args
-                    optimizer_class=torch.optim.SGD
-                ),
-                num_classes=7
-            )
-        else:
-            self.meta_model_args = ModelArgs(
-                model_class=self.model_class,
-                optimizer_args=OptimizerArgs(  # Dummy optimizer args
-                    optimizer_class=torch.optim.SGD
-                )
-            )
 
         # Arguments for evaluation
         self.num_inner_epochs_eval = num_inner_epochs_eval
