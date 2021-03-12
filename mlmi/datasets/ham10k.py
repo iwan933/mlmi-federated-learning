@@ -13,9 +13,10 @@ from torchvision import datasets
 from torchvision.transforms import transforms
 import torchvision.models as models
 
+from mlmi.models.ham10k import MobileNetV2Lightning
 from mlmi.plot import generate_data_label_heatmap
 from mlmi.settings import REPO_ROOT
-from mlmi.structs import FederatedDatasetData
+from mlmi.structs import FederatedDatasetData, OptimizerArgs
 from mlmi.utils import create_tensorboard_logger
 
 
@@ -50,7 +51,8 @@ def load_ham10k_federated(
     test_data_local_dict = {}
 
     for idx, (lazy_train_dataset, lazy_test_dataset) in enumerate(lazy_datasets):
-        train_data_local_dict[idx] = data.DataLoader(lazy_train_dataset, batch_size=batch_size, drop_last=False)
+        train_data_local_dict[idx] = data.DataLoader(lazy_train_dataset, batch_size=batch_size, drop_last=False,
+                                                     shuffle=True)
         test_data_local_dict[idx] = data.DataLoader(lazy_test_dataset, batch_size=batch_size, drop_last=False)
         data_local_train_num_dict[idx] = len(lazy_train_dataset)
         data_local_test_num_dict[idx] = len(lazy_test_dataset)
@@ -141,7 +143,8 @@ def _create_federated_dataloader(train_datasets, test_datasets, batch_size):
     test_data_local_dict = {}
 
     for idx, (lazy_train_dataset, lazy_test_dataset) in enumerate(train_datasets):
-        train_data_local_dict[idx] = data.DataLoader(lazy_train_dataset, batch_size=batch_size, drop_last=False)
+        train_data_local_dict[idx] = data.DataLoader(lazy_train_dataset, batch_size=batch_size, drop_last=False,
+                                                     shuffle=True)
         test_data_local_dict[idx] = data.DataLoader(lazy_test_dataset, batch_size=batch_size, drop_last=False)
         data_local_train_num_dict[idx] = len(lazy_train_dataset)
         data_local_test_num_dict[idx] = len(lazy_test_dataset)
@@ -153,7 +156,8 @@ def _create_federated_dataloader(train_datasets, test_datasets, batch_size):
 
     for idx in range(len(test_datasets)):
         lazy_train_dataset, lazy_test_dataset = test_datasets[idx]
-        test_train_data_local_dict[idx] = data.DataLoader(lazy_train_dataset, batch_size=batch_size, drop_last=False)
+        test_train_data_local_dict[idx] = data.DataLoader(lazy_train_dataset, batch_size=batch_size, drop_last=False,
+                                                          shuffle=True)
         test_test_data_local_dict[idx] = data.DataLoader(lazy_test_dataset, batch_size=batch_size, drop_last=False)
         test_data_local_train_num_dict[idx] = len(lazy_train_dataset)
         test_data_local_test_num_dict[idx] = len(lazy_test_dataset)
@@ -223,7 +227,7 @@ def load_ham10k_few_big_many_small_federated2fulldataset(
     test_subset = ImageFolderSubset(dataset, test_indices.astype(int))
     train_set = LazyImageFolderDataset(train_subset[:], train_transformations)
     test_set = LazyImageFolderDataset(test_subset[:], test_transformations)
-    train_dataloader = data.DataLoader(train_set, batch_size=batch_size, drop_last=False)
+    train_dataloader = data.DataLoader(train_set, batch_size=batch_size, drop_last=False, shuffle=True)
     test_dataloader = data.DataLoader(test_set, batch_size=batch_size, drop_last=False)
     return train_dataloader, test_dataloader
 
@@ -237,7 +241,7 @@ def load_ham10k_partition_by_two_labels_federated(
         std=(0.229, 0.224, 0.225)
 ) -> FederatedDatasetData:
     dataset = load_ham10k()
-    train_transformations, test_transformations = get_transformations(mean, std)
+    train_transformations, test_transformations = None, None  # get_transformations(mean, std)
     client_folder_subsets = partition_by_two_labels_per_client(
         dataset, samples_per_package, max_samples_per_label, test_fraction
     )
@@ -251,7 +255,7 @@ def load_ham10k_partition_by_two_labels_federated(
         train_set = LazyImageFolderDataset(train_subset, train_transformations)
         test_set = LazyImageFolderDataset(test_subset, test_transformations)
 
-        train_data_local_dict[idx] = data.DataLoader(train_set, batch_size=batch_size, drop_last=False)
+        train_data_local_dict[idx] = data.DataLoader(train_set, batch_size=batch_size, drop_last=False, shuffle=True)
         test_data_local_dict[idx] = data.DataLoader(test_set, batch_size=batch_size, drop_last=False)
         data_local_train_num_dict[idx] = len(train_set)
         data_local_test_num_dict[idx] = len(test_set)
@@ -446,7 +450,10 @@ def get_transformations(mean, std) -> Tuple[any, any]:
     transform_train = transforms.Compose([
                         transforms.Resize((224, 224)),
                         transforms.RandomHorizontalFlip(),
-                        transforms.RandomRotation(degrees=60),
+                        transforms.RandomAffine(degrees=60, scale=(1.0, 2.0)),
+                        transforms.RandomApply([transforms.ColorJitter(brightness=(0.7, 1.3))], p=0.3),
+                        transforms.RandomApply([transforms.ColorJitter(contrast=(0.7, 1.3))], p=0.3),
+                        transforms.RandomApply([transforms.ColorJitter(saturation=(0.7, 1.3))], p=0.3),
                         transforms.ToTensor(),
                         transforms.Normalize(mean, std),
                         ])
@@ -492,6 +499,22 @@ class LazyImageFolderDataset(Dataset):
 
 
 if __name__ == '__main__':
+    experiment_logger = create_tensorboard_logger('transform_test')
+
+    from torch import optim
+
+    optimizer_args = OptimizerArgs(optim.SGD, lr=0.01)
+    model = MobileNetV2Lightning(num_classes=7, optimizer_args=optimizer_args, participant_name='1',
+                                  weights=torch.FloatTensor([1, 1, 1, 1, 1, 1, 1]))
+    train_transform, test_transform = get_transformations(mean=(0.485, 0.456, 0.406),
+        std=(0.229, 0.224, 0.225))
+    print(model)
+    dataset = load_ham10k()
+    x, y = dataset[0]
+    for i in range(20):
+        _x = train_transform(x)
+        experiment_logger.experiment.add_image(f'{i}', _x)
+
     _fed_dataset = load_ham10k_partition_by_two_labels_federated()
     tag = 'ham10k2label'
     experiment_logger = create_tensorboard_logger('datadistribution', _fed_dataset.name)
