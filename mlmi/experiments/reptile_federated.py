@@ -4,7 +4,8 @@ import torch
 
 from mlmi.datasets.ham10k import load_ham10k_federated, load_ham10k_few_big_many_small_federated, \
     load_ham10k_partition_by_two_labels_federated
-from mlmi.models.ham10k import GlobalConfusionMatrix, GlobalTestTestConfusionMatrix, GlobalTrainTestConfusionMatrix, \
+from mlmi.models.ham10k import Densenet121Lightning, GlobalConfusionMatrix, GlobalTestTestConfusionMatrix, \
+    GlobalTrainTestConfusionMatrix, \
     MobileNetV2Lightning
 
 from typing import Callable, Dict, List, Optional
@@ -57,8 +58,8 @@ def ham10k():
 
     inner_batch_size = 8
     inner_learning_rate = [0.0008]
-    num_inner_epochs = [1]
-    num_inner_epochs_eval = [3]
+    num_inner_epochs = [2]
+    num_inner_epochs_eval = [2]
     personalize_before_eval = True
     do_balancing = [False]
 
@@ -71,21 +72,21 @@ def ham10k():
 
 @ex.named_config
 def ham10k_fedavg():
-    name = 'ham10kfedavg'
+    name = 'ham10kfedavg_densenet'
     dataset = 'ham10k2label'  # Options: 'omniglot', 'femnist', 'ham10k'
     swap_labels = False  # Only used with dataset='femnist'
     classes = 0  # Only used with dataset='omniglot'
     shots = 0  # Only used with dataset='omniglot'
     seed = 123123123
 
-    model_class = MobileNetV2Lightning
+    model_class = Densenet121Lightning  # MobileNetV2Lightning
     sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
     adam_betas = (0.9, 0.999)  # Used only if sgd = False
 
     num_clients_train = 0  # Not used here
     num_clients_test = 0  # Not used here
     meta_batch_size = 5
-    num_meta_steps = 2401  # due to final evaluation we need to add one round to start at 2400 again
+    num_meta_steps = 1201  # due to final evaluation we need to add one round to start at 2400 again
     meta_learning_rate_initial = 1  # Fixed meta_learning_rate = 1 throughout training
     meta_learning_rate_final = 1  # Reptile aggregation becomes identical to FedAvg
 
@@ -107,6 +108,7 @@ def ham10k_fedavg():
     start_round = 0
     model_state_path = None
     logger_version = None
+
 
 def log_after_round_evaluation(
         experiment_logger,
