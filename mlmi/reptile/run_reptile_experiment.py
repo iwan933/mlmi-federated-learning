@@ -1,5 +1,5 @@
-import random
 from typing import Dict
+import numpy as np
 
 import torch
 from torch import Tensor
@@ -74,8 +74,10 @@ def run_reptile(context: ReptileExperimentContext,
                 if context.num_eval_clients_training == -1:
                     clients = client_set
                 else:
-                    clients = RANDOM.sample(
-                        client_set, context.num_eval_clients_training
+                    clients = np.random.choice(
+                        a=client_set,
+                        size=context.num_eval_clients_training,
+                        replace=False
                     )
                 if personalize_before_eval:
                     reptile_train_step(
@@ -109,8 +111,6 @@ def run_reptile(context: ReptileExperimentContext,
         if after_round_evaluation is not None:
             for c in after_round_evaluation:
                 c(tag, losses[0], accs[0], balanced_accs[0], losses[1], accs[1], balanced_accs[1], global_step)
-
-    RANDOM = random.Random(context.seed)
 
     # Randomly swap labels
     if context.swap_labels:
@@ -157,7 +157,11 @@ def run_reptile(context: ReptileExperimentContext,
         if context.meta_batch_size == -1:
             meta_batch = train_clients
         else:
-            meta_batch = RANDOM.sample(train_clients, context.meta_batch_size)
+            meta_batch = np.random.choice(
+                a=train_clients,
+                size=context.meta_batch_size,
+                replace=False
+            )
         # Meta training step
         reptile_train_step(
             aggregator=server,
@@ -187,3 +191,5 @@ def run_reptile(context: ReptileExperimentContext,
             tag='final_',
             global_step=0
         )
+
+    return server, train_clients, test_clients
