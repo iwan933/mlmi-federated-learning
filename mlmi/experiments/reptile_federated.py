@@ -59,7 +59,7 @@ def ham10k():
     inner_batch_size = 8
     inner_learning_rate = [0.0008]
     num_inner_epochs = [1]
-    num_inner_epochs_eval = [3]
+    num_inner_epochs_eval = [2]
     personalize_before_eval = True
     do_balancing = [False]
 
@@ -73,13 +73,13 @@ def ham10k():
 @ex.named_config
 def ham10k_fedavg():
     name = 'ham10kfedavg'
-    dataset = 'ham10k2label'  # Options: 'omniglot', 'femnist', 'ham10k'
+    dataset = 'ham10k2label_densenet'  # Options: 'omniglot', 'femnist', 'ham10k'
     swap_labels = False  # Only used with dataset='femnist'
     classes = 0  # Only used with dataset='omniglot'
     shots = 0  # Only used with dataset='omniglot'
     seed = 123123123
 
-    model_class = MobileNetV2Lightning
+    model_class = Densenet121Lightning  # MobileNetV2Lightning
     sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
     adam_betas = (0.9, 0.999)  # Used only if sgd = False
 
