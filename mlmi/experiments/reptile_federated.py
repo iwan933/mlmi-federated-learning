@@ -58,7 +58,7 @@ def ham10k():
 
     inner_batch_size = 8
     inner_learning_rate = [0.0008]
-    num_inner_epochs = [1]
+    num_inner_epochs = [2]
     num_inner_epochs_eval = [2]
     personalize_before_eval = True
     do_balancing = [False]
@@ -79,7 +79,7 @@ def ham10k_fedavg():
     shots = 0  # Only used with dataset='omniglot'
     seed = 123123123
 
-    model_class = Densenet121Lightning  # MobileNetV2Lightning
+    model_class = MobileNetV2Lightning
     sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
     adam_betas = (0.9, 0.999)  # Used only if sgd = False
 
@@ -97,7 +97,7 @@ def ham10k_fedavg():
 
     inner_batch_size = 8
     inner_learning_rate = [0.001]
-    num_inner_epochs = [1]
+    num_inner_epochs = [2]
     num_inner_epochs_eval = [3]
     personalize_before_eval = False
     do_balancing = [False]
