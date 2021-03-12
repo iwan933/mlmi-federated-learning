@@ -166,7 +166,7 @@ class MobileNetV2Lightning(BaseParticipantModel, pl.LightningModule):
     def __init__(self, num_classes, *args, weights=None, pretrain=True, **kwargs):
         model = torchvision.models.mobilenet_v2(pretrained=pretrain)
         model.classifier = Sequential(
-            Dropout(p=0.2, inplace=False),
+            Dropout(p=0.8, inplace=False),
             Linear(in_features=1280, out_features=num_classes, bias=True)
         )
         super().__init__(*args, model=model, **kwargs)
@@ -175,6 +175,7 @@ class MobileNetV2Lightning(BaseParticipantModel, pl.LightningModule):
         self.train_accuracy = Accuracy()
         self.balanced_accuracy = BalancedAccuracy()
         self.criterion = CrossEntropyLoss(weight=weights)
+        self._training_epoch = 0
 
     def training_step(self, train_batch, batch_idx):
         x, y = train_batch
@@ -185,6 +186,12 @@ class MobileNetV2Lightning(BaseParticipantModel, pl.LightningModule):
         self.log('train/acc/{}'.format(self.participant_name), self.train_accuracy(preds, y))
         self.log('train/loss/{}'.format(self.participant_name), loss.item())
         return loss
+
+    def training_epoch_end(self, outputs: List[Any]) -> None:
+        self._training_epoch += 1
+        avg_loss = torch.stack([x['loss'] for x in outputs]).mean()
+        self.logger.experiment.add_scalar(f'train-train/loss/{self.participant_name}', avg_loss,
+                                          global_step=self._training_epoch)
 
     def test_step(self, test_batch, batch_idx):
         x, y = test_batch

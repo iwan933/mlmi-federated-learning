@@ -87,10 +87,9 @@ class ReptileClient(BaseTrainingParticipant):
         # Disable logging and do not save checkpoints (not enough disc space for
         # thousands of model states)
         #if enable_logging:
-        #    _kwargs['logger'] = self.logger
+        _kwargs['logger'] = self.logger
         return pl.Trainer(
             checkpoint_callback=False,
-            logger=False,
             limit_val_batches=0.0,
             **_kwargs
         )
