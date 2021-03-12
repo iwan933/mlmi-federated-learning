@@ -13,9 +13,10 @@ from torchvision import datasets
 from torchvision.transforms import transforms
 import torchvision.models as models
 
-from mlmi.models.ham10k import MobileNetV2Lightning
+from mlmi.plot import generate_data_label_heatmap
 from mlmi.settings import REPO_ROOT
-from mlmi.structs import FederatedDatasetData, OptimizerArgs
+from mlmi.structs import FederatedDatasetData
+from mlmi.utils import create_tensorboard_logger
 
 
 def collate_different_sizes(batch):
@@ -365,7 +366,8 @@ def partition_by_two_labels_per_client(
     for label in unique_label:
         label_indices = np.where(unique_inverse == label)[0]
         np.random.shuffle(label_indices)
-        unique_inverse = np.delete(unique_inverse, label_indices[min(10*samples_per_package, len(label_indices)):])
+        # invalidate label to perform downsampling
+        unique_inverse[label_indices[min(10*samples_per_package, len(label_indices)):]] = -1
     client_indices_list = []
     while len(unique_label) >= 2:
         chosen_labels = np.random.choice(unique_label, size=2, replace=False)
@@ -373,7 +375,7 @@ def partition_by_two_labels_per_client(
         for label in chosen_labels:
             label_indices = np.where(unique_inverse == label)[0]
             chosen_label_indices = np.random.choice(label_indices, size=samples_per_package, replace=False)
-            unique_inverse = np.delete(unique_inverse, chosen_label_indices)
+            unique_inverse[chosen_label_indices] = -1  # invalidate the used indices by changing the label
             client_label_indices = np.append(client_label_indices, chosen_label_indices)
             if len(np.where(unique_inverse == label)[0]) < samples_per_package:
                 unique_label = np.delete(unique_label, np.where(unique_label == label)[0])
@@ -488,8 +490,12 @@ class LazyImageFolderDataset(Dataset):
 
 
 if __name__ == '__main__':
-    fed_test_dataset = load_ham10k_federated()
-    federated_dataset, fed_test_dataset_2 = load_ham10k_few_big_many_small_federated()
+    _fed_dataset = load_ham10k_partition_by_two_labels_federated()
+    tag = 'ham10k2label'
+    experiment_logger = create_tensorboard_logger('datadistribution', _fed_dataset.name, version=0)
+    dataloaders = list(_fed_dataset.train_data_local_dict.values())
+    image = generate_data_label_heatmap(tag, dataloaders, _fed_dataset.class_num)
+    experiment_logger.experiment.add_image(f'label distribution/{tag}', image.numpy())
     print('')
     """
     import pytorch_lightning as pl

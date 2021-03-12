@@ -4,7 +4,8 @@ import torch
 
 from mlmi.datasets.ham10k import load_ham10k_federated, load_ham10k_few_big_many_small_federated, \
     load_ham10k_partition_by_two_labels_federated
-from mlmi.models.ham10k import GlobalConfusionMatrix, GlobalTestTestConfusionMatrix, GlobalTrainTestConfusionMatrix, \
+from mlmi.models.ham10k import Densenet121Lightning, GlobalConfusionMatrix, GlobalTestTestConfusionMatrix, \
+    GlobalTrainTestConfusionMatrix, \
     MobileNetV2Lightning
 
 from typing import Callable, Dict, List, Optional
@@ -98,7 +99,7 @@ def ham10k_fedavg():
     inner_learning_rate = [0.001]
     num_inner_epochs = [1]
     num_inner_epochs_eval = [3]
-    personalize_before_eval = False
+    personalize_before_eval = True
     do_balancing = [False]
 
     mean = (0.485, 0.456, 0.406)
@@ -107,6 +108,7 @@ def ham10k_fedavg():
     start_round = 0
     model_state_path = None
     logger_version = None
+
 
 def log_after_round_evaluation(
         experiment_logger,
