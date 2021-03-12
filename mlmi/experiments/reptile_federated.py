@@ -72,14 +72,14 @@ def ham10k():
 
 @ex.named_config
 def ham10k_fedavg():
-    name = 'ham10kfedavg_densenet'
+    name = 'ham10kfedavg'
     dataset = 'ham10k2label'  # Options: 'omniglot', 'femnist', 'ham10k'
     swap_labels = False  # Only used with dataset='femnist'
     classes = 0  # Only used with dataset='omniglot'
     shots = 0  # Only used with dataset='omniglot'
     seed = 123123123
 
-    model_class = Densenet121Lightning  # MobileNetV2Lightning
+    model_class = MobileNetV2Lightning
     sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
     adam_betas = (0.9, 0.999)  # Used only if sgd = False
 
