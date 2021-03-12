@@ -241,7 +241,7 @@ def load_ham10k_partition_by_two_labels_federated(
         std=(0.229, 0.224, 0.225)
 ) -> FederatedDatasetData:
     dataset = load_ham10k()
-    train_transformations, test_transformations = None, None  # get_transformations(mean, std)
+    train_transformations, test_transformations = get_transformations(mean, std)
     client_folder_subsets = partition_by_two_labels_per_client(
         dataset, samples_per_package, max_samples_per_label, test_fraction
     )
