@@ -97,7 +97,7 @@ def ham10k_fedavg():
 
     inner_batch_size = 8
     inner_learning_rate = [0.001]
-    num_inner_epochs = [1]
+    num_inner_epochs = [2]
     num_inner_epochs_eval = [3]
     personalize_before_eval = False
     do_balancing = [False]
