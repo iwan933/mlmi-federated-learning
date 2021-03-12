@@ -99,7 +99,7 @@ def ham10k_fedavg():
     inner_learning_rate = [0.001]
     num_inner_epochs = [1]
     num_inner_epochs_eval = [3]
-    personalize_before_eval = True
+    personalize_before_eval = False
     do_balancing = [False]
 
     mean = (0.485, 0.456, 0.406)
