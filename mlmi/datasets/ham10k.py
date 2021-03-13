@@ -450,8 +450,8 @@ def get_transformations(mean, std) -> Tuple[any, any]:
     transform_train = transforms.Compose([
                         transforms.Resize((224, 224)),
                         transforms.RandomHorizontalFlip(),
-                        transforms.RandomAffine(degrees=60),
-                        transforms.ColorJitter(brightness=(0.9, 1.1), contrast=(0.9, 1.1), saturation=(0.9, 1.1)),
+                        transforms.RandomAffine(degrees=90),
+                        transforms.ColorJitter(brightness=(0.85, 1.15), contrast=(0.85, 1.15), saturation=(0.85, 1.15)),
                         transforms.ToTensor(),
                         transforms.Normalize(mean, std),
                         ])
