@@ -455,12 +455,12 @@ def get_transformations(mean, std) -> Tuple[any, any]:
                         transforms.RandomApply([transforms.ColorJitter(contrast=(0.8, 1.2))], p=0.3),
                         transforms.RandomApply([transforms.ColorJitter(saturation=(0.8, 1.2))], p=0.3),
                         transforms.ToTensor(),
-                        transforms.Normalize(mean, std),
+                        #transforms.Normalize(mean, std),
                         ])
     transform_test = transforms.Compose([
                         transforms.Resize((224, 224)),
                         transforms.ToTensor(),
-                        transforms.Normalize(mean, std),
+                        #transforms.Normalize(mean, std),
                         ])
     return transform_train, transform_test
 
