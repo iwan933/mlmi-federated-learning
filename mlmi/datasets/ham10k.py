@@ -451,9 +451,7 @@ def get_transformations(mean, std) -> Tuple[any, any]:
                         transforms.Resize((224, 224)),
                         transforms.RandomHorizontalFlip(),
                         transforms.RandomAffine(degrees=60),
-                        #transforms.RandomApply([transforms.ColorJitter(brightness=(0.8, 1.2))], p=0.6),
-                        #transforms.RandomApply([transforms.ColorJitter(contrast=(0.8, 1.2))], p=0.6),
-                        transforms.ColorJitter(contrast=(0.9, 1.1), saturation=(0.9, 1.1)),
+                        transforms.ColorJitter(brightness=(0.9, 1.1), contrast=(0.9, 1.1), saturation=(0.9, 1.1)),
                         transforms.ToTensor(),
                         transforms.Normalize(mean, std),
                         ])
