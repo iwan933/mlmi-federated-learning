@@ -56,7 +56,7 @@ def ham10k():
     do_final_evaluation = True
     num_eval_clients_final = -1
 
-    inner_batch_size = 8
+    inner_batch_size = 16
     inner_learning_rate = [0.001]
     num_inner_epochs = [1]
     num_inner_epochs_eval = [3, 5]
