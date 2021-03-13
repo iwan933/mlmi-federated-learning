@@ -72,21 +72,21 @@ def ham10k():
 
 @ex.named_config
 def ham10k_fedavg():
-    name = 'ham10kfedavg_densenet'
+    name = 'ham10kfedavg'
     dataset = 'ham10k2label'  # Options: 'omniglot', 'femnist', 'ham10k'
     swap_labels = False  # Only used with dataset='femnist'
     classes = 0  # Only used with dataset='omniglot'
     shots = 0  # Only used with dataset='omniglot'
     seed = 123123123
 
-    model_class = Densenet121Lightning  # MobileNetV2Lightning
+    model_class = MobileNetV2Lightning
     sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
     adam_betas = (0.9, 0.999)  # Used only if sgd = False
 
     num_clients_train = 0  # Not used here
     num_clients_test = 0  # Not used here
     meta_batch_size = 5
-    num_meta_steps = 1201  # due to final evaluation we need to add one round to start at 2400 again
+    num_meta_steps = 1441  # due to final evaluation we need to add one round to start at 2400 again
     meta_learning_rate_initial = 1  # Fixed meta_learning_rate = 1 throughout training
     meta_learning_rate_final = 1  # Reptile aggregation becomes identical to FedAvg
 
@@ -95,9 +95,9 @@ def ham10k_fedavg():
     do_final_evaluation = True
     num_eval_clients_final = -1
 
-    inner_batch_size = 8
-    inner_learning_rate = [0.001]
-    num_inner_epochs = [1]
+    inner_batch_size = 32
+    inner_learning_rate = [0.001, 0.002]
+    num_inner_epochs = [1, 2]
     num_inner_epochs_eval = [3]
     personalize_before_eval = False
     do_balancing = [False]
