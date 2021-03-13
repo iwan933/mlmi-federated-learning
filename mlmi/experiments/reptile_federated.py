@@ -86,7 +86,7 @@ def ham10k_fedavg():
     num_clients_train = 0  # Not used here
     num_clients_test = 0  # Not used here
     meta_batch_size = 5
-    num_meta_steps = 2401  # due to final evaluation we need to add one round to start at 2400 again
+    num_meta_steps = 1561  # due to final evaluation we need to add one round to start at 2400 again
     meta_learning_rate_initial = 1  # Fixed meta_learning_rate = 1 throughout training
     meta_learning_rate_final = 1  # Reptile aggregation becomes identical to FedAvg
 
