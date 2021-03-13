@@ -3,10 +3,12 @@ from mlmi.fedavg.ham10k import initialize_ham10k_clients
 
 from typing import Callable, Dict, List, Optional
 import random
+import copy
 
 from sacred import Experiment
 from functools import partial
 
+import numpy as np
 import torch
 from torch import Tensor, optim
 
@@ -47,7 +49,7 @@ logger = getLogger(__name__)
 @ex.config
 def default_configuration():
     seed = 123123123
-    name = 'hame10khcreptile'
+    name = 'ham10khcreptile'
     dataset = 'ham10k2label'
     num_clients = 0 # Not used here
     batch_size = 8
@@ -55,7 +57,7 @@ def default_configuration():
     do_balancing = False
 
     hc_lr = 0.0008
-    hc_cluster_initialization_rounds = 8
+    hc_cluster_initialization_rounds = [2]
     hc_meta_batch_size = 5
     hc_local_epochs = 1
     hc_train_cluster_args = TrainArgs(max_epochs=3, min_epochs=3, progress_bar_refresh_rate=0)
@@ -106,7 +108,7 @@ def ham10k():
     hc_linkage_mech = 'ward'
     hc_criterion = 'distance'
     hc_dis_metric = 'euclidean'
-    hc_max_value_criterion = 300.00
+    hc_max_value_criterion = [300.00]
     hc_reallocate_clients = False
     hc_threshold_min_client_cluster = 1
 
@@ -308,7 +310,7 @@ def run_hierarchical_clustering_reptile(
             num_clients_train=num_clients,
             num_clients_test=0,
             meta_batch_size=hc_meta_batch_size,
-            num_meta_steps=hc_cluster_initialization_rounds,
+            num_meta_steps=hc_cluster_initialization_rounds[0],
             meta_learning_rate_initial=1.0,
             meta_learning_rate_final=1.0,
             eval_interval=1,
@@ -369,8 +371,8 @@ def run_hierarchical_clustering_reptile(
 
         for init_rounds, max_value in generate_configuration(hc_cluster_initialization_rounds, hc_max_value_criterion):
             # load the model state
-            round_model_state = load_fedavg_state(fedavg_context, init_rounds)
-            overwrite_participants_models(round_model_state, clients)
+            #round_model_state = load_fedavg_state(fedavg_context, init_rounds)
+            #overwrite_participants_models(round_model_state, clients)
             # initialize the cluster configuration
             round_configuration = {
                 'num_rounds_init': init_rounds,
@@ -399,7 +401,7 @@ def run_hierarchical_clustering_reptile(
                 participants=clients,
                 training_args=hc_train_cluster_args
             )
-            if len(trained_participants) != len(clients):
+            if trained_participants != len(clients):
                 raise ValueError(
                     'not all clients successfully participated in the clustering round')
 
@@ -447,7 +449,7 @@ def run_hierarchical_clustering_reptile(
                             inner_training_args=reptile_context.get_inner_training_args(eval=True),
                             evaluation_mode=True
                         )
-                    if personalize_before_eval:
+                    if rp_personalize_before_eval:
                         result = evaluate_local_models(participants=participants)
                     else:
                         result = evaluate_global_model(
@@ -462,7 +464,9 @@ def run_hierarchical_clustering_reptile(
                     if after_round_evaluation is not None:
                         for c in after_round_evaluation:
                             c(experiment_logger, f'cluster_{cluster_id}',
-                              loss, acc, balanced_acc, global_step)
+                              loss, acc, balanced_acc,
+                              None, None, None,
+                              global_step)
                     loss_list = loss.tolist()
                     acc_list = acc.tolist()
                     balanced_acc_list = balanced_acc.tolist()
@@ -481,7 +485,7 @@ def run_hierarchical_clustering_reptile(
                     if reptile_context.meta_batch_size == -1:
                         meta_batch = participants
                     else:
-                        meta_batch = RANDOM.sample(participants, context.meta_batch_size)
+                        meta_batch = np.random.choice(participants, reptile_context.meta_batch_size, False)
                     # Meta training step
                     reptile_train_step(
                         aggregator=cluster_server_dic[cluster_id],
@@ -501,7 +505,8 @@ def run_hierarchical_clustering_reptile(
                         for c in after_round_evaluation:
                             c(experiment_logger, 'mean_over_all_clients',
                               Tensor(global_loss), Tensor(global_acc),
-                              Tensor(global_balanced_acc), global_step)
+                              Tensor(global_balanced_acc), None, None, None,
+                              global_step)
 
                 logger.info(f'Finished Reptile training round {i}')
 
@@ -510,7 +515,8 @@ def run_hierarchical_clustering_reptile(
                 global_loss, global_acc, global_balanced_acc = _evaluate(
                     global_step=reptile_context.num_meta_steps
                 )
-                log_loss_and_acc(
-                    'overall_mean', Tensor(global_loss), Tensor(global_acc),
-                    Tensor(global_balanced_acc), experiment_logger, 0
-                )
+                if after_round_evaluation is not None:
+                    for c in after_round_evaluation:
+                        c(experiment_logger, 'overall_mean',
+                          Tensor(global_loss), Tensor(global_acc),
+                          Tensor(global_balanced_acc), None, None, None, 0)

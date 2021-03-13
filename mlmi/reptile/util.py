@@ -35,6 +35,7 @@ def run_train_round(participants: List[BaseTrainingParticipant],
 
     if success_threshold != -1 and successful_participants < success_threshold:
         raise ExecutionError('Failed to execute training round, not enough clients participated successfully')
+    return successful_participants
 
 
 def reptile_train_step(aggregator: ReptileServer,
