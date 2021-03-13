@@ -95,7 +95,7 @@ def ham10k_fedavg():
     do_final_evaluation = True
     num_eval_clients_final = -1
 
-    inner_batch_size = 32
+    inner_batch_size = 16
     inner_learning_rate = [0.0014]
     num_inner_epochs = [1]
     num_inner_epochs_eval = [3]
