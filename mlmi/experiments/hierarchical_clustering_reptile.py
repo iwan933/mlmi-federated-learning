@@ -448,7 +448,7 @@ def run_hierarchical_clustering_reptile(
                     # Log
                     if after_round_evaluation is not None:
                         for c in after_round_evaluation:
-                            c(experiment_logger, f'cluster-{_cluster_id}-',
+                            c(f'cluster-{_cluster_id}-',
                               loss, acc, balanced_acc,
                               None, None, None,
                               _global_step)
@@ -486,10 +486,9 @@ def run_hierarchical_clustering_reptile(
                     if after_round_evaluation is not None:
                         # callback for logging
                         for c in after_round_evaluation:
-                            c(experiment_logger, 'global-',
+                            c('global-',
                               Tensor(global_loss), Tensor(global_acc),
-                              Tensor(global_balanced_acc), None, None, None,
-                              i)
+                              Tensor(global_balanced_acc), None, None, None, i)
 
             # Final evaluation at end of training
             if reptile_context.do_final_evaluation:
@@ -498,6 +497,5 @@ def run_hierarchical_clustering_reptile(
                 )
                 if after_round_evaluation is not None:
                     for c in after_round_evaluation:
-                        c(experiment_logger, 'global-',
-                          Tensor(global_loss), Tensor(global_acc),
+                        c('global-', Tensor(global_loss), Tensor(global_acc),
                           Tensor(global_balanced_acc), None, None, None, init_rounds + reptile_context.num_meta_steps)
