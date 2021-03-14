@@ -88,7 +88,7 @@ def default_configuration():
 
 @ex.named_config
 def fedavg():
-    seed = 4444 # 123123123
+    seed = 4444  # 123123123
     name = 'ham10khcfedavg'
     dataset = 'ham10k2label'
     num_clients = 0  # Not used here
@@ -115,7 +115,7 @@ def fedavg():
     rp_num_meta_steps = 1280
     rp_meta_learning_rate_initial = 1
     rp_meta_learning_rate_final = 1
-    rp_eval_interval = 120
+    rp_eval_interval = 20
     rp_inner_learning_rate = 0.001
     rp_num_inner_epochs = 1
     rp_num_inner_epochs_eval = 7
