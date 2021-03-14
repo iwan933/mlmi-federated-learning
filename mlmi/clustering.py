@@ -317,15 +317,16 @@ class FixedAlternativePartitioner(BaseClusterPartitioner):
     def cluster(self, participants: List['BaseParticipant'], server) -> Dict[str, List['BaseParticipant']]:
         logging.info('start clustering...')
         clusters_hac_dic = {}
-        server: Dict[str, Tensor] = server.model.state_dict()
+        server_state: Dict[str, Tensor] = server.model.state_dict()
 
         model_states: List[Dict[str, Tensor]] = [p.model.state_dict() for p in participants]
         keys = list(model_states[0].keys())
         model_parameter = np.array([flatten_model_parameter(m, keys).numpy() for m in model_states], dtype=float)
 
-        global_parameter = flatten_model_parameter(server, keys).cpu().numpy()
-        euclidean_dist = np.array([(((model_parameter[participant_id]-global_parameter)**2).sum(axis=0) ** (1/2))
-                                   for participant_id in range(len(participants))])
+        global_parameter = flatten_model_parameter(server_state, keys).cpu().numpy()
+        layer_distances = [((model_parameter[participant_id] - global_parameter) ** 2) for participant_id in
+                           range(len(participants))]
+        euclidean_dist = np.array([d.sum(axis=0) ** (1 / 2) for d in layer_distances])
 
         cluster_ids = hac.fclusterdata(np.reshape(euclidean_dist, (len(euclidean_dist), 1)), self.max_value_criterion,
                                        self.criterion, method=self.linkage_mech, metric=self.dis_metric)

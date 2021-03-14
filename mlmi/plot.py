@@ -28,11 +28,12 @@ def generate_data_label_heatmap(title: str, dataloaders: List[data.DataLoader], 
         labels_list.append(labels_count)
     x = np.transpose(np.vstack((*labels_list,)))
     labels = x.astype(object)
-    labels[x >= 10] = 'x'
-    labels[x < 10] = [f'{int(y):d}' for y in labels[x < 10]]
+    #labels[x >= 10] = 'x'
+    #labels[x < 10] = [f'{int(y):d}' for y in labels[x < 10]]
     # draw heatmap
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=[12, 6])
-    sns.heatmap(x.astype(int), ax=ax, annot=labels, fmt='')
+    #sns.heatmap(x.astype(int), ax=ax, annot=labels, fmt='')
+    sns.heatmap(x.astype(int), ax=ax, annot=True, fmt='d')
     ax.set_title(title)
     # write to buffer
     buf = io.BytesIO()

@@ -88,6 +88,8 @@ class ReptileClient(BaseTrainingParticipant):
         # thousands of model states)
         #if enable_logging:
         _kwargs['logger'] = self.logger
+        if torch.cuda.is_available():
+            _kwargs['gpus'] = 1
         return pl.Trainer(
             checkpoint_callback=False,
             limit_val_batches=0.0,
@@ -131,14 +133,14 @@ class ReptileServer(BaseAggregatorParticipant):
                   meta_learning_rate: float,
                   weighted: bool = True):
         # Average participants' model states for meta_gradient of server
-        initial_model_state = copy.deepcopy(self.model.state_dict())
+        initial_model_state = copy.deepcopy(self.model.cpu().state_dict())
         if weighted:
             # meta_gradient = weighted (by number of samples) average of
             # participants' model updates
             num_train_samples_total = sum([p._num_train_samples for p in participants])
             new_states = [
                 weight_model(
-                    model=p.model.state_dict(),
+                    model=p.model.cpu().state_dict(),
                     num_samples=p._num_train_samples,
                     num_total_samples=num_train_samples_total
                 ) for p in participants
@@ -147,7 +149,7 @@ class ReptileServer(BaseAggregatorParticipant):
             # meta_gradient = simple average of participants' model updates
             new_states = [
                 weight_model(
-                    model=p.model.state_dict(),
+                    model=p.model.cpu().state_dict(),
                     num_samples=1,
                     num_total_samples=len(participants)
                 ) for p in participants
