@@ -89,7 +89,7 @@ def default_configuration():
 @ex.named_config
 def fedavg():
     seed = 123123123
-    name = 'ham10khcreptile'
+    name = 'ham10khcfedavg'
     dataset = 'ham10k2label'
     num_clients = 0  # Not used here
     batch_size = 16
