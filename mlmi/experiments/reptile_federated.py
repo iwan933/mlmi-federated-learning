@@ -33,12 +33,12 @@ ex = Experiment('reptile')
 
 @ex.config
 def ham10k():
+    seed = 4444  # 123123123
     name = 'ham10kreptile'
     dataset = 'ham10k2label'  # Options: 'omniglot', 'femnist', 'ham10k'
     swap_labels = False  # Only used with dataset='femnist'
     classes = 0  # Only used with dataset='omniglot'
     shots = 0  # Only used with dataset='omniglot'
-    seed = 123123123
 
     model_class = MobileNetV2Lightning
     sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam
@@ -72,12 +72,12 @@ def ham10k():
 
 @ex.named_config
 def ham10k_fedavg():
+    seed = 4444  # 123123123
     name = 'ham10kfedavg'
     dataset = 'ham10k2label'  # Options: 'omniglot', 'femnist', 'ham10k'
     swap_labels = False  # Only used with dataset='femnist'
     classes = 0  # Only used with dataset='omniglot'
     shots = 0  # Only used with dataset='omniglot'
-    seed = 123123123
 
     model_class = MobileNetV2Lightning
     sgd = True  # True -> Use SGD as inner optimizer; False -> Use Adam

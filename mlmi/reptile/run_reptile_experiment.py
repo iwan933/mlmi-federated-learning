@@ -173,14 +173,14 @@ def run_reptile(context: ReptileExperimentContext,
         )
 
         # Evaluation on train and test clients
-        if i % context.eval_interval == 0:
+        if i % context.eval_interval == 0 and i != context.num_meta_steps:
             # Save server model state
             save_reptile_state(context, i, server.model.state_dict())
             # Pick train / test clients at random and test on them
             _evaluate(
                 num_clients=context.num_eval_clients_training,
-                tag='',
-                global_step=i
+                tag='global-',
+                global_step=i + 1
             )
         logger.info('finished training round')
 
@@ -188,8 +188,8 @@ def run_reptile(context: ReptileExperimentContext,
         # Final evaluation on subsample of train / test clients
         _evaluate(
             num_clients=context.num_eval_clients_final,
-            tag='final_',
-            global_step=0
+            tag='global-',
+            global_step=context.num_meta_steps
         )
 
     return server, train_clients, test_clients

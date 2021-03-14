@@ -49,7 +49,7 @@ logger = getLogger(__name__)
 
 @ex.config
 def default_configuration():
-    seed = 123123123
+    seed = 4444  # 123123123
     name = 'ham10khcreptile'
     dataset = 'ham10k2label'
     num_clients = 0  # Not used here
@@ -76,7 +76,7 @@ def default_configuration():
     rp_num_meta_steps = 1280
     rp_meta_learning_rate_initial = 1
     rp_meta_learning_rate_final = 0.46
-    rp_eval_interval = 120
+    rp_eval_interval = 20
     rp_inner_learning_rate = 0.001
     rp_num_inner_epochs = 1
     rp_num_inner_epochs_eval = 7
@@ -88,7 +88,7 @@ def default_configuration():
 
 @ex.named_config
 def fedavg():
-    seed = 123123123
+    seed = 4444 # 123123123
     name = 'ham10khcfedavg'
     dataset = 'ham10k2label'
     num_clients = 0  # Not used here
@@ -294,7 +294,7 @@ def run_hierarchical_clustering_reptile(
             num_meta_steps=hc_cluster_initialization_rounds[0],
             meta_learning_rate_initial=1.0,
             meta_learning_rate_final=1.0,
-            eval_interval=1,
+            eval_interval=rp_eval_interval,
             num_eval_clients_training=-1,
             do_final_evaluation=False,
             num_eval_clients_final=-1,
@@ -479,16 +479,16 @@ def run_hierarchical_clustering_reptile(
                     )
                 logger.info(f'finished reptile training round {i + 1}')
 
-                if i % reptile_context.eval_interval == 0:
+                if i % reptile_context.eval_interval == 0 and i != init_rounds + reptile_context.num_meta_steps:
                     # evaluation
-                    global_loss, global_acc, global_balanced_acc = _evaluate(_global_step=i)
+                    global_loss, global_acc, global_balanced_acc = _evaluate(_global_step=i + 1)
 
                     if after_round_evaluation is not None:
                         # callback for logging
                         for c in after_round_evaluation:
                             c('global-',
                               Tensor(global_loss), Tensor(global_acc),
-                              Tensor(global_balanced_acc), None, None, None, i)
+                              Tensor(global_balanced_acc), None, None, None, i + 1)
 
             # Final evaluation at end of training
             if reptile_context.do_final_evaluation:
