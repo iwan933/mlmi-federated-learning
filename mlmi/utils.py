@@ -1,3 +1,4 @@
+import random
 from typing import Dict, List, Optional
 
 import torch
@@ -121,3 +122,4 @@ def fix_random_seeds(seed: int):
     import torch
     torch.manual_seed(seed)
     np.random.seed(seed)
+    random.seed(seed)
