@@ -121,8 +121,23 @@ richard_client_accuracy = [
 ]
 
 
+FULL_DATASET_2_LABEL_SPLIT = np.array([
+    [0,30,30,0,0,0,0,0,0,27,27,0,28,0,0,0,28,26,0,0,29,0,28,0,0,0,0,0,0,0,0,0,0,0,0],
+    [26,0,0,26,0,28,0,0,27,0,29,29,0,25,28,0,0,30,29,27,0,0,0,0,27,31,0,24,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,29,0,0,0,31,0,29,0,0,0,29,0,29,28,27,0,25,27,32,32,0,28,26,29,0,0],
+    [30,0,0,30,0,0,27,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,27,0,0,0,0,0,0,0,28,0,0,27,28,0,0,0,27,27,0,29,0,0,0,0,0,28,28,30,0,26,29],
+    [0,26,26,0,29,28,0,27,0,0,0,0,0,0,28,0,0,0,27,0,0,0,0,0,29,0,29,0,24,28,0,0,27,30,27],
+    [0,0,0,0,0,0,29,29,29,0,0,27,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+], dtype=int)
+
 if __name__ == '__main__':
     from mlmi.settings import REPO_ROOT
+
+    cmap = sns.color_palette("ch:s=.25,rot=-.25", as_cmap=True)
+    cmap = sns.cubehelix_palette(start=2, light=1, as_cmap=True)
+    sns.heatmap(FULL_DATASET_2_LABEL_SPLIT[:,:10], cmap="YlGnBu", square=True,
+                yticklabels=['akiec', 'bcc', 'bkl', 'df', 'mel', 'nv', 'vasc'], xticklabels=np.arange(1, 11))
     export_dir = REPO_ROOT / 'data' / 'tensorboard_exports'
     richard_graph_fileexports_dict = {}
     for title, color, linestyle, filename in richard_graph_fileexports:
