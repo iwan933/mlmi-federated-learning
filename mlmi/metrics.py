@@ -55,4 +55,3 @@ class BalancedAccuracy(Metric):
         if torch.cuda.is_available():
             return result.cuda().float()
         return result.float()
-

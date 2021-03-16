@@ -4,7 +4,6 @@ import copy
 from mlmi.reptile.model import (
     ReptileClient, ReptileServer
 )
-from mlmi.exceptions import ClientError, ExecutionError
 
 from mlmi.log import getLogger
 from mlmi.structs import TrainArgs
@@ -34,7 +33,7 @@ def run_train_round(participants: List[BaseTrainingParticipant],
             logger.error('training on participant {0} failed'.format(participant._name), e)
 
     if success_threshold != -1 and successful_participants < success_threshold:
-        raise ExecutionError('Failed to execute training round, not enough clients participated successfully')
+        raise ValueError('Failed to execute training round, not enough clients participated successfully')
     return successful_participants
 
 

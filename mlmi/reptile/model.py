@@ -7,13 +7,10 @@ from torch import Tensor
 from torch import nn
 from torch.nn import functional as F
 import pytorch_lightning as pl
-from pytorch_lightning.metrics import Accuracy
 
 from mlmi.log import getLogger
-from mlmi.participant import BaseParticipantModel, BaseTrainingParticipant, BaseAggregatorParticipant, BaseParticipant
+from mlmi.participant import BaseTrainingParticipant, BaseAggregatorParticipant
 from mlmi.reptile.structs import ReptileExperimentContext
-from mlmi.structs import TrainArgs, ModelArgs, OptimizerArgs
-from mlmi.settings import CHECKPOINT_DIR
 
 
 logger = getLogger(__name__)
@@ -195,124 +192,3 @@ def apply_same_padding(x, kernel_size, stride):
         padding = (pad_val_start, pad_val_end, pad_val_start, pad_val_end)
 
     return F.pad(x, padding, "constant", 0)
-
-class OmniglotLightning(BaseParticipantModel, pl.LightningModule):
-    """
-    A model for Omniglot classification - PyTorch implementation.
-    """
-    def __init__(self, num_classes: int, weights=None, *args, **kwargs):
-        # Added parameter weights as a hack so ReptileClient.get_model_args()
-        # does not have to be adapted
-        super().__init__(
-            model=OmniglotModel(num_classes=num_classes),
-            *args,
-            **kwargs
-        )
-        self.model.apply(init_weights)
-        self.criterion = nn.CrossEntropyLoss(reduction='sum')
-        self.accuracy = Accuracy()
-
-    def configure_optimizers(self):
-        o = self.optimizer_args
-        return o.optimizer_class(self.model.parameters(), *o.optimizer_args, **o.optimizer_kwargs)
-
-    def training_step(self, train_batch, batch_idx):
-        x, y = train_batch
-        y = y.long()
-        logits = self.model(x)
-        loss = self.criterion(logits, y)
-        preds = torch.argmax(logits, dim=1)
-        # TODO: this should actually be calculated on a validation set (missing cross entropy implementation)
-        self.log('train/acc/{}'.format(self.participant_name), self.accuracy(preds, y))
-        self.log('train/loss/{}'.format(self.participant_name), loss)
-        return loss
-
-    def test_step(self, test_batch, batch_idx):
-        x, y = test_batch
-        y = y.long()
-        logits = self.model(x)
-        loss = self.criterion(logits, y)
-        preds = torch.argmax(logits, dim=1)
-        self.log('test/acc/{}'.format(self.participant_name), self.accuracy(preds, y))
-        self.log('test/loss/{}'.format(self.participant_name), loss)
-        return loss
-
-    def forward(self, x):
-        return self.model(x)
-
-
-class OmniglotModel(torch.nn.Module):
-    """
-    A model for Omniglot classification. Adapted from Nichol 2018.
-    """
-
-    def __init__(self, num_classes: int):
-        super().__init__()
-
-        self.kernel_size = 3
-        self.stride = 2
-
-        # The below layers could be more conveniently generated as an array.
-        # However, the class function state_dict() does not work then. For this
-        # reason, we define all layers individually.
-        self.conv2d_1 = self._make_conv2d_layer(first=True)
-        self.batchnorm_1 = self._make_batchnorm_layer()
-        self.relu_1 = self._make_relu_layer()
-
-        self.conv2d_2 = self._make_conv2d_layer()
-        self.batchnorm_2 = self._make_batchnorm_layer()
-        self.relu_2 = self._make_relu_layer()
-
-        self.conv2d_3 = self._make_conv2d_layer()
-        self.batchnorm_3 = self._make_batchnorm_layer()
-        self.relu_3 = self._make_relu_layer()
-
-        self.conv2d_4 = self._make_conv2d_layer()
-        self.batchnorm_4 = self._make_batchnorm_layer()
-        self.relu_4 = self._make_relu_layer()
-
-        self.flatten = torch.nn.Flatten(start_dim=1)
-        self.logits = torch.nn.Linear(in_features=256, out_features=num_classes)
-
-    def _make_conv2d_layer(self, first: bool = False):
-        return torch.nn.Conv2d(
-            in_channels=1 if first else 64,
-            out_channels=64,
-            kernel_size=self.kernel_size,
-            stride=self.stride,
-            padding=0
-        )
-
-    def _make_batchnorm_layer(self):
-        return torch.nn.BatchNorm2d(
-            num_features=64, eps=1e-3, momentum=0.01, track_running_stats=False
-        )
-
-    def _make_relu_layer(self):
-        return torch.nn.ReLU()
-
-    def forward(self, x):
-        x = apply_same_padding(x=x, kernel_size=self.kernel_size, stride=self.stride)
-        x = self.conv2d_1(x)
-        x = self.batchnorm_1(x)
-        x = self.relu_1(x)
-
-        x = apply_same_padding(x=x, kernel_size=self.kernel_size, stride=self.stride)
-        x = self.conv2d_2(x)
-        x = self.batchnorm_2(x)
-        x = self.relu_2(x)
-
-        x = apply_same_padding(x=x, kernel_size=self.kernel_size, stride=self.stride)
-        x = self.conv2d_3(x)
-        x = self.batchnorm_3(x)
-        x = self.relu_3(x)
-
-        x = apply_same_padding(x=x, kernel_size=self.kernel_size, stride=self.stride)
-        x = self.conv2d_4(x)
-        x = self.batchnorm_4(x)
-        x = self.relu_4(x)
-
-        x = x.permute(0, 2, 3, 1)
-        x = self.flatten(x)
-        x = self.logits(x)
-        return x

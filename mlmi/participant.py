@@ -233,9 +233,3 @@ class BaseParticipantModel(object):
 
     def configure_optimizers(self):
         return self.optimizer_args(self.model.parameters())
-        """
-        Do not restore state
-        if self.optimizer_state is not None:
-            optimizer.load_state_dict(self.optimizer_state)
-        return optimizer
-        """

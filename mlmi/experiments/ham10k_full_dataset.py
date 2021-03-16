@@ -3,8 +3,7 @@ import torch
 
 from sacred import Experiment
 
-from mlmi.datasets.ham10k import load_ham10k_few_big_many_small_federated2fulldataset, \
-    load_ham10k_partition_by_two_labels_federated2fulldataset
+from mlmi.datasets.ham10k import load_ham10k_partition_by_two_labels_federated2fulldataset
 from mlmi.experiments.log import log_loss_and_acc
 from mlmi.log import getLogger
 from mlmi.models.ham10k import GlobalConfusionMatrix, MobileNetV2Lightning

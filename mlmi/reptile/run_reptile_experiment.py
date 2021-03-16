@@ -10,8 +10,7 @@ from mlmi.reptile.util import reptile_train_step
 from mlmi.reptile.structs import ReptileExperimentContext
 from mlmi.settings import REPO_ROOT
 from mlmi.utils import evaluate_global_model, evaluate_local_models
-from mlmi.fedavg.data import swap_labels
-from mlmi.models.ham10k import GlobalConfusionMatrix, GlobalTestTestConfusionMatrix, GlobalTrainTestConfusionMatrix
+from mlmi.models.ham10k import GlobalTestTestConfusionMatrix, GlobalTrainTestConfusionMatrix
 from mlmi.structs import FederatedDatasetData, ModelArgs
 
 
@@ -111,20 +110,6 @@ def run_reptile(context: ReptileExperimentContext,
         if after_round_evaluation is not None:
             for c in after_round_evaluation:
                 c(tag, losses[0], accs[0], balanced_accs[0], losses[1], accs[1], balanced_accs[1], global_step)
-
-    # Randomly swap labels
-    if context.swap_labels:
-        dataset_train = swap_labels(
-            fed_dataset=dataset_train,
-            max_classes_per_client=62,
-            random_seed=context.seed
-        )
-        if dataset_test is not None:
-            dataset_test = swap_labels(
-                fed_dataset=dataset_test,
-                max_classes_per_client=62,
-                random_seed=context.seed
-            )
 
     # Set up clients
     train_clients = initialize_clients(
