@@ -282,7 +282,7 @@ def load_ham10k_partition_by_two_labels_federated2fulldataset(
         batch_size=8,
         mean=(0.485, 0.456, 0.406),
         std=(0.229, 0.224, 0.225)
-) -> Tuple[data.DataLoader, data.DataLoader]:
+) -> Tuple[data.DataLoader, data.DataLoader, data.DataLoader]:
     dataset = load_ham10k()
     train_transformations, test_transformations = get_transformations(mean, std)
     client_folder_subsets = partition_by_two_labels_per_client(
@@ -295,13 +295,16 @@ def load_ham10k_partition_by_two_labels_federated2fulldataset(
         train_indices = np.concatenate((train_indices, train_subset.indices))
         test_indices = np.concatenate((test_indices, test_subset.indices))
 
-    train_subset = ImageFolderSubset(dataset, train_indices.astype(int))
+    train_subset = ImageFolderSubset(dataset, train_indices[:int(len(train_indices) * 1 - test_fraction)].astype(int))
+    validation_subset = ImageFolderSubset(dataset, train_indices[int(len(train_indices) * 1 - test_fraction):].astype(int))
     test_subset = ImageFolderSubset(dataset, test_indices.astype(int))
     train_set = LazyImageFolderDataset(train_subset[:], train_transformations)
+    validation_subset = LazyImageFolderDataset(validation_subset[:], test_transformations)
     test_set = LazyImageFolderDataset(test_subset[:], test_transformations)
     train_dataloader = data.DataLoader(train_set, batch_size=batch_size, drop_last=False, shuffle=True)
+    validation_dataloader = data.DataLoader(validation_subset, batch_size=batch_size, drop_last=False, shuffle=True)
     test_dataloader = data.DataLoader(test_set, batch_size=batch_size, drop_last=False)
-    return train_dataloader, test_dataloader
+    return train_dataloader, validation_dataloader, test_dataloader
 
 
 def load_ham10k_partition_by_two_labels_federated(

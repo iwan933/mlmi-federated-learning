@@ -35,7 +35,7 @@ def DefaultConfig():
 def run_full_dataset(seed, lr, batch_size, epochs):
     fix_random_seeds(seed)
 
-    train_dataloader, test_dataloader = load_ham10k_partition_by_two_labels_federated2fulldataset()
+    train_dataloader, validation_dataloader, test_dataloader = load_ham10k_partition_by_two_labels_federated2fulldataset()
     optimizer_args = OptimizerArgs(
         optimizer_class=torch.optim.SGD,
         lr=lr
@@ -45,30 +45,10 @@ def run_full_dataset(seed, lr, batch_size, epochs):
     test_each_x_epochs = 10
     eval_after_steps = 20
     for i in range(0, epochs, eval_after_steps):
-        trainer = pl.Trainer(logger=False, checkpoint_callback=False, gpus=1, min_steps=eval_after_steps,
-                             max_steps=eval_after_steps, progress_bar_refresh_rate=0)
+        trainer = pl.Trainer(logger=logger, checkpoint_callback=False, gpus=1, min_epochs=eval_after_steps,
+                             max_epochs=eval_after_steps, progress_bar_refresh_rate=0)
         log.info(f'starting epoch {i}')
-        trainer.fit(model, train_dataloader)
-        save_full_state(model.state_dict(), i + 1, lr, batch_size)
-        GlobalConfusionMatrix().enable_logging()
-        result = trainer.test(model, test_dataloader)[0]
-        GlobalConfusionMatrix().disable_logging()
-        loss = result.get('test/loss/full')
-        acc = result.get('test/acc/full')
-        balanced_acc = result.get('test/balanced_acc/full')
-
-        log_loss_and_acc('global-train-test', torch.FloatTensor([loss]), torch.FloatTensor([acc]), logger, i + 1)
-        log_loss_and_acc('global-balanced-train-test', torch.FloatTensor([loss]), torch.FloatTensor([balanced_acc]),
-                         logger, i + 1)
-
-        try:
-            global_confusion_matrix = GlobalConfusionMatrix()
-            if global_confusion_matrix.has_data:
-                matrix = global_confusion_matrix.compute()
-                image = generate_confusion_matrix_heatmap(matrix)
-                logger.experiment.add_image('test/confusionmatrix', image.numpy(), i + 1)
-        except Exception as e:
-            print('failed to log confusion matrix (global)', e)
+        trainer.fit(model, train_dataloader, validation_dataloader)
     GlobalConfusionMatrix().enable_logging()
     trainer = pl.Trainer(logger=False, checkpoint_callback=False, gpus=1, min_epochs=1, max_epochs=1)
     result = trainer.test(model, test_dataloader)[0]
