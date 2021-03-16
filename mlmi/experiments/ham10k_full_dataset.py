@@ -35,7 +35,9 @@ def DefaultConfig():
 def run_full_dataset(seed, lr, batch_size, epochs):
     fix_random_seeds(seed)
 
-    train_dataloader, validation_dataloader, test_dataloader = load_ham10k_partition_by_two_labels_federated2fulldataset()
+    train_dataloader, validation_dataloader, test_dataloader = load_ham10k_partition_by_two_labels_federated2fulldataset(
+        batch_size=batch_size
+    )
     optimizer_args = OptimizerArgs(
         optimizer_class=torch.optim.SGD,
         lr=lr
