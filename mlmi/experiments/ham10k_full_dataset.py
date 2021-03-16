@@ -3,7 +3,8 @@ import torch
 
 from sacred import Experiment
 
-from mlmi.datasets.ham10k import load_ham10k_few_big_many_small_federated2fulldataset
+from mlmi.datasets.ham10k import load_ham10k_few_big_many_small_federated2fulldataset, \
+    load_ham10k_partition_by_two_labels_federated2fulldataset
 from mlmi.experiments.log import log_loss_and_acc
 from mlmi.log import getLogger
 from mlmi.models.ham10k import GlobalConfusionMatrix, MobileNetV2Lightning
@@ -34,7 +35,7 @@ def DefaultConfig():
 def run_full_dataset(seed, lr, batch_size, epochs):
     fix_random_seeds(seed)
 
-    train_dataloader, test_dataloader = load_ham10k_few_big_many_small_federated2fulldataset()
+    train_dataloader, test_dataloader = load_ham10k_partition_by_two_labels_federated2fulldataset()
     optimizer_args = OptimizerArgs(
         optimizer_class=torch.optim.SGD,
         lr=lr
@@ -42,10 +43,10 @@ def run_full_dataset(seed, lr, batch_size, epochs):
     model = MobileNetV2Lightning(num_classes=7, participant_name='full', optimizer_args=optimizer_args, pretrain=False)
     logger = create_tensorboard_logger('ham10kmobilenetv2')
     test_each_x_epochs = 10
-
-    for i in range(0, epochs):
-        trainer = pl.Trainer(logger=False, checkpoint_callback=False, gpus=1, min_steps=1, max_steps=1,
-                             progress_bar_refresh_rate=0)
+    eval_after_steps = 20
+    for i in range(0, epochs, eval_after_steps):
+        trainer = pl.Trainer(logger=False, checkpoint_callback=False, gpus=1, min_steps=eval_after_steps,
+                             max_steps=eval_after_steps, progress_bar_refresh_rate=0)
         log.info(f'starting epoch {i}')
         trainer.fit(model, train_dataloader)
         save_full_state(model.state_dict(), i + 1, lr, batch_size)

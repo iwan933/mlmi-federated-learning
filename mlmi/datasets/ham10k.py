@@ -275,6 +275,78 @@ def load_ham10k_partition_by_two_labels_federated(
     )
 
 
+def load_ham10k_partition_by_two_labels_federated2fulldataset(
+        samples_per_package=35,
+        max_samples_per_label=500,
+        test_fraction=0.2,
+        batch_size=8,
+        mean=(0.485, 0.456, 0.406),
+        std=(0.229, 0.224, 0.225)
+) -> Tuple[data.DataLoader, data.DataLoader]:
+    dataset = load_ham10k()
+    train_transformations, test_transformations = get_transformations(mean, std)
+    client_folder_subsets = partition_by_two_labels_per_client(
+        dataset, samples_per_package, max_samples_per_label, test_fraction
+    )
+
+    train_indices = np.array([], dtype=int)
+    test_indices = np.array([], dtype=int)
+    for idx, (train_subset, test_subset) in enumerate(client_folder_subsets):
+        train_indices = np.concatenate((train_indices, train_subset.indices))
+        test_indices = np.concatenate((test_indices, test_subset.indices))
+
+    train_subset = ImageFolderSubset(dataset, train_indices.astype(int))
+    test_subset = ImageFolderSubset(dataset, test_indices.astype(int))
+    train_set = LazyImageFolderDataset(train_subset[:], train_transformations)
+    test_set = LazyImageFolderDataset(test_subset[:], test_transformations)
+    train_dataloader = data.DataLoader(train_set, batch_size=batch_size, drop_last=False, shuffle=True)
+    test_dataloader = data.DataLoader(test_set, batch_size=batch_size, drop_last=False)
+    return train_dataloader, test_dataloader
+
+
+def load_ham10k_partition_by_two_labels_federated(
+        samples_per_package=35,
+        max_samples_per_label=500,
+        test_fraction=0.2,
+        batch_size=8,
+        mean=(0.485, 0.456, 0.406),
+        std=(0.229, 0.224, 0.225)
+) -> FederatedDatasetData:
+    dataset = load_ham10k()
+    train_transformations, test_transformations = get_transformations(mean, std)
+    client_folder_subsets = partition_by_two_labels_per_client(
+        dataset, samples_per_package, max_samples_per_label, test_fraction
+    )
+
+    data_local_test_num_dict = {}
+    data_local_train_num_dict = {}
+    train_data_local_dict = {}
+    test_data_local_dict = {}
+
+    for idx, (train_subset, test_subset) in enumerate(client_folder_subsets):
+        train_set = LazyImageFolderDataset(train_subset, train_transformations)
+        test_set = LazyImageFolderDataset(test_subset, test_transformations)
+
+        train_data_local_dict[idx] = data.DataLoader(train_set, batch_size=batch_size, drop_last=False, shuffle=True)
+        test_data_local_dict[idx] = data.DataLoader(test_set, batch_size=batch_size, drop_last=False)
+        data_local_train_num_dict[idx] = len(train_set)
+        data_local_test_num_dict[idx] = len(test_set)
+
+    return FederatedDatasetData(
+        client_num=len(client_folder_subsets),
+        train_data_global=None,
+        test_data_global=None,
+        data_local_num_dict=None,
+        data_local_test_num_dict=data_local_test_num_dict,
+        data_local_train_num_dict=data_local_train_num_dict,
+        class_num=7,
+        train_data_local_dict=train_data_local_dict,
+        test_data_local_dict=test_data_local_dict,
+        name='ham10k',
+        batch_size=batch_size
+    )
+
+
 def load_ham10k() -> 'datasets.ImageFolder':
     data_dir = REPO_ROOT / 'data'
     ham10k_dir = data_dir / 'ham10k'
