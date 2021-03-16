@@ -159,6 +159,7 @@ if __name__ == '__main__':
         filepath = str((export_dir / filename).absolute())
         df = pd.read_csv(filepath, sep=',', index_col='Step')
         series = df['Value']
+        print(title, df['Value'].max())
         ax.plot(series.index, series, label=title)
         plt.axvline(x=40, color='black')
     ax.legend(bbox_to_anchor=(0.9, 0.3))
