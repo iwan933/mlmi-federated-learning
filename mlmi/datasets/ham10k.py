@@ -295,8 +295,8 @@ def load_ham10k_partition_by_two_labels_federated2fulldataset(
         train_indices = np.concatenate((train_indices, train_subset.indices))
         test_indices = np.concatenate((test_indices, test_subset.indices))
 
-    train_subset = ImageFolderSubset(dataset, train_indices[:int(len(train_indices) * 1 - test_fraction)].astype(int))
-    validation_subset = ImageFolderSubset(dataset, train_indices[int(len(train_indices) * 1 - test_fraction):].astype(int))
+    train_subset = ImageFolderSubset(dataset, train_indices[:int(len(train_indices) * (1 - test_fraction))].astype(int))
+    validation_subset = ImageFolderSubset(dataset, train_indices[int(len(train_indices) * (1 - test_fraction)):].astype(int))
     test_subset = ImageFolderSubset(dataset, test_indices.astype(int))
     train_set = LazyImageFolderDataset(train_subset[:], train_transformations)
     validation_subset = LazyImageFolderDataset(validation_subset[:], test_transformations)
