@@ -75,8 +75,9 @@ def run_full_dataset(seed, lr, batch_size, epochs):
     loss = result.get('test/loss/full')
     acc = result.get('test/acc/full')
     balanced_acc = result.get('test/balanced_acc/full')
-    log_loss_and_acc('global-train-test', loss, acc, logger, epochs)
-    log_loss_and_acc('global-balanced-train-test', loss, balanced_acc, logger, epochs)
+    log_loss_and_acc('global-train-test', torch.FloatTensor([loss]), torch.FloatTensor([acc]), logger, epochs)
+    log_loss_and_acc('global-balanced-train-test', torch.FloatTensor([loss]), torch.FloatTensor([balanced_acc]),
+                     logger, epochs)
     try:
         global_confusion_matrix = GlobalConfusionMatrix()
         if global_confusion_matrix.has_data:
