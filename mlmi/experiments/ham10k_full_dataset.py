@@ -44,13 +44,9 @@ def run_full_dataset(seed, lr, batch_size, epochs):
     )
     model = MobileNetV2Lightning(num_classes=7, participant_name='full', optimizer_args=optimizer_args, pretrain=False)
     logger = create_tensorboard_logger('ham10kmobilenetv2')
-    test_each_x_epochs = 10
-    eval_after_steps = 20
-    for i in range(0, epochs, eval_after_steps):
-        trainer = pl.Trainer(logger=logger, checkpoint_callback=False, gpus=1, min_epochs=eval_after_steps,
-                             max_epochs=eval_after_steps, progress_bar_refresh_rate=0)
-        log.info(f'starting epoch {i}')
-        trainer.fit(model, train_dataloader, validation_dataloader)
+    trainer = pl.Trainer(logger=logger, checkpoint_callback=False, gpus=1, min_epochs=epochs,
+                         max_epochs=epochs, progress_bar_refresh_rate=0)
+    trainer.fit(model, train_dataloader, validation_dataloader)
     GlobalConfusionMatrix().enable_logging()
     trainer = pl.Trainer(logger=False, checkpoint_callback=False, gpus=1, min_epochs=1, max_epochs=1)
     result = trainer.test(model, test_dataloader)[0]
