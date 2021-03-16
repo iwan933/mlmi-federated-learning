@@ -190,8 +190,9 @@ class MobileNetV2Lightning(BaseParticipantModel, pl.LightningModule):
     def training_epoch_end(self, outputs: List[Any]) -> None:
         self._training_epoch += 1
         avg_loss = torch.stack([x['loss'] for x in outputs]).mean()
-        self.logger.experiment.add_scalar(f'train-train/loss/{self.participant_name}', avg_loss,
-                                          global_step=self._training_epoch)
+        if self.logger is not None:
+            self.logger.experiment.add_scalar(f'train-train/loss/{self.participant_name}', avg_loss,
+                                              global_step=self._training_epoch)
 
     def test_step(self, test_batch, batch_idx):
         x, y = test_batch
