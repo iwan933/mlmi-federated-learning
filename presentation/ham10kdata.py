@@ -121,6 +121,14 @@ richard_client_accuracy = [
 ]
 
 
+
+paper_accuracy_graph = [
+    ('FedAvg', 'paper/fedavg_acc.csv'),
+    ('Reptile', 'paper/reptile_acc.csv'),
+    ('HC + FedAvg', 'paper/fedavg_hc_acc.csv'),
+    ('HC + Reptile', 'paper/reptile_hc_acc.csv'),
+]
+
 FULL_DATASET_2_LABEL_SPLIT = np.array([
     [0,30,30,0,0,0,0,0,0,27,27,0,28,0,0,0,28,26,0,0,29,0,28,0,0,0,0,0,0,0,0,0,0,0,0],
     [26,0,0,26,0,28,0,0,27,0,29,29,0,25,28,0,0,30,29,27,0,0,0,0,27,31,0,24,0,0,0,0,0,0,0],
@@ -134,11 +142,30 @@ FULL_DATASET_2_LABEL_SPLIT = np.array([
 if __name__ == '__main__':
     from mlmi.settings import REPO_ROOT
 
-    cmap = sns.color_palette("ch:s=.25,rot=-.25", as_cmap=True)
-    cmap = sns.cubehelix_palette(start=2, light=1, as_cmap=True)
-    sns.heatmap(FULL_DATASET_2_LABEL_SPLIT[:,:10], cmap="YlGnBu", square=True,
-                yticklabels=['akiec', 'bcc', 'bkl', 'df', 'mel', 'nv', 'vasc'], xticklabels=np.arange(1, 11))
+    #cmap = sns.color_palette("ch:s=.25,rot=-.25", as_cmap=True)
+    #cmap = sns.cubehelix_palette(start=2, light=1, as_cmap=True)
+    #plt.subplots(figsize=(20, 15))
+    #sns.heatmap(FULL_DATASET_2_LABEL_SPLIT[:,:10], cmap="YlGnBu", square=True,
+    #            yticklabels=['akiec', 'bcc', 'bkl', 'df', 'mel', 'nv', 'vasc'], xticklabels=np.arange(1, 11),
+    #            )
     export_dir = REPO_ROOT / 'data' / 'tensorboard_exports'
+    fig, ax = plt.subplots(nrows=1, ncols=1)
+    ax.set_ylim([0.0, 1.0])
+    ax.spines['left'].set_position(('data', 0))
+    ax.spines['bottom'].set_bounds(0.0, 1280)
+    ax.spines['right'].set_position(('data', 1280))
+    ax.spines['top'].set_bounds(0.0, 1280)
+    for title, filename in paper_accuracy_graph:
+        filepath = str((export_dir / filename).absolute())
+        df = pd.read_csv(filepath, sep=',', index_col='Step')
+        series = df['Value']
+        ax.plot(series.index, series, label=title)
+        plt.axvline(x=40, color='black')
+    ax.legend(bbox_to_anchor=(0.9, 0.3))
+    ax.set_ylabel('accuracy')
+    ax.set_xlabel('federated rounds')
+    fig.show()
+    """
     richard_graph_fileexports_dict = {}
     for title, color, linestyle, filename in richard_graph_fileexports:
         filepath = str((export_dir / filename).absolute())
@@ -162,6 +189,7 @@ if __name__ == '__main__':
     plot_performance_graphs([richard_client_accuracy_dict[key] for key in
                              ['FedAvg']])
 
+    """
 
     #plot_label_counts(label_counts)
 
