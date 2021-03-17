@@ -44,7 +44,7 @@ def run_full_dataset(seed, lr, batch_size, epochs):
             lr=_lr
         )
         model = MobileNetV2Lightning(num_classes=7, participant_name='full', optimizer_args=optimizer_args, pretrain=False)
-        logger = create_tensorboard_logger('ham10kmobilenetv2')
+        logger = create_tensorboard_logger('ham10kmobilenetv2', f'lr{_lr}')
         trainer = pl.Trainer(logger=logger, checkpoint_callback=False, gpus=1, min_epochs=epochs,
                              max_epochs=epochs, progress_bar_refresh_rate=0)
         trainer.fit(model, train_dataloader, validation_dataloader)
