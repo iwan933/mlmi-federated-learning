@@ -58,7 +58,7 @@ def default_configuration():
     do_balancing = False
 
     hc_lr = 0.001
-    hc_cluster_initialization_rounds = [40]  # (1, 5)
+    hc_cluster_initialization_rounds = [240]  # (1, 5)
     hc_meta_batch_size = 5
     hc_local_epochs = 1
     hc_train_cluster_args = TrainArgs(max_epochs=3, min_epochs=3, progress_bar_refresh_rate=0)
