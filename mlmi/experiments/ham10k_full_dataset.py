@@ -28,7 +28,7 @@ def DefaultConfig():
     seed = 4444
     lr = [0.001, 0.0007, 0.0004]
     batch_size = 16
-    epochs = 40  # 210 for 2400, 840 for 10000
+    epochs = 240  # 210 for 2400, 840 for 10000
 
 
 @ex.automain

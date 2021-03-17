@@ -39,7 +39,7 @@ from mlmi.utils import create_tensorboard_logger, evaluate_global_model, fix_ran
 
 from mlmi.reptile.structs import ReptileExperimentContext
 from mlmi.reptile.model import ReptileServer
-from mlmi.reptile.run_reptile_experiment import run_reptile, cyclerange
+from mlmi.reptile.run_reptile_experiment import run_reptile, cyclerange, save_reptile_state
 from mlmi.reptile.util import reptile_train_step, run_train_round
 from mlmi.log import getLogger
 
@@ -351,6 +351,7 @@ def run_hierarchical_clustering_reptile(
             start_round=0,
             personalize_before_eval=False
         )
+        save_reptile_state(reptile_context, 40, server.model.state_dict())
 
         for init_rounds, max_value in generate_configuration(hc_cluster_initialization_rounds, hc_max_value_criterion):
             logger.info(f'clustering with init rounds: {init_rounds}, max value: {max_value}')
