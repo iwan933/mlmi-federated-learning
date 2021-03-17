@@ -20,7 +20,7 @@ Extract the data set such that the following structure is present:
 ## Execute the experiments
 Experiments are provided with sacred and can be directly called with the papers parameter from commandline.
 
-1. install python requirements ``pip install -r requirements.txt`` (for pytorch & tensorflow installations refer to the respective project)
+1. install python requirements ``pip install -r requirements.txt -f https://download.pytorch.org/whl/torch_stable.html`` (for pytorch & tensorflow installations refer to the respective project)
 2. add the project to python path ``cd /path/to/project/ && set pythonpath=%cd%``
 3. run the experiments:
 
