@@ -43,7 +43,8 @@ def run_full_dataset(seed, lr, batch_size, epochs):
             optimizer_class=torch.optim.SGD,
             lr=_lr
         )
-        model = MobileNetV2Lightning(num_classes=7, participant_name='full', optimizer_args=optimizer_args, pretrain=False)
+        model = MobileNetV2Lightning(num_classes=7, participant_name='full', optimizer_args=optimizer_args,
+                                     pretrain=True)
         logger = create_tensorboard_logger('ham10kmobilenetv2', f'lr{_lr}')
         trainer = pl.Trainer(logger=logger, checkpoint_callback=False, gpus=1, min_epochs=epochs,
                              max_epochs=epochs, progress_bar_refresh_rate=0)
