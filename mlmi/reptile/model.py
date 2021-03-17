@@ -81,9 +81,6 @@ class ReptileClient(BaseTrainingParticipant):
         :return: a pytorch lightning trainer instance
         """
         _kwargs = kwargs.copy()
-        # Disable logging and do not save checkpoints (not enough disc space for
-        # thousands of model states)
-        #if enable_logging:
         _kwargs['logger'] = self.logger
         if torch.cuda.is_available():
             _kwargs['gpus'] = 1
@@ -165,8 +162,6 @@ class ReptileServer(BaseAggregatorParticipant):
         :param gradient: OrderedDict[str, Tensor]
         :return:
         """
-        # TODO (optional): Extend this function with other optimizer options
-        #                  than vanilla GD
         new_model_state = copy.deepcopy(self.model.state_dict())
         for key, w in new_model_state.items():
             if key.endswith('running_mean') or key.endswith('running_var') \
