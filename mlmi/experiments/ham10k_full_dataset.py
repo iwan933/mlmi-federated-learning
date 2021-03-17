@@ -26,9 +26,9 @@ def save_full_state(model_state, epoch, lr, batch_size):
 @ex.config
 def DefaultConfig():
     seed = 4444
-    lr = 0.001
+    lr = [0.01, 0.001, 0.0007, 0.0004]
     batch_size = 16
-    epochs = 1000  # 210 for 2400, 840 for 10000
+    epochs = 64  # 210 for 2400, 840 for 10000
 
 
 @ex.automain
@@ -38,30 +38,31 @@ def run_full_dataset(seed, lr, batch_size, epochs):
     train_dataloader, validation_dataloader, test_dataloader = load_ham10k_partition_by_two_labels_federated2fulldataset(
         batch_size=batch_size
     )
-    optimizer_args = OptimizerArgs(
-        optimizer_class=torch.optim.SGD,
-        lr=lr
-    )
-    model = MobileNetV2Lightning(num_classes=7, participant_name='full', optimizer_args=optimizer_args, pretrain=False)
-    logger = create_tensorboard_logger('ham10kmobilenetv2')
-    trainer = pl.Trainer(logger=logger, checkpoint_callback=False, gpus=1, min_epochs=epochs,
-                         max_epochs=epochs, progress_bar_refresh_rate=0)
-    trainer.fit(model, train_dataloader, validation_dataloader)
-    GlobalConfusionMatrix().enable_logging()
-    trainer = pl.Trainer(logger=False, checkpoint_callback=False, gpus=1, min_epochs=1, max_epochs=1)
-    result = trainer.test(model, test_dataloader)[0]
-    GlobalConfusionMatrix().disable_logging()
-    loss = result.get('test/loss/full')
-    acc = result.get('test/acc/full')
-    balanced_acc = result.get('test/balanced_acc/full')
-    log_loss_and_acc('global-train-test', torch.FloatTensor([loss]), torch.FloatTensor([acc]), logger, epochs)
-    log_loss_and_acc('global-balanced-train-test', torch.FloatTensor([loss]), torch.FloatTensor([balanced_acc]),
-                     logger, epochs)
-    try:
-        global_confusion_matrix = GlobalConfusionMatrix()
-        if global_confusion_matrix.has_data:
-            matrix = global_confusion_matrix.compute()
-            image = generate_confusion_matrix_heatmap(matrix)
-            logger.experiment.add_image('test/confusionmatrix', image.numpy(), epochs)
-    except Exception as e:
-        print('failed to log confusion matrix (global)', e)
+    for _lr in lr:
+        optimizer_args = OptimizerArgs(
+            optimizer_class=torch.optim.SGD,
+            lr=_lr
+        )
+        model = MobileNetV2Lightning(num_classes=7, participant_name='full', optimizer_args=optimizer_args, pretrain=False)
+        logger = create_tensorboard_logger('ham10kmobilenetv2')
+        trainer = pl.Trainer(logger=logger, checkpoint_callback=False, gpus=1, min_epochs=epochs,
+                             max_epochs=epochs, progress_bar_refresh_rate=0)
+        trainer.fit(model, train_dataloader, validation_dataloader)
+        GlobalConfusionMatrix().enable_logging()
+        trainer = pl.Trainer(logger=False, checkpoint_callback=False, gpus=1, min_epochs=1, max_epochs=1)
+        result = trainer.test(model, test_dataloader)[0]
+        GlobalConfusionMatrix().disable_logging()
+        loss = result.get('test/loss/full')
+        acc = result.get('test/acc/full')
+        balanced_acc = result.get('test/balanced_acc/full')
+        log_loss_and_acc('global-train-test', torch.FloatTensor([loss]), torch.FloatTensor([acc]), logger, epochs)
+        log_loss_and_acc('global-balanced-train-test', torch.FloatTensor([loss]), torch.FloatTensor([balanced_acc]),
+                         logger, epochs)
+        try:
+            global_confusion_matrix = GlobalConfusionMatrix()
+            if global_confusion_matrix.has_data:
+                matrix = global_confusion_matrix.compute()
+                image = generate_confusion_matrix_heatmap(matrix)
+                logger.experiment.add_image('test/confusionmatrix', image.numpy(), epochs)
+        except Exception as e:
+            print('failed to log confusion matrix (global)', e)
