@@ -193,8 +193,8 @@ class MobileNetV2Lightning(BaseParticipantModel, pl.LightningModule):
         logits = self.model(x)
         loss = self.criterion(logits, y)
         preds = torch.argmax(logits, dim=1)
-        self.log('train/acc/{}'.format(self.participant_name), self.train_accuracy(preds, y), on_epoch=True)
-        self.log('train/loss/{}'.format(self.participant_name), loss.item(), on_epoch=True)
+        self.log('val/acc/{}'.format(self.participant_name), self.train_accuracy(preds, y), on_epoch=True)
+        self.log('val/loss/{}'.format(self.participant_name), loss.item(), on_epoch=True)
         return loss
 
     def test_step(self, test_batch, batch_idx):
