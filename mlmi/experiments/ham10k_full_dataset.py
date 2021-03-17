@@ -26,7 +26,7 @@ def save_full_state(model_state, epoch, lr, batch_size):
 @ex.config
 def DefaultConfig():
     seed = 4444
-    lr = [0.01, 0.007, 0.004, 0.002]
+    lr = [0.001, 0.0007, 0.0004]
     batch_size = 16
     epochs = 40  # 210 for 2400, 840 for 10000
 
